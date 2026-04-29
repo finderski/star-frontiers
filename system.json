@@ -1,0 +1,39 @@
+{
+  "id": "star-frontiers",
+  "title": "Star Frontiers",
+  "description": "A Foundry VTT system for building out Star Frontiers character sheets and rules support.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": 14,
+    "verified": 14
+  },
+  "authors": [
+    {
+      "name": "Local development"
+    }
+  ],
+  "esmodules": [
+    "star-frontiers.mjs"
+  ],
+  "styles": [
+    "styles/star-frontiers.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "documentTypes": {
+    "Actor": {
+      "character": {}
+    },
+    "Item": {
+      "weapon": {},
+      "equipment": {},
+      "skill": {}
+    }
+  },
+  "socket": false
+}
