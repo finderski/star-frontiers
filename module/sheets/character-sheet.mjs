@@ -1,7 +1,9 @@
+import { SYSTEM_ID } from "../config.mjs";
+
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-const SYSTEM_ID = "star-frontiers";
+const MIN_WEAPON_ROWS = 4;
 
 export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static DEFAULT_OPTIONS = {
@@ -35,14 +37,65 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const actor = this.actor ?? this.document;
     context.actor = actor;
     context.system = actor.system;
-    context.expandedRules = game.settings.get(SYSTEM_ID, "expandedRules");
-    context.weaponRows = [
-      { key: "one", data: actor.system.weapons.one },
-      { key: "two", data: actor.system.weapons.two },
-      { key: "three", data: actor.system.weapons.three },
-      { key: "four", data: actor.system.weapons.four }
-    ];
+    context.rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
+    context.expandedRules = context.rulesEdition === "expanded";
+    context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
+    context.themeClass = `theme-${context.sheetTheme}`;
+    context.weaponRows = this.#prepareWeaponRows(actor);
+    context.skillItems = actor.items.filter((item) => item.type === "skill");
+    context.gearItems = actor.items.filter((item) => ["gear", "consumable", "ammo", "powerSource"].includes(item.type));
     return context;
+  }
+
+  #prepareWeaponRows(actor) {
+    const rows = actor.items
+      .filter((item) => item.type === "weapon")
+      .map((item) => ({
+        key: item.id,
+        item,
+        data: {
+          name: item.name,
+          damage: item.system.damageFormula,
+          toHit: "",
+          pointBlank: this.#formatRangeBand(item.system.rangeBands.pointBlank),
+          short: this.#formatRangeBand(item.system.rangeBands.short),
+          medium: this.#formatRangeBand(item.system.rangeBands.medium),
+          long: this.#formatRangeBand(item.system.rangeBands.long),
+          extreme: this.#formatRangeBand(item.system.rangeBands.extreme),
+          ammo: this.#formatAmmo(item)
+        }
+      }));
+
+    while (rows.length < MIN_WEAPON_ROWS) {
+      rows.push({
+        key: `blank-${rows.length}`,
+        data: {
+          name: "",
+          damage: "",
+          toHit: "",
+          pointBlank: "",
+          short: "",
+          medium: "",
+          long: "",
+          extreme: "",
+          ammo: ""
+        }
+      });
+    }
+
+    return rows;
+  }
+
+  #formatRangeBand(band) {
+    if (!band || (band.min === null && band.max === null)) return "";
+    if (band.max === null || band.min === band.max) return String(band.min ?? "");
+    return `${band.min}-${band.max}`;
+  }
+
+  #formatAmmo(item) {
+    const ammo = item.system.ammo;
+    if (!ammo?.capacity) return "";
+    return `${Math.max(ammo.capacity - ammo.consumed, 0)}/${ammo.capacity}`;
   }
 
   static #onPlaceholderAction(event, target) {

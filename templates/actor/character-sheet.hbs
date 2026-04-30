@@ -1,9 +1,9 @@
-<section class="star-frontiers-sheet" autocomplete="off">
+<section class="star-frontiers-sheet {{themeClass}}" autocomplete="off">
   <header class="sheet-header paper-header">
     <div class="identity-block">
       <label class="field-line player-name">
         <span>{{localize "STARFRONTIERS.Character.PlayerName"}}</span>
-        <input type="text" name="system.profile.playerName" value="{{system.profile.playerName}}" />
+        <input type="text" name="system.playerName" value="{{system.playerName}}" />
       </label>
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.CharacterName"}}</span>
@@ -11,16 +11,16 @@
       </label>
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.Handedness"}}</span>
-        <input type="text" name="system.profile.handedness" value="{{system.profile.handedness}}" />
+        <input type="text" name="system.handedness.kind" value="{{system.handedness.kind}}" />
       </label>
       <div class="movement-row">
         <label class="field-line">
           <span>{{localize "STARFRONTIERS.Character.Walking"}}</span>
-          <input type="text" name="system.profile.movement.walking" value="{{system.profile.movement.walking}}" />
+          <input type="text" value="{{system.derived.walking}}" readonly />
         </label>
         <label class="field-line">
           <span>{{localize "STARFRONTIERS.Character.Running"}}</span>
-          <input type="text" name="system.profile.movement.running" value="{{system.profile.movement.running}}" />
+          <input type="text" value="{{system.derived.running}}" readonly />
         </label>
       </div>
     </div>
@@ -28,15 +28,15 @@
     <div class="identity-block compact">
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.Race"}}</span>
-        <input type="text" name="system.profile.race" value="{{system.profile.race}}" />
+        <input type="text" name="system.race" value="{{system.race}}" />
       </label>
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.Sex"}}</span>
-        <input type="text" name="system.profile.sex" value="{{system.profile.sex}}" />
+        <input type="text" name="system.sex" value="{{system.sex}}" />
       </label>
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.Hourly"}}</span>
-        <input type="text" name="system.profile.movement.hourly" value="{{system.profile.movement.hourly}}" />
+        <input type="text" value="{{system.derived.hourly}}" readonly />
       </label>
     </div>
   </header>
@@ -49,43 +49,43 @@
           <i class="fa-solid fa-dice-d10"></i>
         </button>
         <span>STR/STA:</span>
-        <input type="text" name="system.physical.strength" value="{{system.physical.strength}}" />
+        <input type="number" name="system.abilities.str.value" value="{{system.abilities.str.value}}" min="1" max="100" />
         <span class="slash">/</span>
-        <input type="text" name="system.physical.stamina" value="{{system.physical.stamina}}" />
+        <input type="number" name="system.abilities.sta.value" value="{{system.abilities.sta.value}}" min="1" max="100" />
       </div>
       <div class="paired-stat">
         <button type="button" data-action="placeholder" data-label="DEX/RS" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
         <span>DEX/RS:</span>
-        <input type="text" name="system.physical.dexterity" value="{{system.physical.dexterity}}" />
+        <input type="number" name="system.abilities.dex.value" value="{{system.abilities.dex.value}}" min="1" max="100" />
         <span class="slash">/</span>
-        <input type="text" name="system.physical.reactionSpeed" value="{{system.physical.reactionSpeed}}" />
+        <input type="number" name="system.abilities.rs.value" value="{{system.abilities.rs.value}}" min="1" max="100" />
       </div>
       <div class="paired-stat">
         <button type="button" data-action="placeholder" data-label="INT/LOG" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
         <span>INT/LOG:</span>
-        <input type="text" name="system.physical.intuition" value="{{system.physical.intuition}}" />
+        <input type="number" name="system.abilities.int.value" value="{{system.abilities.int.value}}" min="1" max="100" />
         <span class="slash">/</span>
-        <input type="text" name="system.physical.logic" value="{{system.physical.logic}}" />
+        <input type="number" name="system.abilities.log.value" value="{{system.abilities.log.value}}" min="1" max="100" />
       </div>
       <div class="paired-stat">
         <button type="button" data-action="placeholder" data-label="PER/LDR" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
         <span>PER/LDR:</span>
-        <input type="text" name="system.physical.personality" value="{{system.physical.personality}}" />
+        <input type="number" name="system.abilities.per.value" value="{{system.abilities.per.value}}" min="1" max="100" />
         <span class="slash">/</span>
-        <input type="text" name="system.physical.leadership" value="{{system.physical.leadership}}" />
+        <input type="number" name="system.abilities.ldr.value" value="{{system.abilities.ldr.value}}" min="1" max="100" />
       </div>
       <div class="single-stat">
         <button type="button" data-action="placeholder" data-label="IM" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
         <span>IM:</span>
-        <input type="text" name="system.physical.initiativeModifier" value="{{system.physical.initiativeModifier}}" />
+        <input type="number" value="{{system.derived.initiativeMod}}" readonly />
       </div>
     </fieldset>
 
@@ -93,11 +93,11 @@
       <legend>{{localize "STARFRONTIERS.Character.MedicalRecord"}}</legend>
       <label>
         <span>{{localize "STARFRONTIERS.Character.CurrentSta"}}</span>
-        <input type="text" name="system.medical.currentStamina" value="{{system.medical.currentStamina}}" />
+        <input type="number" name="system.stamina.value" value="{{system.stamina.value}}" />
       </label>
       <label class="stacked">
         <span>{{localize "STARFRONTIERS.Character.OtherInjuries"}}</span>
-        <textarea name="system.medical.otherInjuries">{{system.medical.otherInjuries}}</textarea>
+        <textarea name="system.personalFile.injuries">{{system.personalFile.injuries}}</textarea>
       </label>
     </fieldset>
 
@@ -117,15 +117,15 @@
       </div>
       {{#each weaponRows as |row|}}
         <div class="weapons-grid">
-          <input type="text" name="system.weapons.{{row.key}}.name" value="{{row.data.name}}" aria-label="{{localize "STARFRONTIERS.Weapon.Name"}}" />
-          <input type="text" name="system.weapons.{{row.key}}.damage" value="{{row.data.damage}}" aria-label="{{localize "STARFRONTIERS.Weapon.Damage"}}" />
-          <input type="text" name="system.weapons.{{row.key}}.toHit" value="{{row.data.toHit}}" aria-label="{{localize "STARFRONTIERS.Weapon.BasicToHit"}}" />
-          <input type="text" name="system.weapons.{{row.key}}.pointBlank" value="{{row.data.pointBlank}}" aria-label="PB" />
-          <input type="text" name="system.weapons.{{row.key}}.short" value="{{row.data.short}}" aria-label="S" />
-          <input type="text" name="system.weapons.{{row.key}}.medium" value="{{row.data.medium}}" aria-label="M" />
-          <input type="text" name="system.weapons.{{row.key}}.long" value="{{row.data.long}}" aria-label="L" />
-          <input type="text" name="system.weapons.{{row.key}}.extreme" value="{{row.data.extreme}}" aria-label="E" />
-          <input type="text" name="system.weapons.{{row.key}}.ammo" value="{{row.data.ammo}}" aria-label="{{localize "STARFRONTIERS.Weapon.Ammo"}}" />
+          <input type="text" value="{{row.data.name}}" aria-label="{{localize "STARFRONTIERS.Weapon.Name"}}" readonly />
+          <input type="text" value="{{row.data.damage}}" aria-label="{{localize "STARFRONTIERS.Weapon.Damage"}}" readonly />
+          <input type="text" value="{{row.data.toHit}}" aria-label="{{localize "STARFRONTIERS.Weapon.BasicToHit"}}" readonly />
+          <input type="text" value="{{row.data.pointBlank}}" aria-label="PB" readonly />
+          <input type="text" value="{{row.data.short}}" aria-label="S" readonly />
+          <input type="text" value="{{row.data.medium}}" aria-label="M" readonly />
+          <input type="text" value="{{row.data.long}}" aria-label="L" readonly />
+          <input type="text" value="{{row.data.extreme}}" aria-label="E" readonly />
+          <input type="text" value="{{row.data.ammo}}" aria-label="{{localize "STARFRONTIERS.Weapon.Ammo"}}" readonly />
           <button type="button" data-action="placeholder" data-label="{{localize "STARFRONTIERS.Weapon.Attack"}}" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
             <i class="fa-solid fa-crosshairs"></i>
           </button>
@@ -160,15 +160,15 @@
       </label>
       <label>
         <span>{{localize "STARFRONTIERS.Character.Experience"}}</span>
-        <input type="text" name="system.personalFile.experience" value="{{system.personalFile.experience}}" />
+        <input type="number" name="system.experience.earned" value="{{system.experience.earned}}" min="0" />
       </label>
       <label>
         <span>{{localize "STARFRONTIERS.Character.Credits"}}</span>
-        <input type="text" name="system.personalFile.credits" value="{{system.personalFile.credits}}" />
+        <input type="number" name="system.credits" value="{{system.credits}}" min="0" />
       </label>
       <label>
         <span>{{localize "STARFRONTIERS.Character.PayPerDay"}}</span>
-        <input type="text" name="system.personalFile.payPerDay" value="{{system.personalFile.payPerDay}}" />
+        <input type="number" name="system.pay.perDay" value="{{system.pay.perDay}}" min="0" />
       </label>
     </fieldset>
 
@@ -177,15 +177,23 @@
       <div class="reverse-grid">
         <label class="stacked">
           <span>{{localize "STARFRONTIERS.Character.Skills"}}</span>
-          <textarea name="system.skills">{{system.skills}}</textarea>
+          <div class="item-list">
+            {{#each skillItems as |item|}}
+              <div class="item-row">{{item.name}}</div>
+            {{/each}}
+          </div>
         </label>
         <label class="stacked">
           <span>{{localize "STARFRONTIERS.Character.Equipment"}}</span>
-          <textarea name="system.equipment">{{system.equipment}}</textarea>
+          <div class="item-list">
+            {{#each gearItems as |item|}}
+              <div class="item-row">{{item.name}}</div>
+            {{/each}}
+          </div>
         </label>
         <label class="stacked">
           <span>{{localize "STARFRONTIERS.Character.Notes"}}</span>
-          <textarea name="system.notes">{{system.notes}}</textarea>
+          <textarea name="system.personalFile.notes">{{system.personalFile.notes}}</textarea>
         </label>
       </div>
       <div class="placeholder-controls">
@@ -205,7 +213,7 @@
         <legend>{{localize "STARFRONTIERS.Character.ExpandedRules"}}</legend>
         <label class="stacked">
           <span>{{localize "STARFRONTIERS.Character.ExpandedNotes"}}</span>
-          <textarea name="system.expandedRules.notes">{{system.expandedRules.notes}}</textarea>
+          <textarea name="system.combatProfile.special">{{system.combatProfile.special}}</textarea>
         </label>
       </fieldset>
     {{/if}}

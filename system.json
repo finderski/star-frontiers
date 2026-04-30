@@ -1,7 +1,7 @@
 {
   "id": "star-frontiers",
-  "title": "Star Frontiers",
-  "description": "A Foundry VTT system for building out Star Frontiers character sheets and rules support.",
+  "title": "Star Frontiers (Alpha Dawn)",
+  "description": "A Foundry VTT v14 system for Star Frontiers: Alpha Dawn, starting with Basic Rules support and reserving hooks for Expanded Rules.",
   "version": "0.1.0",
   "compatibility": {
     "minimum": 14,
@@ -27,13 +27,119 @@
   ],
   "documentTypes": {
     "Actor": {
-      "character": {}
+      "character": {
+        "htmlFields": [
+          "personalFile.racialAbilities",
+          "personalFile.notes",
+          "personalFile.injuries",
+          "energyRecord",
+          "combatProfile.special"
+        ]
+      },
+      "npc": {
+        "htmlFields": [
+          "personalFile.racialAbilities",
+          "personalFile.notes",
+          "personalFile.injuries",
+          "energyRecord",
+          "combatProfile.special",
+          "loadout"
+        ]
+      },
+      "creature": {
+        "htmlFields": [
+          "description",
+          "defense.notes",
+          "goal.notes",
+          "gmNotes"
+        ]
+      },
+      "robot": {
+        "htmlFields": [
+          "description",
+          "mission"
+        ]
+      },
+      "vehicle": {
+        "htmlFields": [
+          "description",
+          "cargo.notes"
+        ]
+      }
     },
     "Item": {
-      "weapon": {},
-      "equipment": {},
-      "skill": {}
+      "race": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "skill": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "trainedAbility": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "weapon": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "armor": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "screen": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "ammo": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "powerSource": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "gear": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "consumable": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "vehicle": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "computer": {
+        "htmlFields": [
+          "description"
+        ]
+      },
+      "program": {
+        "htmlFields": [
+          "description"
+        ]
+      }
     }
   },
+  "grid": {
+    "distance": 5,
+    "units": "m"
+  },
+  "initiative": "1d10",
+  "primaryTokenAttribute": "stamina",
   "socket": false
 }

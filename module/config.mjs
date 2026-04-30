@@ -1,0 +1,44 @@
+export const SYSTEM_ID = "star-frontiers";
+
+export const RULES_EDITIONS = ["basic", "expanded"];
+export const SHEET_THEMES = ["paper", "retro"];
+
+export const STAR_FRONTIERS_CONFIG = {
+  abilities: ["str", "sta", "dex", "rs", "int", "log", "per", "ldr"],
+  abilityPairs: {
+    strSta: ["str", "sta"],
+    dexRs: ["dex", "rs"],
+    intLog: ["int", "log"],
+    perLdr: ["per", "ldr"]
+  },
+  coverMods: {
+    none: 0,
+    soft: -10,
+    hard: -20
+  },
+  movementMods: {
+    stationary: 10,
+    walking: 0,
+    running: -10,
+    dodging: -20,
+    skimmer: -10
+  },
+  rangeMods: {
+    pointBlank: 0,
+    short: -10,
+    medium: -20,
+    long: -40,
+    extreme: -80
+  },
+  raceMovement: {
+    human: { walking: 2, running: 6, hourly: 0 },
+    dralasite: { walking: 1, running: 4, hourly: 0 },
+    vrusk: { walking: 3, running: 7, hourly: 0 },
+    yazirian: { walking: 2, running: 6, hourly: 0 }
+  },
+  skillCosts: {
+    military: [3, 6, 9, 12, 15, 18],
+    technological: [4, 8, 12, 16, 20, 24],
+    biosocial: [5, 10, 15, 20, 25, 30]
+  }
+};

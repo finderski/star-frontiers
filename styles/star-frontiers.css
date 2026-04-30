@@ -1,14 +1,30 @@
-.star-frontiers.sheet.actor.character {
+.star-frontiers.sheet {
   --sf-ink: #1f1f1f;
   --sf-paper: #f8f7f1;
   --sf-line: #222;
   --sf-muted: #666;
   --sf-focus: #7c2d12;
+  --sf-button-hover: rgba(31, 31, 31, 0.08);
+  --sf-row-line: rgba(31, 31, 31, 0.22);
+  --sf-window-shadow: none;
   color: var(--sf-ink);
 }
 
-.star-frontiers.sheet.actor.character .window-content {
+body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
+.star-frontiers.sheet.theme-retro {
+  --sf-ink: #d8f6ff;
+  --sf-paper: #10151d;
+  --sf-line: #4bdcff;
+  --sf-muted: #83a9b8;
+  --sf-focus: #ff3fb4;
+  --sf-button-hover: rgba(255, 63, 180, 0.16);
+  --sf-row-line: rgba(75, 220, 255, 0.28);
+  --sf-window-shadow: inset 0 0 0 1px rgba(75, 220, 255, 0.22), 0 0 28px rgba(255, 63, 180, 0.16);
+}
+
+.star-frontiers.sheet .window-content {
   background: var(--sf-paper);
+  box-shadow: var(--sf-window-shadow);
 }
 
 .star-frontiers-sheet {
@@ -41,6 +57,10 @@
   outline: none;
 }
 
+.star-frontiers-sheet input[readonly] {
+  color: var(--sf-muted);
+}
+
 .star-frontiers-sheet textarea {
   border: 1px solid transparent;
   border-bottom: 2px solid var(--sf-line);
@@ -65,7 +85,23 @@
 
 .star-frontiers-sheet button:hover,
 .star-frontiers-sheet button:focus {
-  background: rgba(31, 31, 31, 0.08);
+  background: var(--sf-button-hover);
+}
+
+.star-frontiers-sheet.theme-retro {
+  background:
+    linear-gradient(rgba(75, 220, 255, 0.05) 50%, transparent 50%) 0 0 / 100% 4px,
+    var(--sf-paper);
+  text-shadow: 0 0 8px rgba(75, 220, 255, 0.2);
+}
+
+.star-frontiers-sheet.theme-retro input,
+.star-frontiers-sheet.theme-retro textarea {
+  background: rgba(9, 18, 28, 0.52);
+}
+
+.star-frontiers-sheet.theme-retro button {
+  box-shadow: 0 0 10px rgba(75, 220, 255, 0.15);
 }
 
 .paper-header {
@@ -238,6 +274,18 @@
 
 .reverse-grid textarea {
   min-height: 150px;
+}
+
+.item-list {
+  border-bottom: 2px solid var(--sf-line);
+  min-height: 150px;
+  padding: 4px 0;
+}
+
+.item-row {
+  border-bottom: 1px solid var(--sf-row-line);
+  min-height: 28px;
+  padding: 4px;
 }
 
 .placeholder-controls {
