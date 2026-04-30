@@ -4,8 +4,8 @@
   "description": "A Foundry VTT v14 system for Star Frontiers: Alpha Dawn, starting with Basic Rules support and reserving hooks for Expanded Rules.",
   "version": "0.1.0",
   "url": "https://github.com/finderski/star-frontiers",
-  "manifest": "https://github.com/finderski/star-frontiers/releases/latest/download/system.json",
-  "download": "https://github.com/finderski/star-frontiers/releases/download/v0.1.0/star-frontiers-v0.1.0.zip",
+  "manifest": "https://raw.githubusercontent.com/finderski/star-frontiers/main/system.json",
+  "download": "https://github.com/finderski/star-frontiers/archive/refs/heads/main.zip",
   "compatibility": {
     "minimum": 14,
     "verified": 14
