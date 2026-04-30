@@ -3,6 +3,22 @@ export const SYSTEM_ID = "star-frontiers";
 export const RULES_EDITIONS = ["basic", "expanded"];
 export const SHEET_THEMES = ["paper", "retro"];
 
+export const ITEM_TYPE_LABELS = {
+  ammo: "STARFRONTIERS.Item.Type.Ammo",
+  armor: "STARFRONTIERS.Item.Type.Armor",
+  computer: "STARFRONTIERS.Item.Type.Computer",
+  consumable: "STARFRONTIERS.Item.Type.Consumable",
+  gear: "STARFRONTIERS.Item.Type.Gear",
+  powerSource: "STARFRONTIERS.Item.Type.PowerSource",
+  program: "STARFRONTIERS.Item.Type.Program",
+  race: "STARFRONTIERS.Item.Type.Race",
+  screen: "STARFRONTIERS.Item.Type.Screen",
+  skill: "STARFRONTIERS.Item.Type.Skill",
+  trainedAbility: "STARFRONTIERS.Item.Type.TrainedAbility",
+  vehicle: "STARFRONTIERS.Item.Type.Vehicle",
+  weapon: "STARFRONTIERS.Item.Type.Weapon"
+};
+
 export const STAR_FRONTIERS_CONFIG = {
   abilities: ["str", "sta", "dex", "rs", "int", "log", "per", "ldr"],
   abilityPairs: {

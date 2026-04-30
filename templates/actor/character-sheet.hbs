@@ -116,7 +116,7 @@
         <span></span>
       </div>
       {{#each weaponRows as |row|}}
-        <div class="weapons-grid">
+        <div class="weapons-grid" data-item-id="{{row.key}}">
           <input type="text" value="{{row.data.name}}" aria-label="{{localize "STARFRONTIERS.Weapon.Name"}}" readonly />
           <input type="text" value="{{row.data.damage}}" aria-label="{{localize "STARFRONTIERS.Weapon.Damage"}}" readonly />
           <input type="text" value="{{row.data.toHit}}" aria-label="{{localize "STARFRONTIERS.Weapon.BasicToHit"}}" readonly />
@@ -126,9 +126,15 @@
           <input type="text" value="{{row.data.long}}" aria-label="L" readonly />
           <input type="text" value="{{row.data.extreme}}" aria-label="E" readonly />
           <input type="text" value="{{row.data.ammo}}" aria-label="{{localize "STARFRONTIERS.Weapon.Ammo"}}" readonly />
-          <button type="button" data-action="placeholder" data-label="{{localize "STARFRONTIERS.Weapon.Attack"}}" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
-            <i class="fa-solid fa-crosshairs"></i>
-          </button>
+          {{#if row.editable}}
+            <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+          {{else}}
+            <button type="button" data-action="placeholder" data-label="{{localize "STARFRONTIERS.Weapon.Attack"}}" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
+              <i class="fa-solid fa-crosshairs"></i>
+            </button>
+          {{/if}}
         </div>
       {{/each}}
     </fieldset>
@@ -175,33 +181,39 @@
     <fieldset class="paper-box reverse-side full-width">
       <legend>{{localize "STARFRONTIERS.Character.ReverseSide"}}</legend>
       <div class="reverse-grid">
-        <label class="stacked">
+        <section class="stacked">
           <span>{{localize "STARFRONTIERS.Character.Skills"}}</span>
           <div class="item-list">
             {{#each skillItems as |item|}}
-              <div class="item-row">{{item.name}}</div>
+              <button type="button" class="item-row item-open" data-action="openItem" data-item-id="{{item.id}}">
+                <span>{{item.name}}</span>
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
             {{/each}}
           </div>
-        </label>
-        <label class="stacked">
+        </section>
+        <section class="stacked">
           <span>{{localize "STARFRONTIERS.Character.Equipment"}}</span>
           <div class="item-list">
             {{#each gearItems as |item|}}
-              <div class="item-row">{{item.name}}</div>
+              <button type="button" class="item-row item-open" data-action="openItem" data-item-id="{{item.id}}">
+                <span>{{item.name}}</span>
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
             {{/each}}
           </div>
-        </label>
+        </section>
         <label class="stacked">
           <span>{{localize "STARFRONTIERS.Character.Notes"}}</span>
           <textarea name="system.personalFile.notes">{{system.personalFile.notes}}</textarea>
         </label>
       </div>
       <div class="placeholder-controls">
-        <button type="button" data-action="placeholder" data-label="{{localize "STARFRONTIERS.Character.AddSkill"}}">
+        <button type="button" data-action="createItem" data-type="skill" data-name="{{localize "STARFRONTIERS.Item.NewSkill"}}" title="{{localize "STARFRONTIERS.Character.AddSkill"}}">
           <i class="fa-solid fa-plus"></i>
           <span>{{localize "STARFRONTIERS.Character.AddSkill"}}</span>
         </button>
-        <button type="button" data-action="placeholder" data-label="{{localize "STARFRONTIERS.Character.AddEquipment"}}">
+        <button type="button" data-action="createItem" data-type="gear" data-name="{{localize "STARFRONTIERS.Item.NewGear"}}" title="{{localize "STARFRONTIERS.Character.AddEquipment"}}">
           <i class="fa-solid fa-plus"></i>
           <span>{{localize "STARFRONTIERS.Character.AddEquipment"}}</span>
         </button>

@@ -1,0 +1,244 @@
+<section class="star-frontiers-item-sheet {{themeClass}}" autocomplete="off">
+  <header class="item-header">
+    <img class="item-image" src="{{item.img}}" alt="{{item.name}}" data-edit="img" />
+    <div class="item-title">
+      <label class="field-line">
+        <span>{{localize "STARFRONTIERS.Item.Name"}}</span>
+        <input type="text" name="name" value="{{item.name}}" />
+      </label>
+      <div class="item-meta">
+        <span>{{localize typeLabel}}</span>
+        <label>
+          <span>{{localize "STARFRONTIERS.Item.Key"}}</span>
+          <input type="text" name="system.key" value="{{system.key}}" />
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <main class="item-grid">
+    <fieldset class="paper-box item-common full-width">
+      <legend>{{localize "STARFRONTIERS.Item.Common"}}</legend>
+      <label>
+        <span>{{localize "STARFRONTIERS.Item.RulesEdition"}}</span>
+        <select name="system.rulesEdition">
+          {{selectOptions choices.rulesEdition selected=system.rulesEdition}}
+        </select>
+      </label>
+      <label class="stacked">
+        <span>{{localize "STARFRONTIERS.Item.Description"}}</span>
+        <textarea name="system.description">{{system.description}}</textarea>
+      </label>
+    </fieldset>
+
+    {{#if is.race}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.RaceData"}}</legend>
+        <div class="compact-grid four-columns">
+          <label><span>STR/STA</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
+          <label><span>DEX/RS</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
+          <label><span>INT/LOG</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
+          <label><span>PER/LDR</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
+        </div>
+        <div class="compact-grid three-columns">
+          <label><span>{{localize "STARFRONTIERS.Character.Walking"}}</span><input type="number" name="system.movement.walking" value="{{system.movement.walking}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Character.Running"}}</span><input type="number" name="system.movement.running" value="{{system.movement.running}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Character.Hourly"}}</span><input type="number" name="system.movement.hourly" value="{{system.movement.hourly}}" min="0" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.weapon}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.WeaponData"}}</legend>
+        <div class="compact-grid four-columns">
+          <label>
+            <span>{{localize "STARFRONTIERS.Item.WeaponType"}}</span>
+            <select name="system.weaponType">{{selectOptions choices.weaponType selected=system.weaponType}}</select>
+          </label>
+          <label>
+            <span>{{localize "STARFRONTIERS.Item.WeaponSkill"}}</span>
+            <select name="system.weaponSkillKey">{{selectOptions choices.weaponSkill selected=system.weaponSkillKey}}</select>
+          </label>
+          <label>
+            <span>{{localize "STARFRONTIERS.Item.DamageFormula"}}</span>
+            <input type="text" name="system.damageFormula" value="{{system.damageFormula}}" />
+          </label>
+          <label>
+            <span>{{localize "STARFRONTIERS.Item.DamageType"}}</span>
+            <select name="system.damageType">{{selectOptions choices.damageType selected=system.damageType}}</select>
+          </label>
+        </div>
+
+        <div class="range-editor">
+          <span></span>
+          <span>{{localize "STARFRONTIERS.Item.RangeMin"}}</span>
+          <span>{{localize "STARFRONTIERS.Item.RangeMax"}}</span>
+          <span>{{localize "STARFRONTIERS.Item.RangeMod"}}</span>
+          {{#each rangeRows as |row|}}
+            <span>{{row.label}}</span>
+            <input type="number" name="system.rangeBands.{{row.key}}.min" value="{{row.band.min}}" min="0" />
+            <input type="number" name="system.rangeBands.{{row.key}}.max" value="{{row.band.max}}" min="0" />
+            <input type="number" name="system.rangeBands.{{row.key}}.mod" value="{{row.band.mod}}" />
+          {{/each}}
+        </div>
+
+        <div class="compact-grid five-columns">
+          <label>
+            <span>{{localize "STARFRONTIERS.Item.AmmoUse"}}</span>
+            <select name="system.ammo.uses">{{selectOptions choices.ammoUse selected=system.ammo.uses}}</select>
+          </label>
+          <label><span>{{localize "STARFRONTIERS.Item.Capacity"}}</span><input type="number" name="system.ammo.capacity" value="{{system.ammo.capacity}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Consumed"}}</span><input type="number" name="system.ammo.consumed" value="{{system.ammo.consumed}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.skill}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.SkillData"}}</legend>
+        <div class="compact-grid five-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.PSA"}}</span><select name="system.psa">{{selectOptions choices.psa selected=system.psa}}</select></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Category"}}</span><select name="system.category">{{selectOptions choices.skillCategory selected=system.category}}</select></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Level"}}</span><input type="number" name="system.level" value="{{system.level}}" min="0" max="6" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Ability"}}</span><select name="system.ability">{{selectOptions choices.ability selected=system.ability}}</select></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Bonus"}}</span><input type="number" name="system.bonus" value="{{system.bonus}}" /></label>
+        </div>
+        <div class="compact-grid three-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.RollFormula"}}</span><input type="text" name="system.rollFormula" value="{{system.rollFormula}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.WeaponSkill"}}</span><select name="system.weaponSkillKey">{{selectOptions choices.weaponSkill selected=system.weaponSkillKey}}</select></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HeavySkill"}}</span><input type="checkbox" name="system.isHeavyWeaponSkill" {{checked system.isHeavyWeaponSkill}} /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.trainedAbility}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.TrainedAbilityData"}}</legend>
+        <div class="compact-grid five-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.RaceKey"}}</span><input type="text" name="system.raceKey" value="{{system.raceKey}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.BaseChance"}}</span><input type="number" name="system.baseChance" value="{{system.baseChance}}" min="0" max="100" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.CurrentChance"}}</span><input type="number" name="system.currentChance" value="{{system.currentChance}}" min="0" max="100" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Cap"}}</span><input type="number" name="system.cap" value="{{system.cap}}" min="0" max="100" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.XPPerPoint"}}</span><input type="number" name="system.xpPerPoint" value="{{system.xpPerPoint}}" min="0" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.armor}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.ArmorData"}}</legend>
+        <div class="compact-grid three-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.ArmorType"}}</span><input type="text" name="system.armorType" value="{{system.armorType}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Weight"}}</span><input type="number" name="system.weight" value="{{system.weight}}" min="0" step="0.1" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.screen}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.ScreenData"}}</legend>
+        <div class="compact-grid five-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.ScreenType"}}</span><select name="system.screenType">{{selectOptions choices.screenType selected=system.screenType}}</select></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Reduction"}}</span><select name="system.reduction">{{selectOptions choices.screenReduction selected=system.reduction}}</select></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Capacity"}}</span><input type="number" name="system.capacity" value="{{system.capacity}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.SEUPerHit"}}</span><input type="number" name="system.seuPerHit" value="{{system.seuPerHit}}" min="0" /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Active"}}</span><input type="checkbox" name="system.active" {{checked system.active}} /></label>
+        </div>
+        <div class="compact-grid three-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.PowerSource"}}</span><select name="system.power.source">{{selectOptions choices.screenPowerSource selected=system.power.source}}</select></label>
+          <label><span>{{localize "STARFRONTIERS.Item.PowerRef"}}</span><input type="text" name="system.power.capacityRef" value="{{system.power.capacityRef}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.SEURemaining"}}</span><input type="number" name="system.power.seuRemaining" value="{{system.power.seuRemaining}}" min="0" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.ammo}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.AmmoData"}}</legend>
+        <div class="compact-grid three-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.AmmoType"}}</span><input type="text" name="system.ammoType" value="{{system.ammoType}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Shots"}}</span><input type="number" name="system.shots" value="{{system.shots}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.powerSource}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.PowerSourceData"}}</legend>
+        <div class="compact-grid five-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.SourceType"}}</span><select name="system.sourceType">{{selectOptions choices.sourceType selected=system.sourceType}}</select></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Capacity"}}</span><input type="number" name="system.capacity" value="{{system.capacity}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Remaining"}}</span><input type="number" name="system.remaining" value="{{system.remaining}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Rechargeable"}}</span><input type="checkbox" name="system.rechargeable" {{checked system.rechargeable}} /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.gear}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.GearData"}}</legend>
+        <div class="compact-grid four-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.Quantity"}}</span><input type="number" name="system.quantity" value="{{system.quantity}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Weight"}}</span><input type="number" name="system.weight" value="{{system.weight}}" min="0" step="0.1" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Kit"}}</span><input type="checkbox" name="system.isKit" {{checked system.isKit}} /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.consumable}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.ConsumableData"}}</legend>
+        <div class="compact-grid four-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.Uses"}}</span><input type="number" name="system.uses.value" value="{{system.uses.value}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Max"}}</span><input type="number" name="system.uses.max" value="{{system.uses.max}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ConsumeOnUse"}}</span><input type="checkbox" name="system.consumeOnUse" {{checked system.consumeOnUse}} /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.vehicle}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.VehicleData"}}</legend>
+        <div class="compact-grid five-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.VehicleClass"}}</span><input type="text" name="system.vehicleClass" value="{{system.vehicleClass}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Passengers"}}</span><input type="number" name="system.passengers" value="{{system.passengers}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.SpeedSquares"}}</span><input type="number" name="system.speedSquaresPerTurn" value="{{system.speedSquaresPerTurn}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.TurnPenalty"}}</span><input type="number" name="system.turnPenalty" value="{{system.turnPenalty}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.RentalCost"}}</span><input type="number" name="system.rentalCostPerDay" value="{{system.rentalCostPerDay}}" min="0" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.computer}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.ComputerData"}}</legend>
+        <div class="compact-grid four-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.Level"}}</span><input type="number" name="system.level" value="{{system.level}}" min="1" max="6" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.FunctionPointsUsed"}}</span><input type="number" name="system.functionPoints.used" value="{{system.functionPoints.used}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.FunctionPointsMax"}}</span><input type="number" name="system.functionPoints.max" value="{{system.functionPoints.max}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Weight"}}</span><input type="number" name="system.weight" value="{{system.weight}}" min="0" step="0.1" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+
+    {{#if is.program}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.ProgramData"}}</legend>
+        <div class="compact-grid four-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.ProgramType"}}</span><input type="text" name="system.programType" value="{{system.programType}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Level"}}</span><input type="number" name="system.level" value="{{system.level}}" min="1" max="6" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.FunctionPoints"}}</span><input type="number" name="system.functionPoints" value="{{system.functionPoints}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+        </div>
+      </fieldset>
+    {{/if}}
+  </main>
+</section>

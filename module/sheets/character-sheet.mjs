@@ -21,6 +21,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       submitOnChange: true
     },
     actions: {
+      createItem: StarFrontiersCharacterSheet.#onCreateItem,
+      openItem: StarFrontiersCharacterSheet.#onOpenItem,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
   };
@@ -53,6 +55,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       .map((item) => ({
         key: item.id,
         item,
+        editable: true,
         data: {
           name: item.name,
           damage: item.system.damageFormula,
@@ -69,6 +72,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     while (rows.length < MIN_WEAPON_ROWS) {
       rows.push({
         key: `blank-${rows.length}`,
+        editable: false,
         data: {
           name: "",
           damage: "",
@@ -102,5 +106,20 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target ??= event.currentTarget;
     const label = target.dataset.label ?? game.i18n.localize("STARFRONTIERS.Placeholder.Action");
     ui.notifications.info(game.i18n.format("STARFRONTIERS.Placeholder.Message", { label }));
+  }
+
+  static #onOpenItem(event, target) {
+    target ??= event.currentTarget;
+    const itemId = target.closest("[data-item-id]")?.dataset.itemId;
+    const item = this.document.items.get(itemId);
+    item?.sheet?.render(true);
+  }
+
+  static async #onCreateItem(event, target) {
+    target ??= event.currentTarget;
+    const type = target.dataset.type ?? "gear";
+    const name = target.dataset.name ?? game.i18n.localize("STARFRONTIERS.Item.New");
+    const [item] = await this.document.createEmbeddedDocuments("Item", [{ name, type }]);
+    item?.sheet?.render(true);
   }
 }

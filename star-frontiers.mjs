@@ -1,4 +1,4 @@
-import { SHEET_THEMES, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "./module/config.mjs";
+import { ITEM_TYPE_LABELS, SHEET_THEMES, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "./module/config.mjs";
 import {
   StarFrontiersCharacterData,
   StarFrontiersCreatureData,
@@ -22,6 +22,7 @@ import {
   StarFrontiersWeaponData
 } from "./module/data/item-data.mjs";
 import { StarFrontiersCharacterSheet } from "./module/sheets/character-sheet.mjs";
+import { StarFrontiersItemSheet } from "./module/sheets/item-sheet.mjs";
 
 export const STAR_FRONTIERS = {
   id: SYSTEM_ID
@@ -67,6 +68,11 @@ Hooks.once("init", () => {
     vehicle: StarFrontiersVehicleData,
     computer: StarFrontiersComputerData,
     program: StarFrontiersProgramData
+  };
+
+  CONFIG.Item.typeLabels = {
+    ...(CONFIG.Item.typeLabels ?? {}),
+    ...ITEM_TYPE_LABELS
   };
 
   CONFIG.Actor.trackableAttributes = {
@@ -152,6 +158,13 @@ Hooks.once("init", () => {
     types: ["character"],
     makeDefault: true,
     label: "STARFRONTIERS.Sheet.Character"
+  });
+
+  const Items = foundry.documents.collections.Items ?? globalThis.Items;
+  Items.registerSheet(SYSTEM_ID, StarFrontiersItemSheet, {
+    types: Object.keys(ITEM_TYPE_LABELS),
+    makeDefault: true,
+    label: "STARFRONTIERS.Sheet.Item"
   });
 });
 

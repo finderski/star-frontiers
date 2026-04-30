@@ -27,7 +27,8 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   box-shadow: var(--sf-window-shadow);
 }
 
-.star-frontiers-sheet {
+.star-frontiers-sheet,
+.star-frontiers-item-sheet {
   background: var(--sf-paper);
   color: var(--sf-ink);
   font-family: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
@@ -37,7 +38,11 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 }
 
 .star-frontiers-sheet input,
-.star-frontiers-sheet textarea {
+.star-frontiers-sheet textarea,
+.star-frontiers-sheet select,
+.star-frontiers-item-sheet input,
+.star-frontiers-item-sheet textarea,
+.star-frontiers-item-sheet select {
   background: transparent;
   border: 0;
   border-bottom: 2px solid var(--sf-line);
@@ -51,24 +56,31 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 }
 
 .star-frontiers-sheet input:focus,
-.star-frontiers-sheet textarea:focus {
+.star-frontiers-sheet textarea:focus,
+.star-frontiers-sheet select:focus,
+.star-frontiers-item-sheet input:focus,
+.star-frontiers-item-sheet textarea:focus,
+.star-frontiers-item-sheet select:focus {
   border-color: var(--sf-focus);
   box-shadow: 0 2px 0 rgba(124, 45, 18, 0.18);
   outline: none;
 }
 
-.star-frontiers-sheet input[readonly] {
+.star-frontiers-sheet input[readonly],
+.star-frontiers-item-sheet input[readonly] {
   color: var(--sf-muted);
 }
 
-.star-frontiers-sheet textarea {
+.star-frontiers-sheet textarea,
+.star-frontiers-item-sheet textarea {
   border: 1px solid transparent;
   border-bottom: 2px solid var(--sf-line);
   min-height: 90px;
   resize: vertical;
 }
 
-.star-frontiers-sheet button {
+.star-frontiers-sheet button,
+.star-frontiers-item-sheet button {
   align-items: center;
   background: transparent;
   border: 1px solid var(--sf-line);
@@ -84,11 +96,14 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 }
 
 .star-frontiers-sheet button:hover,
-.star-frontiers-sheet button:focus {
+.star-frontiers-sheet button:focus,
+.star-frontiers-item-sheet button:hover,
+.star-frontiers-item-sheet button:focus {
   background: var(--sf-button-hover);
 }
 
-.star-frontiers-sheet.theme-retro {
+.star-frontiers-sheet.theme-retro,
+.star-frontiers-item-sheet.theme-retro {
   background:
     linear-gradient(rgba(75, 220, 255, 0.05) 50%, transparent 50%) 0 0 / 100% 4px,
     var(--sf-paper);
@@ -96,12 +111,108 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 }
 
 .star-frontiers-sheet.theme-retro input,
-.star-frontiers-sheet.theme-retro textarea {
+.star-frontiers-sheet.theme-retro textarea,
+.star-frontiers-sheet.theme-retro select,
+.star-frontiers-item-sheet.theme-retro input,
+.star-frontiers-item-sheet.theme-retro textarea,
+.star-frontiers-item-sheet.theme-retro select {
   background: rgba(9, 18, 28, 0.52);
 }
 
-.star-frontiers-sheet.theme-retro button {
+.star-frontiers-sheet.theme-retro button,
+.star-frontiers-item-sheet.theme-retro button {
   box-shadow: 0 0 10px rgba(75, 220, 255, 0.15);
+}
+
+.item-header {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  margin-bottom: 16px;
+}
+
+.item-image {
+  border: 2px solid var(--sf-line);
+  height: 72px;
+  object-fit: cover;
+  width: 72px;
+}
+
+.item-title {
+  display: grid;
+  gap: 8px;
+}
+
+.item-meta {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.item-meta > span {
+  color: var(--sf-muted);
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.item-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+.item-common textarea {
+  min-height: 130px;
+}
+
+.compact-grid {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.three-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.four-columns {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.five-columns {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.compact-grid label,
+.item-common label {
+  align-items: end;
+  display: grid;
+  gap: 5px;
+}
+
+.checkbox-line {
+  align-items: center;
+  grid-template-columns: 1fr 24px;
+}
+
+.checkbox-line input {
+  height: 18px;
+  justify-self: end;
+  width: 18px;
+}
+
+.range-editor {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(92px, 1fr) repeat(3, minmax(64px, 0.5fr));
+  margin: 12px 0;
+}
+
+.range-editor > span {
+  text-transform: uppercase;
 }
 
 .paper-header {
@@ -130,6 +241,7 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 
 .field-line span,
 .paper-box label > span,
+.paper-box .stacked > span,
 .paired-stat > span,
 .single-stat > span {
   font-size: 1.35rem;
@@ -283,9 +395,27 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 }
 
 .item-row {
+  background: transparent;
   border-bottom: 1px solid var(--sf-row-line);
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
   min-height: 28px;
   padding: 4px;
+}
+
+.item-open {
+  border-radius: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  height: auto;
+  justify-items: start;
+  text-align: left;
+  width: 100%;
+}
+
+.item-open i {
+  justify-self: end;
 }
 
 .placeholder-controls {
@@ -301,14 +431,20 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 }
 
 @media (max-width: 820px) {
-  .star-frontiers-sheet {
+  .star-frontiers-sheet,
+  .star-frontiers-item-sheet {
     padding: 12px;
   }
 
   .paper-header,
   .sheet-grid,
   .movement-row,
-  .reverse-grid {
+  .reverse-grid,
+  .item-header,
+  .item-meta,
+  .three-columns,
+  .four-columns,
+  .five-columns {
     grid-template-columns: 1fr;
   }
 
