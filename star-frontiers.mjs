@@ -171,3 +171,8 @@ Hooks.once("init", () => {
 Hooks.once("ready", () => {
   applySheetTheme();
 });
+
+Hooks.on("preCreateItem", (item, data) => {
+  if (data?.system?.rulesEdition) return;
+  item.updateSource({ "system.rulesEdition": game.settings.get(SYSTEM_ID, "rulesEdition") });
+});

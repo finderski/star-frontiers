@@ -4,6 +4,11 @@ const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
 const MIN_WEAPON_ROWS = 4;
+const HANDEDNESS_CHOICES = {
+  left: "STARFRONTIERS.Choice.Handedness.left",
+  right: "STARFRONTIERS.Choice.Handedness.right",
+  ambi: "STARFRONTIERS.Choice.Handedness.ambi"
+};
 
 export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static DEFAULT_OPTIONS = {
@@ -22,6 +27,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     },
     actions: {
       createItem: StarFrontiersCharacterSheet.#onCreateItem,
+      deleteItem: StarFrontiersCharacterSheet.#onDeleteItem,
+      duplicateItem: StarFrontiersCharacterSheet.#onDuplicateItem,
       openItem: StarFrontiersCharacterSheet.#onOpenItem,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
@@ -43,9 +50,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.expandedRules = context.rulesEdition === "expanded";
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
+    context.handednessChoices = HANDEDNESS_CHOICES;
+    context.handednessKind = this.#normalizeHandedness(actor.system.handedness.kind);
     context.weaponRows = this.#prepareWeaponRows(actor);
+    context.armorItems = actor.items.filter((item) => item.type === "armor");
+    context.screenItems = actor.items.filter((item) => item.type === "screen");
     context.skillItems = actor.items.filter((item) => item.type === "skill");
-    context.gearItems = actor.items.filter((item) => ["gear", "consumable", "ammo", "powerSource"].includes(item.type));
+    context.equipmentItems = actor.items.filter((item) => ["gear", "consumable", "ammo", "powerSource"].includes(item.type));
     return context;
   }
 
@@ -65,7 +76,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           medium: this.#formatRangeBand(item.system.rangeBands.medium),
           long: this.#formatRangeBand(item.system.rangeBands.long),
           extreme: this.#formatRangeBand(item.system.rangeBands.extreme),
-          ammo: this.#formatAmmo(item)
+          ammo: this.#formatAmmo(item),
+          ammoCapacity: item.system.ammo?.capacity ?? 0,
+          ammoConsumed: item.system.ammo?.consumed ?? 0
         }
       }));
 
@@ -82,7 +95,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           medium: "",
           long: "",
           extreme: "",
-          ammo: ""
+          ammo: "",
+          ammoCapacity: "",
+          ammoConsumed: ""
         }
       });
     }
@@ -102,6 +117,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return `${Math.max(ammo.capacity - ammo.consumed, 0)}/${ammo.capacity}`;
   }
 
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    for (const input of this.element.querySelectorAll("[data-item-field]")) {
+      input.addEventListener("change", this.#onItemFieldChange.bind(this));
+    }
+  }
+
   static #onPlaceholderAction(event, target) {
     target ??= event.currentTarget;
     const label = target.dataset.label ?? game.i18n.localize("STARFRONTIERS.Placeholder.Action");
@@ -110,8 +132,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static #onOpenItem(event, target) {
     target ??= event.currentTarget;
-    const itemId = target.closest("[data-item-id]")?.dataset.itemId;
-    const item = this.document.items.get(itemId);
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     item?.sheet?.render(true);
   }
 
@@ -119,7 +140,46 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target ??= event.currentTarget;
     const type = target.dataset.type ?? "gear";
     const name = target.dataset.name ?? game.i18n.localize("STARFRONTIERS.Item.New");
-    const [item] = await this.document.createEmbeddedDocuments("Item", [{ name, type }]);
+    const system = { rulesEdition: game.settings.get(SYSTEM_ID, "rulesEdition") };
+    const [item] = await this.document.createEmbeddedDocuments("Item", [{ name, type, system }]);
     item?.sheet?.render(true);
+  }
+
+  static async #onDuplicateItem(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+
+    const source = item.toObject();
+    delete source._id;
+    source.name = game.i18n.format("STARFRONTIERS.Item.CopyName", { name: item.name });
+    const [copy] = await this.document.createEmbeddedDocuments("Item", [source]);
+    copy?.sheet?.render(true);
+  }
+
+  static async #onDeleteItem(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    await item?.delete();
+  }
+
+  static #getItemFromTarget(actor, target) {
+    const itemId = target.closest("[data-item-id]")?.dataset.itemId;
+    return actor.items.get(itemId);
+  }
+
+  async #onItemFieldChange(event) {
+    event.stopPropagation();
+    const target = event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+
+    const value = target.type === "number" ? Number(target.value || 0) : target.value;
+    await item.update({ [target.dataset.itemField]: value });
+  }
+
+  #normalizeHandedness(value) {
+    const normalized = String(value ?? "").toLowerCase();
+    return normalized in HANDEDNESS_CHOICES ? normalized : "right";
   }
 }

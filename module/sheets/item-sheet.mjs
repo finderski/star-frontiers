@@ -8,7 +8,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     tag: "form",
     classes: ["star-frontiers", "sheet", "item"],
     position: {
-      width: 620,
+      width: 760,
       height: "auto"
     },
     window: {
@@ -17,6 +17,10 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     form: {
       closeOnSubmit: false,
       submitOnChange: true
+    },
+    dragDrop: [{ dragSelector: null, dropSelector: ".ammo-drop-zone" }],
+    actions: {
+      clearAmmo: StarFrontiersItemSheet.#onClearAmmo
     }
   };
 
@@ -34,7 +38,10 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.system = item.system;
     context.typeLabel = ITEM_TYPE_LABELS[item.type] ?? item.type;
     context.is = Object.fromEntries(Object.keys(ITEM_TYPE_LABELS).map((type) => [type, item.type === type]));
-    context.rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
+    context.itemRulesEdition = item.system.rulesEdition || game.settings.get(SYSTEM_ID, "rulesEdition");
+    context.expandedRules = context.itemRulesEdition === "expanded";
+    context.showKey = ["race", "skill", "trainedAbility"].includes(item.type);
+    context.linkedAmmo = await this.#resolveLinkedAmmo(item);
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
     context.choices = this.#prepareChoices();
@@ -76,5 +83,51 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       choices[value] = game.i18n.localize(`${prefix}.${key}`);
       return choices;
     }, {});
+  }
+
+  async _onDropDocument(event, document) {
+    if (this.item.type === "weapon" && document.documentName === "Item" && document.type === "ammo") {
+      const sameActor = document.parent && document.parent === this.item.parent;
+      const ref = sameActor ? document.id : document.uuid;
+      const updateData = {
+        "system.ammo.clipItem": ref,
+        "system.ammo.uses": "clip"
+      };
+
+      if (document.system.shots > 0) updateData["system.ammo.capacity"] = document.system.shots;
+      await this.item.update(updateData);
+      ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.AmmoLinked", { name: document.name }));
+      return document;
+    }
+
+    if (this.item.type === "weapon" && document.documentName === "Item") {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropAmmoOnly"));
+      return null;
+    }
+
+    return super._onDropDocument(event, document);
+  }
+
+  async #resolveLinkedAmmo(item) {
+    if (item.type !== "weapon") return null;
+    const ref = item.system.ammo?.clipItem;
+    if (!ref) return null;
+
+    const owned = item.actor?.items?.get(ref);
+    if (owned) return owned;
+    if (!globalThis.fromUuid) return null;
+
+    try {
+      return await globalThis.fromUuid(ref);
+    } catch {
+      return null;
+    }
+  }
+
+  static async #onClearAmmo(event, target) {
+    await this.item.update({
+      "system.ammo.clipItem": "",
+      "system.ammo.uses": "none"
+    });
   }
 }

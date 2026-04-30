@@ -11,7 +11,9 @@
       </label>
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.Handedness"}}</span>
-        <input type="text" name="system.handedness.kind" value="{{system.handedness.kind}}" />
+        <select name="system.handedness.kind">
+          {{selectOptions handednessChoices selected=handednessKind localize=true}}
+        </select>
       </label>
       <div class="movement-row">
         <label class="field-line">
@@ -113,7 +115,7 @@
         <span>L</span>
         <span>E</span>
         <span>{{localize "STARFRONTIERS.Weapon.Ammo"}}</span>
-        <span></span>
+        <span>{{localize "STARFRONTIERS.Item.Actions"}}</span>
       </div>
       {{#each weaponRows as |row|}}
         <div class="weapons-grid" data-item-id="{{row.key}}">
@@ -125,11 +127,26 @@
           <input type="text" value="{{row.data.medium}}" aria-label="M" readonly />
           <input type="text" value="{{row.data.long}}" aria-label="L" readonly />
           <input type="text" value="{{row.data.extreme}}" aria-label="E" readonly />
-          <input type="text" value="{{row.data.ammo}}" aria-label="{{localize "STARFRONTIERS.Weapon.Ammo"}}" readonly />
           {{#if row.editable}}
-            <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
-              <i class="fa-solid fa-pen-to-square"></i>
-            </button>
+            <div class="weapon-ammo-cell">
+              <input type="number" value="{{row.data.ammoConsumed}}" min="0" max="{{row.data.ammoCapacity}}" data-item-field="system.ammo.consumed" aria-label="{{localize "STARFRONTIERS.Item.Consumed"}}" />
+              <span>/ {{row.data.ammoCapacity}}</span>
+            </div>
+          {{else}}
+            <input type="text" value="{{row.data.ammo}}" aria-label="{{localize "STARFRONTIERS.Weapon.Ammo"}}" readonly />
+          {{/if}}
+          {{#if row.editable}}
+            <div class="item-actions">
+              <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+              <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
           {{else}}
             <button type="button" data-action="placeholder" data-label="{{localize "STARFRONTIERS.Weapon.Attack"}}" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
               <i class="fa-solid fa-crosshairs"></i>
@@ -137,6 +154,12 @@
           {{/if}}
         </div>
       {{/each}}
+      <div class="section-controls">
+        <button type="button" data-action="createItem" data-type="weapon" data-name="{{localize "STARFRONTIERS.Item.NewWeapon"}}" title="{{localize "STARFRONTIERS.Character.AddWeapon"}}">
+          <i class="fa-solid fa-plus"></i>
+          <span>{{localize "STARFRONTIERS.Character.AddWeapon"}}</span>
+        </button>
+      </div>
     </fieldset>
 
     <div class="left-column">
@@ -150,6 +173,50 @@
           <span>{{localize "STARFRONTIERS.Character.Screen"}}</span>
           <input type="text" name="system.defenses.screen" value="{{system.defenses.screen}}" />
         </label>
+        <div class="defense-lists">
+          <section class="stacked">
+            <span>{{localize "STARFRONTIERS.Character.ArmorItems"}}</span>
+            <div class="item-list compact-list">
+              {{#each armorItems as |item|}}
+                <div class="item-row" data-item-id="{{item.id}}">
+                  <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
+                  <div class="item-actions">
+                    <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
+                    <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                </div>
+              {{/each}}
+            </div>
+            <div class="section-controls">
+              <button type="button" data-action="createItem" data-type="armor" data-name="{{localize "STARFRONTIERS.Item.NewArmor"}}" title="{{localize "STARFRONTIERS.Character.AddArmor"}}">
+                <i class="fa-solid fa-plus"></i>
+                <span>{{localize "STARFRONTIERS.Character.AddArmor"}}</span>
+              </button>
+            </div>
+          </section>
+          <section class="stacked">
+            <span>{{localize "STARFRONTIERS.Character.ScreenItems"}}</span>
+            <div class="item-list compact-list">
+              {{#each screenItems as |item|}}
+                <div class="item-row" data-item-id="{{item.id}}">
+                  <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
+                  <div class="item-actions">
+                    <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
+                    <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                </div>
+              {{/each}}
+            </div>
+            <div class="section-controls">
+              <button type="button" data-action="createItem" data-type="screen" data-name="{{localize "STARFRONTIERS.Item.NewScreen"}}" title="{{localize "STARFRONTIERS.Character.AddScreen"}}">
+                <i class="fa-solid fa-plus"></i>
+                <span>{{localize "STARFRONTIERS.Character.AddScreen"}}</span>
+              </button>
+            </div>
+          </section>
+        </div>
       </fieldset>
 
       <fieldset class="paper-box energy-record">
@@ -185,21 +252,29 @@
           <span>{{localize "STARFRONTIERS.Character.Skills"}}</span>
           <div class="item-list">
             {{#each skillItems as |item|}}
-              <button type="button" class="item-row item-open" data-action="openItem" data-item-id="{{item.id}}">
-                <span>{{item.name}}</span>
-                <i class="fa-solid fa-pen-to-square"></i>
-              </button>
+              <div class="item-row" data-item-id="{{item.id}}">
+                <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
+                <div class="item-actions">
+                  <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
+                  <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </div>
             {{/each}}
           </div>
         </section>
         <section class="stacked">
           <span>{{localize "STARFRONTIERS.Character.Equipment"}}</span>
           <div class="item-list">
-            {{#each gearItems as |item|}}
-              <button type="button" class="item-row item-open" data-action="openItem" data-item-id="{{item.id}}">
-                <span>{{item.name}}</span>
-                <i class="fa-solid fa-pen-to-square"></i>
-              </button>
+            {{#each equipmentItems as |item|}}
+              <div class="item-row" data-item-id="{{item.id}}">
+                <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
+                <div class="item-actions">
+                  <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
+                  <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </div>
             {{/each}}
           </div>
         </section>
@@ -216,6 +291,14 @@
         <button type="button" data-action="createItem" data-type="gear" data-name="{{localize "STARFRONTIERS.Item.NewGear"}}" title="{{localize "STARFRONTIERS.Character.AddEquipment"}}">
           <i class="fa-solid fa-plus"></i>
           <span>{{localize "STARFRONTIERS.Character.AddEquipment"}}</span>
+        </button>
+        <button type="button" data-action="createItem" data-type="ammo" data-name="{{localize "STARFRONTIERS.Item.NewAmmo"}}" title="{{localize "STARFRONTIERS.Character.AddAmmo"}}">
+          <i class="fa-solid fa-plus"></i>
+          <span>{{localize "STARFRONTIERS.Character.AddAmmo"}}</span>
+        </button>
+        <button type="button" data-action="createItem" data-type="powerSource" data-name="{{localize "STARFRONTIERS.Item.NewPowerSource"}}" title="{{localize "STARFRONTIERS.Character.AddPowerSource"}}">
+          <i class="fa-solid fa-plus"></i>
+          <span>{{localize "STARFRONTIERS.Character.AddPowerSource"}}</span>
         </button>
       </div>
     </fieldset>

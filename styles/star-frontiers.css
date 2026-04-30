@@ -148,7 +148,7 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   align-items: end;
   display: grid;
   gap: 10px;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
 }
 
 .item-meta > span {
@@ -187,9 +187,53 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 
 .compact-grid label,
 .item-common label {
-  align-items: end;
+  align-items: start;
   display: grid;
   gap: 5px;
+  grid-template-columns: 1fr;
+}
+
+.star-frontiers-item-sheet .paper-box label > span,
+.star-frontiers-item-sheet .paper-box .stacked > span,
+.star-frontiers-item-sheet .range-editor > span,
+.star-frontiers-item-sheet .ammo-drop-zone > span {
+  font-size: 1rem;
+  line-height: 1.1;
+}
+
+.star-frontiers-item-sheet .paper-box legend {
+  font-size: 1.7rem;
+}
+
+.weapon-core-grid {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.weapon-ammo-grid {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+}
+
+.ammo-drop-zone {
+  align-items: center;
+  border: 1px dashed var(--sf-line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  margin: 12px 0;
+  min-height: 38px;
+  padding: 6px 8px;
+}
+
+.ammo-drop-zone > div {
+  align-items: center;
+  color: var(--sf-muted);
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ammo-drop-zone strong {
+  color: var(--sf-ink);
 }
 
 .checkbox-line {
@@ -345,13 +389,25 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
     minmax(98px, 0.85fr)
     repeat(5, minmax(42px, 0.4fr))
     minmax(90px, 0.75fr)
-    30px;
+    minmax(82px, 0.45fr);
 }
 
 .weapons-heading span {
   font-size: 1.25rem;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.weapon-ammo-cell {
+  align-items: center;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: minmax(38px, 1fr) auto;
+}
+
+.weapon-ammo-cell span {
+  color: var(--sf-muted);
+  white-space: nowrap;
 }
 
 .left-column {
@@ -362,6 +418,12 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 .defenses-box {
   display: grid;
   gap: 14px;
+}
+
+.defense-lists {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .energy-record textarea {
@@ -394,28 +456,54 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   padding: 4px 0;
 }
 
+.compact-list {
+  min-height: 74px;
+}
+
 .item-row {
+  align-items: center;
   background: transparent;
   border-bottom: 1px solid var(--sf-row-line);
   border-left: 0;
   border-right: 0;
   border-top: 0;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 28px;
   padding: 4px;
 }
 
-.item-open {
+.item-name-button {
+  border: 0;
   border-radius: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 24px;
   height: auto;
-  justify-items: start;
+  justify-content: start;
+  min-height: 24px;
+  min-width: 0;
+  padding: 0 4px;
   text-align: left;
   width: 100%;
 }
 
-.item-open i {
-  justify-self: end;
+.item-actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.item-actions button {
+  height: 24px;
+  padding: 0;
+  width: 24px;
+}
+
+.section-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .placeholder-controls {
@@ -440,11 +528,15 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   .sheet-grid,
   .movement-row,
   .reverse-grid,
+  .defense-lists,
   .item-header,
   .item-meta,
+  .ammo-drop-zone,
   .three-columns,
   .four-columns,
-  .five-columns {
+  .five-columns,
+  .weapon-core-grid,
+  .weapon-ammo-grid {
     grid-template-columns: 1fr;
   }
 

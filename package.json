@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "npm run check:js && npm run check:json",
-    "check:js": "node --check star-frontiers.mjs && node --check module/config.mjs && node --check module/data/fields.mjs && node --check module/data/character-data.mjs && node --check module/data/item-data.mjs && node --check module/sheets/character-sheet.mjs && node --check module/sheets/item-sheet.mjs",
-    "check:json": "node -e \"import fs from 'node:fs'; for (const file of ['system.json', 'lang/en.json']) JSON.parse(fs.readFileSync(file, 'utf8'));\""
+    "check": "npm run check:js && npm run check:json && npm run check:i18n",
+    "check:js": "node --check star-frontiers.mjs && node --check module/config.mjs && node --check module/data/fields.mjs && node --check module/data/character-data.mjs && node --check module/data/item-data.mjs && node --check module/sheets/character-sheet.mjs && node --check module/sheets/item-sheet.mjs && node --check tools/check-i18n.mjs",
+    "check:json": "node -e \"import fs from 'node:fs'; for (const file of ['system.json', 'lang/en.json']) JSON.parse(fs.readFileSync(file, 'utf8'));\"",
+    "check:i18n": "node tools/check-i18n.mjs"
   }
 }
