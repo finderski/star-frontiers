@@ -1,3 +1,47 @@
+@font-face {
+  font-family: "av05";
+  src: url("../assets/fonts/av05-logotype.otf.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "michroma";
+  src: url("../assets/fonts/michroma-normal-400.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "prosto";
+  src: url("../assets/fonts/prosto-one-normal-400.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+#pause {
+  height: 250px !important;
+}
+
+#pause img {
+  content: url("../assets/images/upf-logo-transparent.svg") !important;;
+  width: 180px;
+  height: 180px;
+}
+
+#pause > figcaption {
+  font-family: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
+}
+
+.star-frontiers-sheet {
+  --logo: "av05";
+  --fieldset: "michroma";
+  --input: "prosto", monospace, "Courier New", Courier, monospace;
+}
+
 .star-frontiers.sheet {
   --sf-ink: #1f1f1f;
   --sf-paper: #f8f7f1;
@@ -287,6 +331,27 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   align-content: end;
 }
 
+.identity-block input {
+  font-size: 1.35em;
+}
+
+.input-with-unit {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border-bottom: 2px solid var(--sf-ink);
+}
+
+.input-with-unit input,
+.input-with-unit .readonly-value {
+  font-family: var(--input);
+}
+
+.input-with-unit .unit {
+  font-family: var(--input);
+  text-transform: lowercase;
+}
+
 .player-name-row {
   align-items: center;
   display: grid;
@@ -313,6 +378,20 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+label.field-line {
+  font-family: var(--fieldset);
+}
+
+.field-line > span {
+  font-size: 1em;
+}
+
+.field-line > input,
+.field-line > select {
+  font-family: var(--input);
+  font-size: 1.15em;
 }
 
 .player-name span {
@@ -350,11 +429,12 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 
 .paper-box legend {
   background: var(--sf-paper);
-  font-size: 2.1rem;
+  font-size: 1.5em;
   letter-spacing: 0;
   line-height: 1;
   padding: 0 8px;
   text-transform: uppercase;
+  font-family: var(--fieldset);
 }
 
 .full-width {
@@ -386,8 +466,21 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   width: 28px;
 }
 
-.slash {
+.paired-stat span,
+.single-stat span {
+  font-family: var(--fieldset);
+  font-size: .9em;
+}
+
+.paired-stat input,
+.single-stat input {
+  font-family: var(--input);
+  font-size: 1.15em;
+}
+
+.paired-stat .slash {
   justify-self: center;
+  font-size: 1.5em;
 }
 
 .medical-record {

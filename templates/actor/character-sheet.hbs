@@ -25,11 +25,17 @@
       <div class="movement-row">
         <label class="field-line">
           <span>{{localize "STARFRONTIERS.Character.Walking"}}</span>
-          <input type="text" value="{{system.derived.walking}}" readonly />
+          <span class="input-with-unit">
+          <span class="readonly-value">{{system.derived.walking}}</span>
+          <span class="unit">{{localize "STARFRONTIERS.Character.meter-abbr"}}</span>
+        </span>
         </label>
         <label class="field-line">
           <span>{{localize "STARFRONTIERS.Character.Running"}}</span>
-          <input type="text" value="{{system.derived.running}}" readonly />
+          <span class="input-with-unit">
+          <span class="readonly-value">{{system.derived.running}}</span>
+          <span class="unit">{{localize "STARFRONTIERS.Character.meter-abbr"}}</span>
+        </span>
         </label>
       </div>
     </div>
@@ -45,7 +51,10 @@
       </label>
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.Hourly"}}</span>
-        <input type="text" value="{{system.derived.hourly}}" readonly />
+        <span class="input-with-unit">
+          <span class="readonly-value">{{system.derived.hourly}}</span>
+          <span class="unit">{{localize "STARFRONTIERS.Character.kilometer-abbr"}}</span>
+        </span>
       </label>
     </div>
   </header>
@@ -57,7 +66,7 @@
         <button type="button" data-action="placeholder" data-label="STR/STA" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
-        <span>STR/STA:</span>
+        <span>{{localize "STARFRONTIERS.Character.Strength-abbr-Stamina-abbr"}}:</span>
         <input type="number" name="system.abilities.str.value" value="{{system.abilities.str.value}}" min="1" max="100" />
         <span class="slash">/</span>
         <input type="number" name="system.abilities.sta.value" value="{{system.abilities.sta.value}}" min="1" max="100" />
@@ -66,7 +75,7 @@
         <button type="button" data-action="placeholder" data-label="DEX/RS" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
-        <span>DEX/RS:</span>
+        <span>{{localize "STARFRONTIERS.Character.Dexterity-abbr-ReactionSpeed-abbr"}}:</span>
         <input type="number" name="system.abilities.dex.value" value="{{system.abilities.dex.value}}" min="1" max="100" />
         <span class="slash">/</span>
         <input type="number" name="system.abilities.rs.value" value="{{system.abilities.rs.value}}" min="1" max="100" />
@@ -75,7 +84,7 @@
         <button type="button" data-action="placeholder" data-label="INT/LOG" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
-        <span>INT/LOG:</span>
+        <span>{{localize "STARFRONTIERS.Character.Intuition-abbr-Logic-abbr"}}:</span>
         <input type="number" name="system.abilities.int.value" value="{{system.abilities.int.value}}" min="1" max="100" />
         <span class="slash">/</span>
         <input type="number" name="system.abilities.log.value" value="{{system.abilities.log.value}}" min="1" max="100" />
@@ -84,7 +93,7 @@
         <button type="button" data-action="placeholder" data-label="PER/LDR" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
-        <span>PER/LDR:</span>
+        <span>{{localize "STARFRONTIERS.Character.Personality-abbr-Leadership-abbr"}}:</span>
         <input type="number" name="system.abilities.per.value" value="{{system.abilities.per.value}}" min="1" max="100" />
         <span class="slash">/</span>
         <input type="number" name="system.abilities.ldr.value" value="{{system.abilities.ldr.value}}" min="1" max="100" />
@@ -93,7 +102,7 @@
         <button type="button" data-action="placeholder" data-label="IM" title="{{localize "STARFRONTIERS.Placeholder.Action"}}">
           <i class="fa-solid fa-dice-d10"></i>
         </button>
-        <span>IM:</span>
+        <span>{{localize "STARFRONTIERS.Character.InitiativeModifier-abbr"}}:</span>
         <input type="number" value="{{system.derived.initiativeMod}}" readonly />
       </div>
     </fieldset>

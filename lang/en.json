@@ -21,6 +21,8 @@
       "GenerateStats": "Generate Stats",
       "Handedness": "Handedness:",
       "Hourly": "Hourly:",
+      "kilometer-abbr": "km",
+      "meter-abbr": "m",
       "MedicalRecord": "Medical Record",
       "Notes": "Notes",
       "OtherInjuries": "Other Injuries:",
@@ -40,6 +42,11 @@
       "StatsGenerated": "Ability scores generated.",
       "Suit": "Suit:",
       "Walking": "Walking:",
+      "Strength-abbr-Stamina-abbr": "STR/STA",
+      "Dexterity-abbr-ReactionSpeed-abbr": "DEX/RS",
+      "Intuition-abbr-Logic-abbr": "INT/LOG",
+      "Personality-abbr-Leadership-abbr": "PER/LDR",
+      "InitiativeModifier-abbr": "IM",
       "Weapons": "Weapons"
     },
     "Ability": {
