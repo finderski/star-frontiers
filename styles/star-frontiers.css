@@ -17,7 +17,15 @@
 @font-face {
   font-family: "prosto";
   src: url("../assets/fonts/prosto-one-normal-400.woff2") format("woff2");
-  font-weight: normal;
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "noto";
+  src: url("../assets/fonts/noto-emoji-normal-300-700.woff2") format("woff2");
+  font-weight: 300 700;
   font-style: normal;
   font-display: swap;
 }
@@ -40,6 +48,7 @@
   --logo: "av05";
   --fieldset: "michroma";
   --input: "prosto", monospace, "Courier New", Courier, monospace;
+  --symbol: "noto";
 }
 
 .star-frontiers.sheet {
@@ -419,6 +428,167 @@ label.field-line {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.chat-message .star-frontiers.stat-roll-card {
+  --sf-chat-ink: #1f1f1f;
+  --sf-chat-paper: #f8f7f1;
+  --sf-chat-line: rgba(31, 31, 31, 0.18);
+  background: var(--sf-chat-paper);
+  color: var(--sf-chat-ink);
+  display: grid;
+  gap: 12px;
+  padding: 4px;
+}
+
+body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.stat-roll-card {
+  --sf-chat-ink: #d8f6ff;
+  --sf-chat-paper: #10151d;
+  --sf-chat-line: rgba(75, 220, 255, 0.2);
+}
+
+.chat-message .star-frontiers.check-roll-card {
+  --sf-chat-ink: #1f1f1f;
+  --sf-chat-paper: #f8f7f1;
+  --sf-chat-line: rgba(31, 31, 31, 0.18);
+  background: var(--sf-chat-paper);
+  color: var(--sf-chat-ink);
+  display: grid;
+  gap: 12px;
+  padding: 4px;
+}
+
+body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll-card {
+  --sf-chat-ink: #d8f6ff;
+  --sf-chat-paper: #10151d;
+  --sf-chat-line: rgba(75, 220, 255, 0.2);
+}
+
+.stat-roll-card__header {
+  border-bottom: 1px solid var(--sf-chat-line);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+}
+
+.stat-roll-card__header h3 {
+  font-family: var(--fieldset, "Roboto Condensed", "Arial Narrow", Arial, sans-serif);
+  font-size: 1.2rem;
+  line-height: 1.15;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.stat-roll-card__header p {
+  color: color-mix(in srgb, var(--sf-chat-ink) 68%, transparent);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.check-roll-card__header {
+  border-bottom: 1px solid var(--sf-chat-line);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+}
+
+.check-roll-card__header h3 {
+  font-family: var(--fieldset, "Roboto Condensed", "Arial Narrow", Arial, sans-serif);
+  font-size: 1.2rem;
+  line-height: 1.15;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.check-roll-card__header p {
+  color: color-mix(in srgb, var(--sf-chat-ink) 68%, transparent);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.stat-roll-card__rows {
+  display: grid;
+  gap: 8px;
+}
+
+.check-roll-card__rows {
+  display: grid;
+  gap: 8px;
+}
+
+.stat-roll-card__row {
+  align-items: baseline;
+  border-bottom: 1px solid var(--sf-chat-line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(72px, max-content) max-content max-content max-content minmax(0, 1fr);
+  padding-bottom: 8px;
+}
+
+.check-roll-card__row {
+  align-items: baseline;
+  border-bottom: 1px solid var(--sf-chat-line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  padding-bottom: 8px;
+}
+
+.stat-roll-card__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.check-roll-card__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.stat-roll-card__label,
+.stat-roll-card__roll,
+.stat-roll-card__arrow,
+.stat-roll-card__result,
+.stat-roll-card__applied {
+  line-height: 1.2;
+}
+
+.check-roll-card__label,
+.check-roll-card__value {
+  line-height: 1.2;
+}
+
+.stat-roll-card__label {
+  font-weight: 700;
+}
+
+.stat-roll-card__result {
+  font-size: 1.05rem;
+}
+
+.stat-roll-card__applied {
+  color: color-mix(in srgb, var(--sf-chat-ink) 72%, transparent);
+  justify-self: end;
+  text-align: right;
+}
+
+.check-roll-card__value {
+  font-size: 1.05rem;
+}
+
+.check-roll-card__outcome {
+  border: 1px solid var(--sf-chat-line);
+  font-weight: 700;
+  padding: 6px 8px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.check-roll-card__outcome--success {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.check-roll-card__outcome--failure {
+  background: rgba(220, 38, 38, 0.12);
+}
+
 .paper-box {
   border: 2px solid var(--sf-line);
   margin: 0;
@@ -451,11 +621,11 @@ label.field-line {
   align-items: center;
   display: grid;
   gap: 8px;
-  grid-template-columns: 30px 96px minmax(54px, 1fr) 18px minmax(54px, 1fr);
+  grid-template-columns: 132px minmax(54px, 1fr) 18px minmax(54px, 1fr);
 }
 
 .single-stat {
-  grid-template-columns: 30px 96px minmax(54px, 1fr) 18px minmax(54px, 1fr);
+  grid-template-columns: 132px minmax(54px, 1fr);
 }
 
 .paired-stat button,
@@ -464,6 +634,88 @@ label.field-line {
   height: 26px;
   padding: 0;
   width: 28px;
+}
+
+.roll-label-pair {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.roll-label-group {
+  align-items: center;
+  display: inline-flex;
+  position: relative;
+}
+
+button.roll-label-main,
+button.roll-label-action {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--sf-ink);
+  cursor: pointer;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  width: auto;
+}
+
+button.roll-label-main {
+  font-family: var(--fieldset);
+  font-size: 1rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.roll-label-main:hover,
+.roll-label-main:focus-visible {
+  background: transparent;
+  color: var(--sf-focus);
+  text-decoration: underline;
+}
+
+button.roll-label-action {
+  font-family: var(--symbol);
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.92);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.roll-label-action:hover,
+.roll-label-action:focus-visible {
+  background: transparent;
+  color: var(--sf-focus);
+  transform: translateY(-50%) scale(1);
+}
+
+.roll-label-actions {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  gap: 4px;
+  z-index: 2;
+  font-family: var(--symbol);
+}
+
+.roll-label-group--left .roll-label-actions {
+  right: calc(100% + 8px);
+}
+
+.roll-label-group--right .roll-label-actions {
+  left: calc(100% + 8px);
+}
+
+.roll-label-group:hover .roll-label-action,
+.roll-label-group:focus-within .roll-label-action {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
 }
 
 .paired-stat span,

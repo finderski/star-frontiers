@@ -14,6 +14,7 @@ const ABILITY_KEYS = STAR_FRONTIERS_CONFIG.abilities;
 function abilityField(initial = 30) {
   return schemaField({
     base: numberField({ initial, min: 1, max: 100 }),
+    initialized: boolField(),
     value: numberField({ initial, min: 1, max: 100 }),
     swap: numberField({ initial: 0, min: -100, max: 100 })
   });
@@ -171,6 +172,11 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
         meleeBonus: numberField({ initial: 0 }),
         rangedBonus: numberField({ initial: 0 }),
         special: htmlField()
+      }),
+
+      charGen: schemaField({
+        statsInitialized: boolField(),
+        statsGenerated: boolField()
       }),
 
       rulesEdition: textField({ initial: "basic", choices: ["basic", "expanded"] }),

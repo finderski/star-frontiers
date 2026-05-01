@@ -18,7 +18,7 @@ for (const root of roots) {
 
 for (const file of files) {
   const text = fs.readFileSync(file, "utf8");
-  for (const [ref] of text.matchAll(/STARFRONTIERS\.[A-Za-z0-9.]+/g)) {
+  for (const [ref] of text.matchAll(/STARFRONTIERS\.[A-Za-z0-9.-]+/g)) {
     if (ref.endsWith(".")) continue;
     refs.add(ref);
   }

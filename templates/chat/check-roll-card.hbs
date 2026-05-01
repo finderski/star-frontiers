@@ -1,0 +1,25 @@
+<section class="star-frontiers check-roll-card">
+  <header class="check-roll-card__header">
+    <h3>{{title}}</h3>
+    {{#if subtitle}}
+      <p>{{subtitle}}</p>
+    {{/if}}
+  </header>
+
+  <div class="check-roll-card__rows">
+    {{#each rows as |row|}}
+      <div class="check-roll-card__row">
+        <span class="check-roll-card__label">{{row.label}}</span>
+        <strong class="check-roll-card__value">{{row.value}}</strong>
+      </div>
+    {{/each}}
+  </div>
+
+  {{#if outcome}}
+    <div class="check-roll-card__outcome check-roll-card__outcome--{{outcomeClass}}">
+      {{outcome}}
+    </div>
+  {{/if}}
+
+  {{{rollHtml}}}
+</section>

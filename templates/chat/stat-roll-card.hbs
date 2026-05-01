@@ -1,0 +1,32 @@
+<section class="star-frontiers stat-roll-card">
+  <header class="stat-roll-card__header">
+    <h3>{{title}}</h3>
+    {{#if playerName}}
+      <p>{{playerName}}</p>
+    {{/if}}
+    {{#if raceName}}
+      <p>{{raceName}}</p>
+    {{/if}}
+  </header>
+
+  <div class="stat-roll-card__rows">
+    {{#each results as |row|}}
+      <div class="stat-roll-card__row">
+        <span class="stat-roll-card__label">{{row.label}}</span>
+        <span class="stat-roll-card__roll">({{row.roll}})</span>
+        <span class="stat-roll-card__arrow">=&gt;</span>
+        <strong class="stat-roll-card__result">{{row.result}}</strong>
+        {{#if row.applied}}
+          <span class="stat-roll-card__applied">{{row.applied}}</span>
+        {{/if}}
+      </div>
+    {{/each}}
+
+    <div class="stat-roll-card__row stat-roll-card__row--initiative">
+      <span class="stat-roll-card__label">{{initiative.label}}</span>
+      <span class="stat-roll-card__roll">({{initiative.roll}})</span>
+      <span class="stat-roll-card__arrow">=&gt;</span>
+      <strong class="stat-roll-card__result">{{initiative.result}}</strong>
+    </div>
+  </div>
+</section>

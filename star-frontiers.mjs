@@ -132,6 +132,19 @@ Hooks.once("init", () => {
     onChange: applySheetTheme
   });
 
+  game.settings.register(SYSTEM_ID, "staminaCheckSource", {
+    name: "STARFRONTIERS.Settings.StaminaCheckSource.Name",
+    hint: "STARFRONTIERS.Settings.StaminaCheckSource.Hint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      current: "STARFRONTIERS.Settings.StaminaCheckSource.Current",
+      ability: "STARFRONTIERS.Settings.StaminaCheckSource.Ability"
+    },
+    default: "current"
+  });
+
   game.settings.register(SYSTEM_ID, "automateAmmo", {
     name: "STARFRONTIERS.Settings.AutomateAmmo.Name",
     hint: "STARFRONTIERS.Settings.AutomateAmmo.Hint",
