@@ -177,16 +177,16 @@
     <fieldset class="paper-box weapons-box full-width">
       <legend>{{localize "STARFRONTIERS.Character.Weapons"}}</legend>
       <div class="weapons-grid weapons-heading" aria-hidden="true">
-        <span>{{localize "STARFRONTIERS.Weapon.Name"}}</span>
-        <span>{{localize "STARFRONTIERS.Weapon.Damage"}}</span>
-        <span>{{localize "STARFRONTIERS.Weapon.BasicToHit"}}</span>
-        <span>PB</span>
-        <span>S</span>
-        <span>M</span>
-        <span>L</span>
-        <span>E</span>
-        <span>{{localize "STARFRONTIERS.Weapon.Ammo"}}</span>
-        <span>{{localize "STARFRONTIERS.Item.Actions"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Name"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Damage"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.BasicToHit"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.PointBlank-abbr"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Short-abbr"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Medium-abbr"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Long-abbr"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Extreme-abbr"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Ammo"}}</span>
+        <span class="labelSpan">{{localize "STARFRONTIERS.Item.Actions"}}</span>
       </div>
       {{#each weaponRows as |row|}}
         <div class="weapons-grid" data-item-id="{{row.key}}">

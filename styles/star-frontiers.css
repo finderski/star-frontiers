@@ -148,6 +148,23 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   resize: vertical;
 }
 
+.star-frontiers-sheet span.labelSpan {
+  color: var(--sf-ink);
+  font-family: var(--fieldset);
+}
+
+.star-frontiers-sheet .weapons-heading .labelSpan {
+  width: 100%;
+  font-size: .8rem;
+  line-height: 1.2;
+}
+
+.star-frontiers-sheet .weapons-grid input,
+.star-frontiers-sheet .weapons-grid select,
+.star-frontiers-sheet .weapons-grid button {
+  font-size: .85em;
+}
+
 .star-frontiers-sheet button,
 .star-frontiers-item-sheet button {
   align-items: center;

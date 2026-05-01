@@ -370,7 +370,12 @@
       "RangeModifier": "Range Mod",
       "RollAttack": "Roll Attack",
       "RollDamage": "Roll Damage",
-      "Skill": "Skill"
+      "Skill": "Skill",
+      "PointBlank-abbr": "PB",
+      "Short-abbr": "S",
+      "Medium-abbr": "M",
+      "Long-abbr": "L",
+      "Extreme-abbr": "E"
     }
   }
 }
