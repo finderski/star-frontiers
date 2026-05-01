@@ -648,85 +648,37 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   position: relative;
 }
 
-button.roll-label-main,
-button.roll-label-action {
+button.roll-label-main {
   background: transparent;
   border: none;
   border-radius: 0;
   box-shadow: none;
   color: var(--sf-ink);
   cursor: pointer;
+  font-family: var(--fieldset);
+  font-size: 1rem;
   height: auto;
+  line-height: 1;
   min-height: 0;
   min-width: 0;
   padding: 0;
+  text-transform: uppercase;
   width: auto;
 }
 
-button.roll-label-main {
-  font-family: var(--fieldset);
-  font-size: 1rem;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.roll-label-main:hover,
-.roll-label-main:focus-visible {
+button.roll-label-main:hover,
+button.roll-label-main:focus-visible {
   background: transparent;
   color: var(--sf-focus);
   text-decoration: underline;
 }
 
-button.roll-label-action {
-  font-family: var(--symbol);
-  font-size: 1rem;
-  line-height: 1;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-50%) scale(0.92);
-  transition: opacity 120ms ease, transform 120ms ease;
-}
-
-.roll-label-action {
-  width: 1.1rem;
-  height: 1.1rem;
-  background: var(--sf-ink);
-  border: 0;
-  padding: 0;
-
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: contain;
-
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: contain;
-}
-
-.roll-label-action--blind {
-  mask-image: url("../assets/icons/blind-roll.svg");
-  -webkit-mask-image: url("../assets/icons/blind-roll.svg");
-}
-
-.roll-label-action--gm {
-  mask-image: url("../assets/icons/whisper-roll-gm.svg");
-  -webkit-mask-image: url("../assets/icons/whisper-roll-gm.svg");
-}
-
-.roll-label-action:hover,
-.roll-label-action:focus-visible {
-  background: transparent;
-  color: var(--sf-focus);
-  transform: translateY(-50%) scale(1);
-}
-
 .roll-label-actions {
-  position: absolute;
-  top: 50%;
   display: inline-flex;
   gap: 4px;
+  position: absolute;
+  top: 50%;
   z-index: 2;
-  font-family: var(--symbol);
 }
 
 .roll-label-group--left .roll-label-actions {
@@ -737,11 +689,53 @@ button.roll-label-action {
   left: calc(100% + 8px);
 }
 
-.roll-label-group:hover .roll-label-action,
-.roll-label-group:focus-within .roll-label-action {
+button.roll-label-action {
+  background-color: var(--sf-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+  display: inline-block;
+  height: 1.1rem;
+  min-height: 0;
+  min-width: 0;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.92);
+  transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease;
+  width: 1.1rem;
+
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+button.roll-label-action.roll-label-action--blind {
+  mask-image: url("../assets/icons/blind-roll.svg");
+  -webkit-mask-image: url("../assets/icons/blind-roll.svg");
+}
+
+button.roll-label-action.roll-label-action--gm {
+  mask-image: url("../assets/icons/whisper-roll-gm.svg");
+  -webkit-mask-image: url("../assets/icons/whisper-roll-gm.svg");
+}
+
+.roll-label-group:hover button.roll-label-action,
+.roll-label-group:focus-within button.roll-label-action {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(-50%) scale(1);
+}
+
+button.roll-label-action:hover,
+button.roll-label-action:focus-visible {
+  background-color: var(--sf-focus);
 }
 
 .paired-stat span,
