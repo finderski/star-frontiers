@@ -674,19 +674,24 @@ button.roll-label-main:focus-visible {
 }
 
 .roll-label-actions {
+  align-items: center;
+  background: var(--sf-paper);
+  border: 1px solid var(--sf-line);
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
   display: inline-flex;
-  gap: 4px;
+  gap: 5px;
+  padding: 3px 4px;
   position: absolute;
-  top: 50%;
-  z-index: 2;
-}
 
-.roll-label-group--left .roll-label-actions {
-  right: calc(100% + 8px);
-}
+  left: 0;
+  top: -2.1rem;
 
-.roll-label-group--right .roll-label-actions {
-  left: calc(100% + 8px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.25rem);
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 50;
 }
 
 .star-frontiers-sheet button.roll-label-action {
@@ -694,18 +699,17 @@ button.roll-label-main:focus-visible {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  color: inherit;
   cursor: pointer;
   display: inline-block;
-  height: 1.1rem;
+  height: 1.25rem;
   min-height: 0;
   min-width: 0;
-  opacity: 0;
+  opacity: 1;
   padding: 0;
-  pointer-events: none;
-  transform: translateY(-50%) scale(0.92);
-  transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease;
-  width: 1.1rem;
+  pointer-events: auto;
+  transform: none;
+  transition: background-color 120ms ease;
+  width: 1.25rem;
 
   mask-position: center;
   mask-repeat: no-repeat;
@@ -716,12 +720,12 @@ button.roll-label-main:focus-visible {
   -webkit-mask-size: contain;
 }
 
-button.roll-label-action.roll-label-action--blind {
+.star-frontiers-sheet button.roll-label-action.roll-label-action--blind {
   mask-image: url("../assets/images/blind-roll.svg");
   -webkit-mask-image: url("../assets/images/blind-roll.svg");
 }
 
-button.roll-label-action.roll-label-action--gm {
+.star-frontiers-sheet button.roll-label-action.roll-label-action--gm {
   mask-image: url("../assets/images/whisper-roll-gm.svg");
   -webkit-mask-image: url("../assets/images/whisper-roll-gm.svg");
 }
@@ -733,9 +737,17 @@ button.roll-label-action.roll-label-action--gm {
   transform: translateY(-50%) scale(1);
 }
 
-button.roll-label-action:hover,
-button.roll-label-action:focus-visible {
+.star-frontiers-sheet .roll-label-group:hover .roll-label-actions,
+.star-frontiers-sheet .roll-label-group:focus-within .roll-label-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.star-frontiers-sheet button.roll-label-action:hover,
+.star-frontiers-sheet button.roll-label-action:focus-visible {
   background-color: var(--sf-focus);
+  transform: none;
 }
 
 .paired-stat span,
