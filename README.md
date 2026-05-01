@@ -31,3 +31,7 @@ The `Rules Edition` world setting is available under Configure Settings. For now
 Weapons, skills, and equipment are intentionally modeled as embedded Items rather
 than fixed character fields. The current sheet displays those owned Items in a
 paper-sheet layout while the item sheets and drag/drop workflows are still pending.
+
+## Additional Notes
+
+Migrations are intentionally minimal for now. The current scaffold records the world schema version and provides a no-op baseline. Add real migrations only when changing persisted Actor/Item data paths or meanings.
