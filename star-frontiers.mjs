@@ -39,7 +39,7 @@ function applySheetTheme(theme = game.settings.get(SYSTEM_ID, "sheetTheme")) {
 
 Hooks.once("init", () => {
   registerMigrationSettings();
-  runMigrations();
+  // runMigrations();
 
   CONFIG.SF = {
     ...(CONFIG.SF ?? {}),
