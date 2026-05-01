@@ -678,20 +678,29 @@ button.roll-label-main:focus-visible {
   background: var(--sf-paper);
   border: 1px solid var(--sf-line);
   border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
   display: inline-flex;
-  gap: 5px;
-  padding: 3px 4px;
+  gap: 6px;
+  padding: 4px 5px;
   position: absolute;
-
-  left: 0;
-  top: -2.1rem;
+  bottom: calc(100% + 0.55rem);
+  z-index: 100;
 
   opacity: 0;
   pointer-events: none;
-  transform: translateY(0.25rem);
-  transition: opacity 120ms ease, transform 120ms ease;
-  z-index: 50;
+  visibility: hidden;
+
+  transition: opacity 120ms ease;
+}
+
+/* Invisible bridge so moving from label to toolbar doesn't break hover */
+.roll-label-actions::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.65rem;
+  height: 0.65rem;
 }
 
 .star-frontiers-sheet button.roll-label-action {
@@ -734,14 +743,25 @@ button.roll-label-main:focus-visible {
 .roll-label-group:focus-within button.roll-label-action {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(-50%) scale(1);
 }
 
 .star-frontiers-sheet .roll-label-group:hover .roll-label-actions,
 .star-frontiers-sheet .roll-label-group:focus-within .roll-label-actions {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0);
+  visibility: visible;
+}
+
+/* Left-side labels: toolbar opens upward/right */
+.roll-label-group--left .roll-label-actions {
+  left: 0;
+  right: auto;
+}
+
+/* Right-side labels: toolbar opens upward/left */
+.roll-label-group--right .roll-label-actions {
+  right: 0;
+  left: auto;
 }
 
 .star-frontiers-sheet button.roll-label-action:hover,
