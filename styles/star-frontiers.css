@@ -114,6 +114,7 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   box-shadow: none;
   color: var(--sf-ink);
   font: inherit;
+  font-family: var(--input);
   height: 28px;
   min-width: 0;
   padding: 2px 4px;
@@ -667,34 +668,46 @@ button.roll-label-main {
 
   position: relative;
   isolation: isolate;
+  z-index: 0;
 }
 
-button.roll-label-main::before {
-  font-family: "Font Awesome 6 Free";
-  font-weight: 900;
-  content: var(--fa) / "";
-
-  position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -50%);
-
-  font-size: 1.25rem;
-  line-height: 1;
-  opacity: 0.18;
-  pointer-events: none;
-  z-index: -1;
+button.roll-label-main {
+  text-shadow:
+    1px 0 var(--sf-paper),
+    -1px 0 var(--sf-paper),
+    0 1px var(--sf-paper),
+    0 -1px var(--sf-paper);
 }
 
-button.roll-label-main:hover::before,
-button.roll-label-main:focus-visible::before {
-  opacity: 0.35;
+button.roll-label-main:hover .roll-label-main__icon,
+button.roll-label-main:focus-visible .roll-label-main__icon {
+  opacity: 0.5;
+  z-index: 10;
 }
+
 
 button.roll-label-main:hover,
 button.roll-label-main:focus-visible {
   background: transparent;
   color: var(--sf-focus);
-  text-decoration: underline;
+}
+
+.roll-label-main__icon {
+  color: var(--sf-ink);
+  font-size: 1.25rem;
+  left: 50%;
+  line-height: 1;
+  opacity: 0.18;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+}
+
+.roll-label-main__text {
+  position: relative;
+  z-index: 1;
 }
 
 .roll-label-actions {
