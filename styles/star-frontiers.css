@@ -664,6 +664,30 @@ button.roll-label-main {
   padding: 0;
   text-transform: uppercase;
   width: auto;
+
+  position: relative;
+  isolation: isolate;
+}
+
+button.roll-label-main::before {
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  content: var(--fa) / "";
+
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+
+  font-size: 1.25rem;
+  line-height: 1;
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: -1;
+}
+
+button.roll-label-main:hover::before,
+button.roll-label-main:focus-visible::before {
+  opacity: 0.35;
 }
 
 button.roll-label-main:hover,
