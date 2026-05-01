@@ -97,6 +97,11 @@
         "rounds": "Rounds",
         "seu": "SEU"
       },
+      "CarryState": {
+        "carried": "Carried",
+        "ready": "Ready",
+        "stored": "Stored"
+      },
       "DamageType": {
         "None": "None",
         "acid": "Acid",
@@ -194,6 +199,7 @@
       "Actions": "Actions",
       "AmmoData": "Ammunition",
       "AmmoLinked": "Linked ammo: {name}",
+      "AmmoPerShot": "Ammo/Shot",
       "AmmoType": "Ammo Type",
       "AmmoUse": "Ammo Use",
       "ArmorData": "Armor",
@@ -203,6 +209,7 @@
       "Cap": "Cap",
       "Capacity": "Capacity",
       "Category": "Category",
+      "CarryState": "Carry State",
       "Common": "Common",
       "ComputerData": "Computer",
       "ConsumableData": "Consumable",
@@ -211,6 +218,7 @@
       "Consumed": "Consumed",
       "Cost": "Cost",
       "CopyName": "{name} Copy",
+      "CurrentSetting": "Current Setting",
       "CurrentChance": "Current Chance",
       "DamageFormula": "Damage",
       "DamageType": "Damage Type",
@@ -343,10 +351,26 @@
     },
     "Weapon": {
       "Ammo": "Ammo",
+      "AmmoRemaining": "Ammo Remaining",
       "Attack": "Attack",
+      "AttackFlavor": "{weapon} Attack",
+      "AttackPrompt": "Choose the range band and enter any situational modifier. The base target is {target}.",
+      "AttackTitle": "{weapon} Attack",
       "BasicToHit": "Basic # To Hit",
       "Damage": "DMG",
-      "Name": "Weapon"
+      "DamageType": "Damage Type",
+      "DamageFlavor": "{weapon} Damage",
+      "DamageFormulaLabel": "Damage Formula",
+      "DamageTitle": "{name}: {weapon} Damage",
+      "InvalidDamageFormula": "That weapon's damage formula is invalid.",
+      "Name": "Weapon",
+      "NoDamageFormula": "That weapon does not have a damage formula yet.",
+      "OutOfAmmo": "That weapon does not have enough loaded ammunition.",
+      "Range": "Range",
+      "RangeModifier": "Range Mod",
+      "RollAttack": "Roll Attack",
+      "RollDamage": "Roll Damage",
+      "Skill": "Skill"
     }
   }
 }

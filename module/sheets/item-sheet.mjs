@@ -62,6 +62,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     return {
       ability: this.#choices(["", "str", "sta", "dex", "rs", "int", "log", "per", "ldr"], "STARFRONTIERS.Ability"),
       ammoUse: this.#choices(["clip", "powerpack", "seu", "rounds", "none"], "STARFRONTIERS.Choice.AmmoUse"),
+      carryState: this.#choices(["ready", "carried", "stored"], "STARFRONTIERS.Choice.CarryState"),
       damageType: this.#choices(["", "laser", "sonic", "inertia", "gauss", "needler", "acid", "poison", "other"], "STARFRONTIERS.Choice.DamageType"),
       armorReduction: this.#choices(["", "half", "full", "flat"], "STARFRONTIERS.Choice.DefenseMode"),
       psa: this.#choices(["", "military", "technological", "biosocial"], "STARFRONTIERS.Choice.PSA"),

@@ -190,8 +190,13 @@
       </div>
       {{#each weaponRows as |row|}}
         <div class="weapons-grid" data-item-id="{{row.key}}">
-          <input type="text" value="{{row.data.name}}" aria-label="{{localize "STARFRONTIERS.Weapon.Name"}}" readonly />
-          <input type="text" value="{{row.data.damage}}" aria-label="{{localize "STARFRONTIERS.Weapon.Damage"}}" readonly />
+          {{#if row.editable}}
+            <button type="button" class="weapon-roll-button" data-action="rollWeaponAttack" title="{{localize "STARFRONTIERS.Weapon.RollAttack"}}">{{row.data.name}}</button>
+            <button type="button" class="weapon-roll-button weapon-roll-button--damage" data-action="rollWeaponDamage" title="{{localize "STARFRONTIERS.Weapon.RollDamage"}}">{{row.data.damage}}</button>
+          {{else}}
+            <input type="text" value="{{row.data.name}}" aria-label="{{localize "STARFRONTIERS.Weapon.Name"}}" readonly />
+            <input type="text" value="{{row.data.damage}}" aria-label="{{localize "STARFRONTIERS.Weapon.Damage"}}" readonly />
+          {{/if}}
           <input type="text" value="{{row.data.toHit}}" aria-label="{{localize "STARFRONTIERS.Weapon.BasicToHit"}}" readonly />
           <input type="text" value="{{row.data.pointBlank}}" aria-label="PB" readonly />
           <input type="text" value="{{row.data.short}}" aria-label="S" readonly />
@@ -208,11 +213,11 @@
           {{/if}}
           {{#if row.editable}}
             <div class="item-actions">
+              <select data-item-field="system.carryState" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}">
+                {{selectOptions @root.carryStateChoices selected=row.data.carryState localize=true}}
+              </select>
               <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
                 <i class="fa-solid fa-pen-to-square"></i>
-              </button>
-              <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}">
-                <i class="fa-solid fa-copy"></i>
               </button>
               <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}">
                 <i class="fa-solid fa-trash"></i>

@@ -196,3 +196,12 @@ Hooks.on("preCreateItem", (item, data) => {
   if (data?.system?.rulesEdition) return;
   item.updateSource({ "system.rulesEdition": game.settings.get(SYSTEM_ID, "rulesEdition") });
 });
+
+Hooks.on("renderChatMessageHTML", (message, html) => {
+  for (const button of html.querySelectorAll(".sf-chat-action")) {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      StarFrontiersCharacterSheet.handleChatCardAction(button);
+    });
+  }
+});

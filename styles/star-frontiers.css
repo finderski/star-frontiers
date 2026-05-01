@@ -136,6 +136,10 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   color: var(--sf-muted);
 }
 
+.star-frontiers-sheet textarea.fieldInput {
+  font-size: 0.75em;
+}
+
 .star-frontiers-sheet textarea,
 .star-frontiers-item-sheet textarea {
   border: 1px solid transparent;
@@ -853,13 +857,39 @@ button.roll-label-main:focus-visible {
     minmax(98px, 0.85fr)
     repeat(5, minmax(42px, 0.4fr))
     minmax(90px, 0.75fr)
-    minmax(82px, 0.45fr);
+    minmax(170px, 0.8fr);
 }
 
 .weapons-heading span {
   font-size: 1.25rem;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.weapons-grid .weapon-roll-button {
+  border: 0;
+  border-bottom: 2px solid var(--sf-line);
+  border-radius: 0;
+  box-shadow: none;
+  font-family: var(--input);
+  font-size: 1.05rem;
+  height: 28px;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 2px 4px;
+  text-align: left;
+  width: 100%;
+}
+
+.weapons-grid .weapon-roll-button:hover,
+.weapons-grid .weapon-roll-button:focus-visible {
+  background: var(--sf-button-hover);
+  border-bottom-color: var(--sf-focus);
+}
+
+.weapons-grid .weapon-roll-button--damage {
+  justify-content: center;
+  text-align: center;
 }
 
 .weapon-ammo-cell {
@@ -957,10 +987,43 @@ button.roll-label-main:focus-visible {
   justify-content: flex-end;
 }
 
+.weapons-grid .item-actions {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: minmax(92px, 1fr) 24px 24px;
+}
+
+.weapons-grid .item-actions select {
+  font-size: 0.95rem;
+  height: 24px;
+  min-width: 0;
+  padding-inline: 2px;
+}
+
 .item-actions button {
   height: 24px;
   padding: 0;
   width: 24px;
+}
+
+.chat-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chat-card-actions .sf-chat-action {
+  background: transparent;
+  border: 1px solid var(--sf-chat-line);
+  color: var(--sf-chat-ink);
+  cursor: pointer;
+  font: inherit;
+  min-height: 28px;
+  padding: 4px 10px;
+}
+
+.chat-card-actions .sf-chat-action:hover,
+.chat-card-actions .sf-chat-action:focus-visible {
+  background: color-mix(in srgb, var(--sf-chat-ink) 10%, transparent);
 }
 
 .section-controls {

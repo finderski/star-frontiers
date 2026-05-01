@@ -1,0 +1,39 @@
+<section class="star-frontiers check-roll-card weapon-attack-card">
+  <header class="check-roll-card__header">
+    <h3>{{title}}</h3>
+    {{#if subtitle}}
+      <p>{{subtitle}}</p>
+    {{/if}}
+  </header>
+
+  <div class="check-roll-card__rows">
+    {{#each rows as |row|}}
+      <div class="check-roll-card__row">
+        <span class="check-roll-card__label">{{row.label}}</span>
+        <strong class="check-roll-card__value">{{row.value}}</strong>
+      </div>
+    {{/each}}
+  </div>
+
+  {{#if outcome}}
+    <div class="check-roll-card__outcome check-roll-card__outcome--{{outcomeClass}}">
+      {{outcome}}
+    </div>
+  {{/if}}
+
+  {{#if canRollDamage}}
+    <div class="chat-card-actions">
+      <button
+        type="button"
+        class="sf-chat-action"
+        data-action="rollWeaponDamage"
+        data-item-uuid="{{itemUuid}}"
+        data-roll-mode="{{rollMode}}"
+      >
+        {{damageButtonLabel}}
+      </button>
+    </div>
+  {{/if}}
+
+  {{{rollHtml}}}
+</section>

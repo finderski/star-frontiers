@@ -148,6 +148,7 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
+      carryState: textField({ initial: "ready", choices: ["ready", "carried", "stored"] }),
       weaponType: textField({
         initial: "pistol",
         choices: ["pistol", "rifle", "grenade", "melee", "heavy", "thrown"]
