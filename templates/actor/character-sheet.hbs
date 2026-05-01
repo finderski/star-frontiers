@@ -177,16 +177,16 @@
     <fieldset class="paper-box weapons-box full-width">
       <legend>{{localize "STARFRONTIERS.Character.Weapons"}}</legend>
       <div class="weapons-grid weapons-heading" aria-hidden="true">
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Name"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Damage"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.BasicToHit"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.PointBlank-abbr"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Short-abbr"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Medium-abbr"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Long-abbr"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Extreme-abbr"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Weapon.Ammo"}}</span>
-        <span class="labelSpan">{{localize "STARFRONTIERS.Item.Actions"}}</span>
+        <span class="labelSpan ls-Left">{{localize "STARFRONTIERS.Weapon.Name"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Weapon.Damage"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Weapon.BasicToHit"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Weapon.PointBlank-abbr"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Weapon.Short-abbr"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Weapon.Medium-abbr"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Weapon.Long-abbr"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Weapon.Extreme-abbr"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Weapon.Ammo"}}</span>
+        <span class="labelSpan ls-Center">{{localize "STARFRONTIERS.Item.Actions"}}</span>
       </div>
       {{#each weaponRows as |row|}}
         <div class="weapons-grid" data-item-id="{{row.key}}">
@@ -197,12 +197,12 @@
             <input type="text" value="{{row.data.name}}" aria-label="{{localize "STARFRONTIERS.Weapon.Name"}}" readonly />
             <input type="text" value="{{row.data.damage}}" aria-label="{{localize "STARFRONTIERS.Weapon.Damage"}}" readonly />
           {{/if}}
-          <input type="text" value="{{row.data.toHit}}" aria-label="{{localize "STARFRONTIERS.Weapon.BasicToHit"}}" readonly />
-          <input type="text" value="{{row.data.pointBlank}}" aria-label="PB" readonly />
-          <input type="text" value="{{row.data.short}}" aria-label="S" readonly />
-          <input type="text" value="{{row.data.medium}}" aria-label="M" readonly />
-          <input type="text" value="{{row.data.long}}" aria-label="L" readonly />
-          <input type="text" value="{{row.data.extreme}}" aria-label="E" readonly />
+          <input class="ls-Center" type="text" value="{{row.data.toHit}}" aria-label="{{localize "STARFRONTIERS.Weapon.BasicToHit"}}" readonly />
+          <input class="ls-Center" type="text" value="{{row.data.pointBlank}}" aria-label="PB" readonly />
+          <input class="ls-Center" type="text" value="{{row.data.short}}" aria-label="S" readonly />
+          <input class="ls-Center" type="text" value="{{row.data.medium}}" aria-label="M" readonly />
+          <input class="ls-Center" type="text" value="{{row.data.long}}" aria-label="L" readonly />
+          <input class="ls-Center" type="text" value="{{row.data.extreme}}" aria-label="E" readonly />
           {{#if row.editable}}
             <div class="weapon-ammo-cell">
               <input type="number" value="{{row.data.ammoLoaded}}" min="0" max="{{row.data.ammoCapacity}}" data-item-ammo-loaded aria-label="{{localize "STARFRONTIERS.Item.Loaded"}}" />
@@ -213,13 +213,15 @@
           {{/if}}
           {{#if row.editable}}
             <div class="item-actions">
-              <select data-item-field="system.carryState" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}">
+              <!--<select data-item-field="system.carryState" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}">
                 {{selectOptions @root.carryStateChoices selected=row.data.carryState localize=true}}
-              </select>
-              <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
+              </select>-->
+              <button type="button" class="weapon-carry-state weapon-carry-state--{{row.data.carryState}}" data-action="cycleWeaponCarryState" title="{{localize "STARFRONTIERS.Item.CarryState"}}" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}"></button>
+                <!--<i class="fa-solid fa-hand-fist"></i>-->
+              <button type="button" class="weapon-row-action" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
-              <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}">
+              <button type="button" class="weapon-row-action" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}">
                 <i class="fa-solid fa-trash"></i>
               </button>
             </div>

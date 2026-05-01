@@ -41,7 +41,8 @@
 }
 
 #pause > figcaption {
-  font-family: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
+  font-family: "av05";
+  font-size: 2.5em;
 }
 
 .star-frontiers-sheet {
@@ -869,12 +870,12 @@ button.roll-label-main:focus-visible {
   display: grid;
   gap: 8px;
   grid-template-columns:
-    minmax(160px, 1.7fr)
-    minmax(58px, 0.45fr)
-    minmax(98px, 0.85fr)
-    repeat(5, minmax(42px, 0.4fr))
-    minmax(90px, 0.75fr)
-    minmax(170px, 0.8fr);
+    [col1] minmax(160px, 1.7fr)
+    [col2] minmax(58px, 0.45fr)
+    [col3] minmax(75px, 0.85fr)
+    [col4-8] repeat(5, minmax(55px, 0.4fr))
+    [col9] minmax(100px, 0.75fr)
+    [col10]  minmax(85px, 0.8fr)
 }
 
 .weapons-heading span {
@@ -906,6 +907,17 @@ button.roll-label-main:focus-visible {
 
 .weapons-grid .weapon-roll-button--damage {
   justify-content: center;
+  text-align: center;
+}
+
+.weapons-grid span.labelSpan.ls-Left {
+  justify-self: left;
+  text-align: left;
+}
+
+.weapons-grid span.labelSpan.ls-Center,
+.weapons-grid input.ls-Center {
+  justify-self: center;
   text-align: center;
 }
 
@@ -1004,10 +1016,60 @@ button.roll-label-main:focus-visible {
   justify-content: flex-end;
 }
 
+.star-frontiers-sheet button.weapon-carry-state {
+  background-color: var(--sf-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  display: inline-block;
+  height: 1.35rem;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  width: 1.35rem;
+
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.star-frontiers-sheet button.weapon-carry-state:hover,
+.star-frontiers-sheet button.weapon-carry-state:focus-visible {
+  background-color: var(--sf-focus);
+}
+
+.weapon-carry-state--ready {
+  mask-image: url("../assets/images/sheet-icons/equipped.svg");
+  -webkit-mask-image: url("../assets/images/sheet-icons/equipped.svg");
+}
+
+.weapon-carry-state--carried {
+  mask-image: url("../assets/images/sheet-icons/carried.svg");
+  -webkit-mask-image: url("../assets/images/sheet-icons/carried.svg");
+}
+
+.weapon-carry-state--stored {
+  mask-image: url("../assets/images/sheet-icons/stashed.svg");
+  -webkit-mask-image: url("../assets/images/sheet-icons/stashed.svg");
+}
+
+.star-frontiers-sheet button.weapon-row-action {
+  height: 1.35rem;
+  min-height: 0;
+  padding: 0;
+  width: 1.35rem;
+}
+
 .weapons-grid .item-actions {
   display: grid;
   gap: 4px;
-  grid-template-columns: minmax(92px, 1fr) 24px 24px;
+  /*grid-template-columns: minmax(92px, 1fr) 24px 24px;*/
+  grid-template-columns: repeat(3, 24px);
 }
 
 .weapons-grid .item-actions select {

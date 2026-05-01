@@ -55,6 +55,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       rollInitiative: StarFrontiersCharacterSheet.#onRollInitiative,
       rollWeaponAttack: StarFrontiersCharacterSheet.#onRollWeaponAttack,
       rollWeaponDamage: StarFrontiersCharacterSheet.#onRollWeaponDamage,
+      cycleWeaponCarryState: StarFrontiersCharacterSheet.#onCycleWeaponCarryState,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
   };
@@ -307,6 +308,19 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!weapon) return;
     await StarFrontiersCharacterSheet.#rollWeaponDamage(this.document, weapon, target.dataset.rollMode ?? "public");
+  }
+
+  static async #onCycleWeaponCarryState(event, target) {
+    target ??= event.currentTarget;
+
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+
+    const states = ["ready", "carried", "stored"];
+    const current = item.system.carryState || "ready";
+    const next = states[(states.indexOf(current) + 1) % states.length];
+
+    await item.update({ "system.carryState": next });
   }
 
   static #getItemFromTarget(actor, target) {
