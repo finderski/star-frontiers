@@ -23,6 +23,10 @@ import {
 } from "./module/data/item-data.mjs";
 import { StarFrontiersCharacterSheet } from "./module/sheets/character-sheet.mjs";
 import { StarFrontiersItemSheet } from "./module/sheets/item-sheet.mjs";
+import {
+  registerMigrationSettings,
+  runMigrations
+} from "./module/migration/migrations.mjs";
 
 export const STAR_FRONTIERS = {
   id: SYSTEM_ID
@@ -34,6 +38,9 @@ function applySheetTheme(theme = game.settings.get(SYSTEM_ID, "sheetTheme")) {
 }
 
 Hooks.once("init", () => {
+  registerMigrationSettings();
+  runMigrations();
+
   CONFIG.SF = {
     ...(CONFIG.SF ?? {}),
     ...STAR_FRONTIERS_CONFIG
@@ -168,8 +175,9 @@ Hooks.once("init", () => {
   });
 });
 
-Hooks.once("ready", () => {
+Hooks.once("ready", async () => {
   applySheetTheme();
+  await runMigrations();
 });
 
 Hooks.on("preCreateItem", (item, data) => {
