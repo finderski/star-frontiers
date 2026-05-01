@@ -687,6 +687,32 @@ button.roll-label-action {
   transition: opacity 120ms ease, transform 120ms ease;
 }
 
+.roll-label-action {
+  width: 1.1rem;
+  height: 1.1rem;
+  background: var(--sf-ink);
+  border: 0;
+  padding: 0;
+
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}
+
+.roll-label-action--blind {
+  mask-image: url("../assets/icons/blind-roll.svg");
+  -webkit-mask-image: url("../assets/icons/blind-roll.svg");
+}
+
+.roll-label-action--gm {
+  mask-image: url("../assets/icons/whisper-roll-gm.svg");
+  -webkit-mask-image: url("../assets/icons/whisper-roll-gm.svg");
+}
+
 .roll-label-action:hover,
 .roll-label-action:focus-visible {
   background: transparent;

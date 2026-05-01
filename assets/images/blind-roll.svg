@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none" role="img" aria-label="Speech bubble">
+  <path d="M24 34C24 21.85 34.75 12 48 12H80C93.25 12 104 21.85 104 34V61C104 73.15 93.25 83 80 83H58L36 108V80.5C28.77 76.9 24 69.62 24 61V34Z"
+        stroke="#1f1f1f" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
