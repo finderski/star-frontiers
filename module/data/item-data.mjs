@@ -46,9 +46,13 @@ export class StarFrontiersRaceData extends StarFrontiersItemData {
       ...super.defineSchema(),
       modifiers: schemaField({
         str: numberField({ initial: 0 }),
+        sta: numberField({ initial: 0 }),
         dex: numberField({ initial: 0 }),
+        rs: numberField({ initial: 0 }),
         int: numberField({ initial: 0 }),
-        per: numberField({ initial: 0 })
+        log: numberField({ initial: 0 }),
+        per: numberField({ initial: 0 }),
+        ldr: numberField({ initial: 0 })
       }),
       movement: schemaField({
         walking: numberField({ initial: 2, min: 0 }),

@@ -187,7 +187,9 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
     this.derived.paired.perLdr = Math.max(abilities.per.value, abilities.ldr.value);
     this.derived.derivedLimbs = Math.ceil((abilities.dex.value || 0) / 10);
 
-    const raceItem = this.parent?.items?.get(this.race) ?? this.parent?.items?.find((item) => item.type === "race");
+    const raceItem = this.parent?.items?.get(this.race)
+      ?? this.parent?.items?.find((item) => item.type === "race" && item.name === this.race)
+      ?? this.parent?.items?.find((item) => item.type === "race");
     const raceMovement = raceItem?.system?.movement
       ?? CONFIG.SF?.raceMovement?.[raceItem?.system?.key]
       ?? CONFIG.SF?.raceMovement?.[raceKeyFrom(this.race)]

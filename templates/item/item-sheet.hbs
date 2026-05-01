@@ -36,12 +36,25 @@
     {{#if is.race}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.RaceData"}}</legend>
-        <div class="compact-grid four-columns">
-          <label><span>STR/STA</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
-          <label><span>DEX/RS</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
-          <label><span>INT/LOG</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
-          <label><span>PER/LDR</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
-        </div>
+        {{#if expandedRules}}
+          <div class="compact-grid four-columns">
+            <label><span>{{localize "STARFRONTIERS.Ability.str"}}</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.sta"}}</span><input type="number" name="system.modifiers.sta" value="{{system.modifiers.sta}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.dex"}}</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.rs"}}</span><input type="number" name="system.modifiers.rs" value="{{system.modifiers.rs}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.int"}}</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.log"}}</span><input type="number" name="system.modifiers.log" value="{{system.modifiers.log}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.per"}}</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.ldr"}}</span><input type="number" name="system.modifiers.ldr" value="{{system.modifiers.ldr}}" /></label>
+          </div>
+        {{else}}
+          <div class="compact-grid four-columns">
+            <label><span>STR/STA</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
+            <label><span>DEX/RS</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
+            <label><span>INT/LOG</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
+            <label><span>PER/LDR</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
+          </div>
+        {{/if}}
         <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Character.Walking"}}</span><input type="number" name="system.movement.walking" value="{{system.movement.walking}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Character.Running"}}</span><input type="number" name="system.movement.running" value="{{system.movement.running}}" min="0" /></label>

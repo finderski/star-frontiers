@@ -4,6 +4,12 @@ const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
 const MIN_WEAPON_ROWS = 4;
+const ABILITY_PAIRS = [
+  ["str", "sta"],
+  ["dex", "rs"],
+  ["int", "log"],
+  ["per", "ldr"]
+];
 const HANDEDNESS_CHOICES = {
   left: "STARFRONTIERS.Choice.Handedness.left",
   right: "STARFRONTIERS.Choice.Handedness.right",
@@ -16,7 +22,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     classes: ["star-frontiers", "sheet", "actor", "character"],
     position: {
       width: 940,
-      height: "auto"
+      height: 900
     },
     window: {
       resizable: true
@@ -25,10 +31,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       closeOnSubmit: false,
       submitOnChange: true
     },
+    dragDrop: [{ dragSelector: null, dropSelector: ".star-frontiers-sheet" }],
     actions: {
       createItem: StarFrontiersCharacterSheet.#onCreateItem,
       deleteItem: StarFrontiersCharacterSheet.#onDeleteItem,
       duplicateItem: StarFrontiersCharacterSheet.#onDuplicateItem,
+      generateStats: StarFrontiersCharacterSheet.#onGenerateStats,
       openItem: StarFrontiersCharacterSheet.#onOpenItem,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
@@ -78,7 +86,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           extreme: this.#formatRangeBand(item.system.rangeBands.extreme),
           ammo: this.#formatAmmo(item),
           ammoCapacity: item.system.ammo?.capacity ?? 0,
-          ammoConsumed: item.system.ammo?.consumed ?? 0
+          ammoLoaded: this.#getLoadedAmmo(item)
         }
       }));
 
@@ -97,7 +105,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           extreme: "",
           ammo: "",
           ammoCapacity: "",
-          ammoConsumed: ""
+          ammoLoaded: ""
         }
       });
     }
@@ -117,11 +125,28 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return `${Math.max(ammo.capacity - ammo.consumed, 0)}/${ammo.capacity}`;
   }
 
+  #getLoadedAmmo(item) {
+    const ammo = item.system.ammo;
+    if (!ammo?.capacity) return 0;
+    return Math.max(ammo.capacity - ammo.consumed, 0);
+  }
+
   async _onRender(context, options) {
     await super._onRender(context, options);
-    for (const input of this.element.querySelectorAll("[data-item-field]")) {
+    for (const input of this.element.querySelectorAll("[data-item-field], [data-item-ammo-loaded]")) {
       input.addEventListener("change", this.#onItemFieldChange.bind(this));
     }
+  }
+
+  async _onDropDocument(event, document) {
+    if (document.documentName === "Item" && document.type === "race") {
+      const race = await this.#ownRaceItem(document);
+      await this.document.update({ "system.race": race.name });
+      ui.notifications.info(game.i18n.format("STARFRONTIERS.Character.RaceApplied", { name: race.name }));
+      return race;
+    }
+
+    return super._onDropDocument(event, document);
   }
 
   static #onPlaceholderAction(event, target) {
@@ -157,6 +182,26 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     copy?.sheet?.render(true);
   }
 
+  static async #onGenerateStats(event, target) {
+    const actor = this.document;
+    const race = StarFrontiersCharacterSheet.#getActiveRace(actor);
+    const updates = {};
+
+    for (const [primary, secondary] of ABILITY_PAIRS) {
+      const base = StarFrontiersCharacterSheet.#rollAbilityBase();
+      updates[`system.abilities.${primary}.base`] = base;
+      updates[`system.abilities.${secondary}.base`] = base;
+      updates[`system.abilities.${primary}.value`] = StarFrontiersCharacterSheet.#clampAbility(base + StarFrontiersCharacterSheet.#raceModifier(race, primary));
+      updates[`system.abilities.${secondary}.value`] = StarFrontiersCharacterSheet.#clampAbility(base + StarFrontiersCharacterSheet.#raceModifier(race, secondary));
+    }
+
+    updates["system.stamina.value"] = updates["system.abilities.sta.value"];
+    updates["system.stamina.max"] = updates["system.abilities.sta.value"];
+
+    await actor.update(updates);
+    ui.notifications.info(game.i18n.localize("STARFRONTIERS.Character.StatsGenerated"));
+  }
+
   static async #onDeleteItem(event, target) {
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
@@ -174,6 +219,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
 
+    if (target.dataset.itemAmmoLoaded !== undefined) {
+      const capacity = item.system.ammo?.capacity ?? 0;
+      const loaded = Math.min(Math.max(Number(target.value || 0), 0), capacity);
+      await item.update({ "system.ammo.consumed": Math.max(capacity - loaded, 0) });
+      return;
+    }
+
     const value = target.type === "number" ? Number(target.value || 0) : target.value;
     await item.update({ [target.dataset.itemField]: value });
   }
@@ -181,5 +233,52 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   #normalizeHandedness(value) {
     const normalized = String(value ?? "").toLowerCase();
     return normalized in HANDEDNESS_CHOICES ? normalized : "right";
+  }
+
+  async #ownRaceItem(document) {
+    if (document.parent === this.document) return document;
+
+    const source = document.toObject();
+    delete source._id;
+    source.system ??= {};
+    source.system.rulesEdition ??= game.settings.get(SYSTEM_ID, "rulesEdition");
+    const [race] = await this.document.createEmbeddedDocuments("Item", [source]);
+    return race;
+  }
+
+  static #getActiveRace(actor) {
+    const raceValue = actor.system.race;
+    return actor.items.get(raceValue)
+      ?? actor.items.find((item) => item.type === "race" && item.name === raceValue)
+      ?? actor.items.find((item) => item.type === "race");
+  }
+
+  static #raceModifier(race, ability) {
+    const modifiers = race?.system?.modifiers;
+    if (!modifiers) return 0;
+    if (race.system.rulesEdition === "expanded") return Number(modifiers[ability] ?? 0);
+
+    const direct = modifiers[ability];
+    if (direct !== undefined && direct !== null && direct !== 0) return Number(direct);
+
+    const pairPrimary = ABILITY_PAIRS.find((pair) => pair.includes(ability))?.[0];
+    return Number(modifiers[pairPrimary] ?? 0);
+  }
+
+  static #rollAbilityBase() {
+    const roll = Math.ceil(Math.random() * 100);
+    if (roll <= 10) return 30;
+    if (roll <= 20) return 35;
+    if (roll <= 35) return 40;
+    if (roll <= 55) return 45;
+    if (roll <= 70) return 50;
+    if (roll <= 80) return 55;
+    if (roll <= 90) return 60;
+    if (roll <= 95) return 65;
+    return 70;
+  }
+
+  static #clampAbility(value) {
+    return Math.min(Math.max(value, 1), 100);
   }
 }

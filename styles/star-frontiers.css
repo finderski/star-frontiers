@@ -27,13 +27,24 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   box-shadow: var(--sf-window-shadow);
 }
 
+.star-frontiers.sheet.actor.character .window-content {
+  overflow: hidden;
+}
+
+.star-frontiers.sheet.actor.character .star-frontiers-sheet {
+  height: 100%;
+  overflow-y: auto;
+}
+
 .star-frontiers-sheet,
 .star-frontiers-item-sheet {
   background: var(--sf-paper);
   color: var(--sf-ink);
   font-family: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
   font-size: 16px;
+  max-height: calc(100vh - 120px);
   min-width: 0;
+  overflow-y: auto;
   padding: 18px;
 }
 
@@ -263,7 +274,8 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   display: grid;
   gap: 36px;
   grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
-  margin-bottom: 20px;
+  grid-template-rows: [row1] auto [row2] auto;
+  margin-bottom: 25px;
 }
 
 .identity-block {
@@ -273,6 +285,15 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 
 .identity-block.compact {
   align-content: end;
+}
+
+.player-name-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  width: 100%;
+  grid-column: 1 / span2;
 }
 
 .field-line,
@@ -296,6 +317,15 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 
 .player-name span {
   font-size: 2rem;
+}
+
+.player-name input[name="system.playerName"] {
+  font-size: 2rem;
+}
+
+.player-name-row button {
+  height: 32px;
+  padding-inline: 10px;
 }
 
 .movement-row {

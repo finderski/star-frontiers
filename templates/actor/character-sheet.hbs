@@ -1,10 +1,17 @@
 <section class="star-frontiers-sheet {{themeClass}}" autocomplete="off">
   <header class="sheet-header paper-header">
-    <div class="identity-block">
+    <div class="player-name-row">
       <label class="field-line player-name">
         <span>{{localize "STARFRONTIERS.Character.PlayerName"}}</span>
         <input type="text" name="system.playerName" value="{{system.playerName}}" />
       </label>
+      <button type="button" data-action="generateStats" title="{{localize "STARFRONTIERS.Character.GenerateStats"}}">
+        <i class="fa-solid fa-dice-d10"></i>
+        <span>{{localize "STARFRONTIERS.Character.GenerateStats"}}</span>
+      </button>
+    </div>
+    <div class="identity-block">
+      <!-- Player Name Row was here -->
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.CharacterName"}}</span>
         <input type="text" name="name" value="{{actor.name}}" />
@@ -129,7 +136,7 @@
           <input type="text" value="{{row.data.extreme}}" aria-label="E" readonly />
           {{#if row.editable}}
             <div class="weapon-ammo-cell">
-              <input type="number" value="{{row.data.ammoConsumed}}" min="0" max="{{row.data.ammoCapacity}}" data-item-field="system.ammo.consumed" aria-label="{{localize "STARFRONTIERS.Item.Consumed"}}" />
+              <input type="number" value="{{row.data.ammoLoaded}}" min="0" max="{{row.data.ammoCapacity}}" data-item-ammo-loaded aria-label="{{localize "STARFRONTIERS.Item.Loaded"}}" />
               <span>/ {{row.data.ammoCapacity}}</span>
             </div>
           {{else}}
