@@ -689,7 +689,7 @@ button.roll-label-main:focus-visible {
   left: calc(100% + 8px);
 }
 
-button.roll-label-action {
+.star-frontiers-sheet button.roll-label-action {
   background-color: var(--sf-ink);
   border: 0;
   border-radius: 0;
