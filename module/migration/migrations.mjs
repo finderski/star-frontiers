@@ -1,6 +1,7 @@
 import { SYSTEM_ID } from "../config.mjs";
 
 export const CURRENT_SCHEMA_VERSION = "0.1.0";
+const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
   {
@@ -18,7 +19,7 @@ export function registerMigrationSettings() {
     scope: "world",
     config: false,
     type: String,
-    default: CURRENT_SCHEMA_VERSION
+    default: BASELINE_SCHEMA_VERSION
   });
 }
 
