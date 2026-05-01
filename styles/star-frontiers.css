@@ -717,13 +717,13 @@ button.roll-label-main:focus-visible {
 }
 
 button.roll-label-action.roll-label-action--blind {
-  mask-image: url("../assets/icons/blind-roll.svg");
-  -webkit-mask-image: url("../assets/icons/blind-roll.svg");
+  mask-image: url("../assets/images/blind-roll.svg");
+  -webkit-mask-image: url("../assets/images/blind-roll.svg");
 }
 
 button.roll-label-action.roll-label-action--gm {
-  mask-image: url("../assets/icons/whisper-roll-gm.svg");
-  -webkit-mask-image: url("../assets/icons/whisper-roll-gm.svg");
+  mask-image: url("../assets/images/whisper-roll-gm.svg");
+  -webkit-mask-image: url("../assets/images/whisper-roll-gm.svg");
 }
 
 .roll-label-group:hover button.roll-label-action,
