@@ -191,8 +191,20 @@
       {{#each weaponRows as |row|}}
         <div class="weapons-grid" data-item-id="{{row.key}}">
           {{#if row.editable}}
-            <button type="button" class="weapon-roll-button" data-action="rollWeaponAttack" title="{{localize "STARFRONTIERS.Weapon.RollAttack"}}">{{row.data.name}}</button>
-            <button type="button" class="weapon-roll-button weapon-roll-button--damage" data-action="rollWeaponDamage" title="{{localize "STARFRONTIERS.Weapon.RollDamage"}}">{{row.data.damage}}</button>
+            <div class="roll-label-group">
+              <button type="button" class="weapon-roll-button" data-action="rollWeaponAttack" title="{{localize "STARFRONTIERS.Weapon.RollAttack"}}">{{row.data.name}}</button>
+              <div class="roll-label-actions">
+                <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollWeaponAttack" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Weapon.RollAttackBlind"}}"></button>
+                <button type="button" class="roll-label-action roll-label-action--gm" data-action="rollWeaponAttack" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Weapon.RollAttackWhisper"}}"></button>
+              </div>
+            </div>
+            <div class="roll-label-group">
+                <button type="button" class="weapon-roll-button weapon-roll-button--damage" data-action="rollWeaponDamage" title="{{localize "STARFRONTIERS.Weapon.RollDamage"}}">{{row.data.damage}}</button>
+                <div class="roll-label-actions">
+                  <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollWeaponDamage" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Weapon.RollDamageBlind"}}"></button>
+                  <button type="button" class="roll-label-action roll-label-action--gm" data-action="rollWeaponDamage" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Weapon.RollDamageWhisper"}}"></button>
+                </div>
+            </div>
           {{else}}
             <input type="text" value="{{row.data.name}}" aria-label="{{localize "STARFRONTIERS.Weapon.Name"}}" readonly />
             <input type="text" value="{{row.data.damage}}" aria-label="{{localize "STARFRONTIERS.Weapon.Damage"}}" readonly />
