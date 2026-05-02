@@ -36,6 +36,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     const item = this.item ?? this.document;
     context.item = item;
     context.system = item.system;
+    context.editable = this.isEditable;
     context.typeLabel = ITEM_TYPE_LABELS[item.type] ?? item.type;
     context.is = Object.fromEntries(Object.keys(ITEM_TYPE_LABELS).map((type) => [type, item.type === type]));
     context.itemRulesEdition = item.system.rulesEdition || game.settings.get(SYSTEM_ID, "rulesEdition");

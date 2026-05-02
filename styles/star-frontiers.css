@@ -1171,3 +1171,14 @@ button.roll-label-main:focus-visible {
     font-size: 1.05rem;
   }
 }
+
+.star-frontiers-item-sheet .editor {
+  border: 1px solid var(--sf-line);
+  min-height: 140px;
+  padding: 6px;
+}
+
+.star-frontiers-item-sheet .editor-content,
+.star-frontiers-item-sheet prose-mirror {
+  min-height: 120px;
+}

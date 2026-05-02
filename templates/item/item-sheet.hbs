@@ -27,10 +27,17 @@
           {{selectOptions choices.rulesEdition selected=itemRulesEdition}}
         </select>
       </label>
-      <label class="stacked">
+      <div class="stacked item-description-editor">
         <span>{{localize "STARFRONTIERS.Item.Description"}}</span>
-        <textarea name="system.description">{{system.description}}</textarea>
-      </label>
+        {{editor
+          system.description
+          target="system.description"
+          button=true
+          editable=editable
+          engine="prosemirror"
+          collaborate=false
+        }}
+      </div>
     </fieldset>
 
     {{#if is.race}}
