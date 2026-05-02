@@ -71,10 +71,6 @@
       "Total": "Total",
       "Using": "Using",
       "Walking": "Walking:",
-      "Strength-abbr-Stamina-abbr": "STR/STA",
-      "Dexterity-abbr-ReactionSpeed-abbr": "DEX/RS",
-      "Intuition-abbr-Logic-abbr": "INT/LOG",
-      "Personality-abbr-Leadership-abbr": "PER/LDR",
       "InitiativeModifier-abbr": "IM",
       "Weapons": "Weapons"
     },
@@ -87,7 +83,11 @@
       "per": "PER",
       "rs": "RS",
       "sta": "STA",
-      "str": "STR"
+      "str": "STR",
+      "Strength-abbr-Stamina-abbr": "STR/STA",
+      "Dexterity-abbr-ReactionSpeed-abbr": "DEX/RS",
+      "Intuition-abbr-Logic-abbr": "INT/LOG",
+      "Personality-abbr-Leadership-abbr": "PER/LDR"
     },
     "Choice": {
       "AmmoUse": {

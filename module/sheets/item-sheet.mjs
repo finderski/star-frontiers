@@ -41,6 +41,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.itemRulesEdition = item.system.rulesEdition || game.settings.get(SYSTEM_ID, "rulesEdition");
     context.expandedRules = context.itemRulesEdition === "expanded";
     context.showKey = ["race", "skill", "trainedAbility"].includes(item.type);
+    context.showCost = !["race", "skill", "trainedAbility"].includes(item.type);
+    context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;

@@ -13,10 +13,10 @@ const ABILITY_PAIRS = [
   ["per", "ldr"]
 ];
 const ABILITY_PAIR_LABELS = {
-  str: "STARFRONTIERS.Character.Strength-abbr-Stamina-abbr",
-  dex: "STARFRONTIERS.Character.Dexterity-abbr-ReactionSpeed-abbr",
-  int: "STARFRONTIERS.Character.Intuition-abbr-Logic-abbr",
-  per: "STARFRONTIERS.Character.Personality-abbr-Leadership-abbr"
+  str: "STARFRONTIERS.Ability.Strength-abbr-Stamina-abbr",
+  dex: "STARFRONTIERS.Ability.Dexterity-abbr-ReactionSpeed-abbr",
+  int: "STARFRONTIERS.Ability.Intuition-abbr-Logic-abbr",
+  per: "STARFRONTIERS.Ability.Personality-abbr-Leadership-abbr"
 };
 const HANDEDNESS_CHOICES = {
   left: "STARFRONTIERS.Choice.Handedness.left",

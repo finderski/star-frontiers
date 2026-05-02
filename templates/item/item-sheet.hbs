@@ -49,10 +49,10 @@
           </div>
         {{else}}
           <div class="compact-grid four-columns">
-            <label><span>STR/STA</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
-            <label><span>DEX/RS</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
-            <label><span>INT/LOG</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
-            <label><span>PER/LDR</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.Strength-abbr-Stamina-abbr"}}</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.Dexterity-abbr-ReactionSpeed-abbr"}}</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.Intuition-abbr-Logic-abbr"}}</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
+            <label><span>{{localize "STARFRONTIERS.Ability.Personality-abbr-Leadership-abbr"}}</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
           </div>
         {{/if}}
         <div class="compact-grid three-columns">
@@ -171,7 +171,7 @@
           <label><span>{{localize "STARFRONTIERS.Item.ArmorType"}}</span><input type="text" name="system.armorType" value="{{system.armorType}}" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
           {{#if expandedRules}}
-            <label><span>{{localize "STARFRONTIERS.Item.Weight"}}</span><input type="number" name="system.weight" value="{{system.weight}}" min="0" step="0.1" /></label>
+            <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
           {{/if}}
         </div>
       </fieldset>
@@ -226,7 +226,7 @@
           <label><span>{{localize "STARFRONTIERS.Item.Quantity"}}</span><input type="number" name="system.quantity" value="{{system.quantity}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
           {{#if expandedRules}}
-            <label><span>{{localize "STARFRONTIERS.Item.Weight"}}</span><input type="number" name="system.weight" value="{{system.weight}}" min="0" step="0.1" /></label>
+            <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
           {{/if}}
           <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Kit"}}</span><input type="checkbox" name="system.isKit" {{checked system.isKit}} /></label>
         </div>
@@ -266,7 +266,7 @@
           <label><span>{{localize "STARFRONTIERS.Item.FunctionPointsUsed"}}</span><input type="number" name="system.functionPoints.used" value="{{system.functionPoints.used}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.FunctionPointsMax"}}</span><input type="number" name="system.functionPoints.max" value="{{system.functionPoints.max}}" min="0" /></label>
           {{#if expandedRules}}
-            <label><span>{{localize "STARFRONTIERS.Item.Weight"}}</span><input type="number" name="system.weight" value="{{system.weight}}" min="0" step="0.1" /></label>
+            <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
           {{/if}}
         </div>
       </fieldset>

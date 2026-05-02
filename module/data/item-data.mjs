@@ -8,21 +8,21 @@ import {
   textField
 } from "./fields.mjs";
 
-function rangeBandField({ nullableMin = false } = {}) {
+function rangeBandField({ nullableMin = false, mod = 0 } = {}) {
   return schemaField({
     min: numberField({ initial: nullableMin ? null : 0, min: 0, nullable: nullableMin }),
     max: numberField({ initial: null, min: 0, nullable: true }),
-    mod: numberField({ initial: 0 })
+    mod: numberField({ initial: mod })
   });
 }
 
 function rangeBandsField() {
   return schemaField({
-    pointBlank: rangeBandField({ nullableMin: true }),
-    short: rangeBandField(),
-    medium: rangeBandField(),
-    long: rangeBandField(),
-    extreme: rangeBandField()
+    pointBlank: rangeBandField({ nullableMin: true, mod: 0 }),
+    short: rangeBandField({ mod: -10 }),
+    medium: rangeBandField({ mod: -20 }),
+    long: rangeBandField({ mod: -40 }),
+    extreme: rangeBandField({ mod: -80 })
   });
 }
 
@@ -209,7 +209,7 @@ export class StarFrontiersArmorData extends StarFrontiersItemData {
         amount: numberField({ initial: null, min: 0, nullable: true })
       })),
       cost: numberField({ initial: 0, min: 0 }),
-      weight: numberField({ initial: 0, min: 0, integer: false }),
+      mass: numberField({ initial: 0, min: 0, integer: false }),
       mechanics: schemaField({
         tags: setField(textField())
       })
@@ -260,7 +260,7 @@ export class StarFrontiersPowerSourceData extends StarFrontiersItemData {
       remaining: numberField({ initial: 0, min: 0 }),
       rechargeable: boolField(),
       cost: numberField({ initial: 0, min: 0 }),
-      weight: numberField({ initial: 0, min: 0, integer: false })
+      mass: numberField({ initial: 0, min: 0, integer: false })
     };
   }
 
@@ -274,7 +274,7 @@ export class StarFrontiersGearData extends StarFrontiersItemData {
     return {
       ...super.defineSchema(),
       quantity: numberField({ initial: 1, min: 0 }),
-      weight: numberField({ initial: 0, min: 0, integer: false }),
+      mass: numberField({ initial: 0, min: 0, integer: false }),
       cost: numberField({ initial: 0, min: 0 }),
       isKit: boolField(),
       contents: arrayField(schemaField({
@@ -349,7 +349,7 @@ export class StarFrontiersComputerData extends StarFrontiersItemData {
         max: numberField({ initial: 0, min: 0 })
       }),
       installedPrograms: arrayField(textField()),
-      weight: numberField({ initial: 0, min: 0, integer: false }),
+      mass: numberField({ initial: 0, min: 0, integer: false }),
       structuralPoints: schemaField({
         value: numberField({ initial: 0, min: 0 }),
         max: numberField({ initial: 0, min: 0 })
