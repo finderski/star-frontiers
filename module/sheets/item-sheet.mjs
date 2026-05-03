@@ -36,7 +36,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     const item = this.item ?? this.document;
     context.item = item;
     context.system = item.system;
-    context.editable = this.isEditable;
+    context.editable = options.editable ?? this.options.editable ?? true;
     context.typeLabel = ITEM_TYPE_LABELS[item.type] ?? item.type;
     context.is = Object.fromEntries(Object.keys(ITEM_TYPE_LABELS).map((type) => [type, item.type === type]));
     context.itemRulesEdition = item.system.rulesEdition || game.settings.get(SYSTEM_ID, "rulesEdition");
@@ -49,6 +49,15 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.themeClass = `theme-${context.sheetTheme}`;
     context.choices = this.#prepareChoices();
     context.rangeRows = this.#prepareRangeRows(item);
+    context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      item.system.description ?? "",
+      {
+        secrets: item.isOwner,
+        relativeTo: item,
+        rollData: item.getRollData?.() ?? {},
+        async: true
+      }
+    );
     return context;
   }
 

@@ -45,7 +45,8 @@
   font-size: 2.5em;
 }
 
-.star-frontiers-sheet {
+.star-frontiers-sheet,
+.star-frontiers-item-sheet {
   --logo: "av05";
   --fieldset: "michroma";
   --input: "prosto", monospace, "Courier New", Courier, monospace;
@@ -284,8 +285,9 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 .star-frontiers-item-sheet .paper-box .stacked > span,
 .star-frontiers-item-sheet .range-editor > span,
 .star-frontiers-item-sheet .ammo-drop-zone > span {
-  font-size: 1rem;
+  font-size: .85em;
   line-height: 1.1;
+  font-family: var(--fieldset);
 }
 
 .star-frontiers-item-sheet .paper-box legend {
@@ -412,7 +414,8 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   white-space: nowrap;
 }
 
-label.field-line {
+label.field-line,
+.item-meta {
   font-family: var(--fieldset);
 }
 
@@ -1172,6 +1175,24 @@ button.roll-label-main:focus-visible {
   }
 }
 
+.star-frontiers-item-sheet .paper-box .top-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+}
+
+.star-frontiers-item-sheet .paper-box .top-row .mass,
+.star-frontiers-item-sheet .paper-box .top-row .cost {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.star-frontiers-item-sheet fieldset .stacked {
+  margin: 10px 0 0 0;
+}
+
 .star-frontiers-item-sheet .editor {
   border: 1px solid var(--sf-line);
   min-height: 140px;
@@ -1181,4 +1202,20 @@ button.roll-label-main:focus-visible {
 .star-frontiers-item-sheet .editor-content,
 .star-frontiers-item-sheet prose-mirror {
   min-height: 120px;
+  font-family: var(--input);
+}
+
+.star-frontiers-item-sheet .item-description-editor .editor {
+  border: 1px solid var(--sf-line);
+  min-height: 180px;
+}
+
+.star-frontiers-item-sheet .item-description-editor .editor-content,
+.star-frontiers-item-sheet .item-description-editor prose-mirror {
+  min-height: 160px;
+  padding: 6px;
+}
+
+.star-frontiers-item-sheet prose-mirror menu {
+  background: unset;
 }

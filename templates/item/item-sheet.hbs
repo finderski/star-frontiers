@@ -21,22 +21,29 @@
   <main class="item-grid">
     <fieldset class="paper-box item-common full-width">
       <legend>{{localize "STARFRONTIERS.Item.Common"}}</legend>
-      <label>
-        <span>{{localize "STARFRONTIERS.Item.RulesEdition"}}</span>
-        <select name="system.rulesEdition">
-          {{selectOptions choices.rulesEdition selected=itemRulesEdition}}
-        </select>
-      </label>
+      <div class="top-row">
+        <label>
+          <span>{{localize "STARFRONTIERS.Item.Ruleset"}}</span>
+          <select name="system.rulesEdition">
+            {{selectOptions choices.rulesEdition selected=itemRulesEdition}}
+          </select>
+        </label>
+        <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+        {{#if expandedRules}}
+          <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
+        {{/if}}
+      </div>
       <div class="stacked item-description-editor">
         <span>{{localize "STARFRONTIERS.Item.Description"}}</span>
-        {{editor
-          system.description
-          target="system.description"
-          button=true
-          editable=editable
-          engine="prosemirror"
-          collaborate=false
-        }}
+        <prose-mirror
+          name="system.description"
+          data-document-u-u-i-d="{{item.uuid}}"
+          value="{{system.description}}"
+          collaborate="true"
+          toggled="true"
+        >
+          {{{enrichedDescription}}}
+        </prose-mirror>
       </div>
     </fieldset>
 
@@ -132,10 +139,6 @@
           <label><span>{{localize "STARFRONTIERS.Item.Consumed"}}</span><input type="number" name="system.ammo.consumed" value="{{system.ammo.consumed}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.AmmoPerShot"}}</span><input type="number" name="system.ammo.seuPerShot" value="{{system.ammo.seuPerShot}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.CurrentSetting"}}</span><input type="number" name="system.ammo.variableSetting.current" value="{{system.ammo.variableSetting.current}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
-          {{#if expandedRules}}
-            <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
-          {{/if}}
         </div>
       </fieldset>
     {{/if}}
