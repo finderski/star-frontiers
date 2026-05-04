@@ -90,6 +90,10 @@
       "Personality-abbr-Leadership-abbr": "PER/LDR"
     },
     "Choice": {
+      "AmmoType": {
+        "rounds": "Rounds",
+        "seu": "SEU"
+      },
       "AmmoUse": {
         "clip": "Clip",
         "none": "None",

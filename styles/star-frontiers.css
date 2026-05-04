@@ -277,6 +277,10 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   margin-bottom: 12px;
 }
 
+.auto-columns {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
 .three-columns {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -1242,6 +1246,7 @@ button.roll-label-main:focus-visible {
   .item-header,
   .item-meta,
   .ammo-drop-zone,
+  .auto-columns,
   .three-columns,
   .four-columns,
   .five-columns,

@@ -237,9 +237,8 @@ export class StarFrontiersAmmoData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
-      ammoType: textField(),
+      ammoType: textField({ choices: ["rounds", "seu"] }),
       shots: numberField({ initial: 0, min: 0 }),
-      quantity: numberField({ initial: 1, min: 0 }),
       cost: numberField({ initial: 0, min: 0 })
     };
   }

@@ -18,7 +18,6 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       closeOnSubmit: false,
       submitOnChange: true
     },
-    dragDrop: [{ dragSelector: null, dropSelector: ".ammo-drop-zone" }],
     actions: {
       clearAmmo: StarFrontiersItemSheet.#onClearAmmo,
       editImage: StarFrontiersItemSheet.#onEditImage
@@ -46,6 +45,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.showCost = !["race", "skill", "trainedAbility"].includes(item.type);
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
+    context.weaponUsesSeu = item.type === "weapon" && item.system.ammo?.uses === "seu";
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
     context.choices = this.#prepareChoices();
@@ -74,6 +74,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   #prepareChoices() {
     return {
       ability: this.#choices(["", "str", "sta", "dex", "rs", "int", "log", "per", "ldr"], "STARFRONTIERS.Ability"),
+      ammoType: this.#choices(["rounds", "seu"], "STARFRONTIERS.Choice.AmmoType"),
       ammoUse: this.#choices(["seu", "rounds", "none"], "STARFRONTIERS.Choice.AmmoUse"),
       carryState: this.#choices(["ready", "carried", "stored"], "STARFRONTIERS.Choice.CarryState"),
       damageType: this.#choices(["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"], "STARFRONTIERS.Choice.DefenseType"),
@@ -90,7 +91,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     };
   }
 
-  _onRender(context, options) {
+  async _onRender(context, options) {
+    await super._onRender(context, options);
     const weaponTypeEl = this.element.querySelector('select[name="system.weaponType"]');
     const ammoUsesEl = this.element.querySelector('select[name="system.ammo.uses"]');
     if (weaponTypeEl && ammoUsesEl) {

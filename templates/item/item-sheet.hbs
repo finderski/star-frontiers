@@ -131,9 +131,14 @@
             <span>{{localize "STARFRONTIERS.Item.AmmoUse"}}</span>
             <select name="system.ammo.uses">{{selectOptions choices.ammoUse selected=system.ammo.uses}}</select>
           </label>
-          {{#if expandedRules}}
-            <label><span>{{localize "STARFRONTIERS.Item.VariableMin"}}</span><input type="number" name="system.ammo.variableSetting.min" value="{{system.ammo.variableSetting.min}}" min="0" /></label>
-            <label><span>{{localize "STARFRONTIERS.Item.VariableMax"}}</span><input type="number" name="system.ammo.variableSetting.max" value="{{system.ammo.variableSetting.max}}" min="0" /></label>
+          {{#if weaponUsesSeu}}
+            <label><span>{{localize "STARFRONTIERS.Item.SEUPerHit"}}</span><input type="number" name="system.ammo.seuPerShot" value="{{system.ammo.seuPerShot}}" min="0" /></label>
+          {{/if}}
+          {{#if weaponUsesSeu}}
+            {{#if expandedRules}}
+              <label><span>{{localize "STARFRONTIERS.Item.VariableMin"}}</span><input type="number" name="system.ammo.variableSetting.min" value="{{system.ammo.variableSetting.min}}" min="0" /></label>
+              <label><span>{{localize "STARFRONTIERS.Item.VariableMax"}}</span><input type="number" name="system.ammo.variableSetting.max" value="{{system.ammo.variableSetting.max}}" min="0" /></label>
+            {{/if}}
           {{/if}}
         </div>
       </fieldset>
@@ -203,10 +208,9 @@
     {{#if is.ammo}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.AmmoData"}}</legend>
-        <div class="compact-grid three-columns">
-          <label><span>{{localize "STARFRONTIERS.Item.AmmoType"}}</span><input type="text" name="system.ammoType" value="{{system.ammoType}}" /></label>
+        <div class="compact-grid auto-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.AmmoType"}}</span><select name="system.ammoType">{{selectOptions choices.ammoType selected=system.ammoType}}</select></label>
           <label><span>{{localize "STARFRONTIERS.Item.Shots"}}</span><input type="number" name="system.shots" value="{{system.shots}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Quantity"}}</span><input type="number" name="system.quantity" value="{{system.quantity}}" min="0" /></label>
         </div>
       </fieldset>
     {{/if}}
