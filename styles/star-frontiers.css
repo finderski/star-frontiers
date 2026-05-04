@@ -340,7 +340,7 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   align-items: end;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(92px, 1fr) repeat(3, minmax(64px, 0.5fr));
+  grid-template-columns: minmax(92px, 1fr) repeat(2, minmax(64px, 0.5fr));
   margin: 12px 0;
 }
 

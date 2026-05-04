@@ -385,7 +385,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static async #rollWeaponAttack(actor, weapon, rollMode = "public") {
     const profile = StarFrontiersCharacterSheet.#getWeaponAttackProfile(actor, weapon);
-    const prompt = await StarFrontiersCharacterSheet.#promptWeaponAttack(actor, weapon, profile);
+
+    const targetDistance = StarFrontiersCharacterSheet.#getTargetDistance(actor);
+    const autoRangeBand = targetDistance !== null
+      ? StarFrontiersCharacterSheet.#getRangeBandFromDistance(weapon, targetDistance)
+      : null;
+
+    const prompt = await StarFrontiersCharacterSheet.#promptWeaponAttack(actor, weapon, profile, autoRangeBand);
     if (!prompt) return;
 
     const ammoCheck = StarFrontiersCharacterSheet.#getAmmoConsumption(weapon);
@@ -397,7 +403,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }
     }
 
-    const rangeMod = prompt.rangeBand ? Number(weapon.system.rangeBands[prompt.rangeBand]?.mod ?? 0) : 0;
+    const activeBandKey = autoRangeBand?.key ?? prompt.rangeBand;
+    const activeRangeLabel = autoRangeBand?.label ?? prompt.rangeLabel;
+    const rangeMod = activeBandKey ? Number(weapon.system.rangeBands[activeBandKey]?.mod ?? 0) : 0;
     const adjustedTarget = StarFrontiersCharacterSheet.#clampAttackTarget(profile.baseTarget + rangeMod + prompt.modifier);
     const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
     const success = roll.total <= adjustedTarget;
@@ -416,10 +424,18 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(profile.baseTarget) }
     ];
 
-    if (prompt.rangeLabel) {
+    if (autoRangeBand && targetDistance !== null) {
+      const units = canvas?.grid?.units || "m";
+      rows.push({
+        label: game.i18n.localize("STARFRONTIERS.Weapon.Distance"),
+        value: `${targetDistance} ${units}`
+      });
+    }
+
+    if (activeRangeLabel) {
       rows.push({
         label: game.i18n.localize("STARFRONTIERS.Weapon.Range"),
-        value: prompt.rangeLabel
+        value: activeRangeLabel
       });
       rows.push({
         label: game.i18n.localize("STARFRONTIERS.Weapon.RangeModifier"),
@@ -713,6 +729,34 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return value === null || value === undefined ? "" : String(value);
   }
 
+  static #getTargetDistance(actor) {
+    if (!canvas?.ready) return null;
+    const token = actor.getActiveTokens(true)[0];
+    if (!token) return null;
+    const targets = [...game.user.targets];
+    if (!targets.length) return null;
+    const measurement = canvas.grid.measurePath([token.center, targets[0].center]);
+    return measurement.distance ?? null;
+  }
+
+  static #getRangeBandFromDistance(weapon, distance) {
+    if (distance === null || distance === undefined) return null;
+    for (const key of RANGE_BAND_ORDER) {
+      const band = weapon.system.rangeBands?.[key];
+      if (!band) continue;
+      if (band.min === null && band.max === null) continue;
+      const min = band.min ?? 0;
+      if (distance < min) continue;
+      if (band.max !== null && distance > band.max) continue;
+      return {
+        key,
+        label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
+        mod: Number(band.mod ?? 0)
+      };
+    }
+    return null;
+  }
+
   static #getAvailableWeaponRangeBands(weapon) {
     const bands = [];
     for (const key of RANGE_BAND_ORDER) {
@@ -731,12 +775,19 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return bands;
   }
 
-  static async #promptWeaponAttack(actor, weapon, profile) {
-    const rangeBands = StarFrontiersCharacterSheet.#getAvailableWeaponRangeBands(weapon);
+  static async #promptWeaponAttack(actor, weapon, profile, autoRangeBand = null) {
+    const rangeBands = autoRangeBand ? [] : StarFrontiersCharacterSheet.#getAvailableWeaponRangeBands(weapon);
     const options = rangeBands.map((band) => {
       const mod = band.modifier >= 0 ? `+${band.modifier}` : `${band.modifier}`;
       return `<option value="${band.key}">${band.label} (${mod})</option>`;
     }).join("");
+
+    const autoRangeInfo = autoRangeBand
+      ? `<p>${game.i18n.format("STARFRONTIERS.Weapon.AutoRangeDetected", {
+          range: autoRangeBand.label,
+          mod: autoRangeBand.mod >= 0 ? `+${autoRangeBand.mod}` : String(autoRangeBand.mod)
+        })}</p>`
+      : "";
 
     return foundry.applications.api.DialogV2.wait({
       window: {
@@ -747,6 +798,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           weapon: weapon.name,
           target: profile.baseTarget
         })}</p>
+        ${autoRangeInfo}
         ${rangeBands.length ? `
           <label class="dialog-field">
             <span>${game.i18n.localize("STARFRONTIERS.Weapon.Range")}</span>

@@ -367,6 +367,8 @@
       "Name": "Weapon",
       "NoDamageFormula": "That weapon does not have a damage formula yet.",
       "OutOfAmmo": "That weapon does not have enough loaded ammunition.",
+      "AutoRangeDetected": "Range auto-detected from target: {range} ({mod})",
+      "Distance": "Distance",
       "Range": "Range",
       "RangeModifier": "Range Mod",
       "RollAttack": "Roll Attack",

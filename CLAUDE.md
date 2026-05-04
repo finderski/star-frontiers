@@ -83,7 +83,7 @@ Doze grenade hit = `unconscious-doze` Active Effect (1 hour). Miss = 1d10 bounce
 - **ActorSheetV2 + HandlebarsApplicationMixin** — v14 sheet base classes. `static PARTS` declares template fragments. `_prepareContext()` builds the data object the template receives. `static DEFAULT_OPTIONS.actions` maps action names to static handler methods.
 - **ApplicationV2 / DialogV2** — v14 dialog system used for all prompts (attack modifier, stat replacement confirmation, etc.).
 - **Active Effects** — duration in seconds for time-bounded effects (1 h = 3600 s). Changes use mode 2 (ADD) to modify `system.*` paths.
-- `CONFIG.SF` — the system's tunables (rangeMods, coverMods, movementMods, raceMovement, skillCosts, abilities list).
+- `CONFIG.SF` — the system's tunables (coverMods, movementMods, raceMovement, skillCosts, abilities list). Range band modifiers live on each weapon's `system.rangeBands[key].mod`.
 - `globalThis.sf` — system namespace (`sf.id`, `sf.config`).
 - **No build step** — plain `.mjs` ES modules, loaded directly by Foundry. No esbuild/rollup.
 

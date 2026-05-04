@@ -39,13 +39,6 @@ export const STAR_FRONTIERS_CONFIG = {
     dodging: -20,
     skimmer: -10
   },
-  rangeMods: {
-    pointBlank: 0,
-    short: -10,
-    medium: -20,
-    long: -40,
-    extreme: -80
-  },
   raceMovement: {
     human: { walking: 2, running: 6, hourly: 0 },
     dralasite: { walking: 1, running: 4, hourly: 0 },

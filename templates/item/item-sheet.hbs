@@ -107,12 +107,12 @@
           <span></span>
           <span>{{localize "STARFRONTIERS.Item.RangeMin"}}</span>
           <span>{{localize "STARFRONTIERS.Item.RangeMax"}}</span>
-          <span>{{localize "STARFRONTIERS.Item.RangeMod"}}</span>
+          <!--<span>{{localize "STARFRONTIERS.Item.RangeMod"}}</span>-->
           {{#each rangeRows as |row|}}
             <span>{{row.label}}</span>
             <input type="number" name="system.rangeBands.{{row.key}}.min" value="{{row.band.min}}" min="0" />
             <input type="number" name="system.rangeBands.{{row.key}}.max" value="{{row.band.max}}" min="0" />
-            <input type="number" name="system.rangeBands.{{row.key}}.mod" value="{{row.band.mod}}" />
+            <!--<input type="number" name="system.rangeBands.{{row.key}}.mod" value="{{row.band.mod}}" />-->
           {{/each}}
         </div>
 
