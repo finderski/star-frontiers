@@ -99,7 +99,7 @@ export class StarFrontiersSkillData extends StarFrontiersItemData {
       ability: textField({ choices: ["", "str", "sta", "dex", "rs", "int", "log", "per", "ldr"] }),
       bonus: numberField({ initial: 0 }),
       rollFormula: textField(),
-      weaponSkillKey: textField({ choices: ["", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
+      weaponSkillKey: textField({ choices: ["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
       isHeavyWeaponSkill: boolField(),
       subskills: arrayField(schemaField({
         key: textField(),
@@ -148,7 +148,7 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
         initial: "beam",
         choices: ["melee", "beam", "projectile", "gyrojet", "grenade"]
       }),
-      weaponSkillKey: textField({ choices: ["", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
+      weaponSkillKey: textField({ choices: ["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
       damageFormula: textField(),
       damageType: textField({ choices: ["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"] }),
       rangeBands: rangeBandsField(),

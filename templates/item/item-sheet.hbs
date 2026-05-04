@@ -126,7 +126,7 @@
           </div>
         </div>
 
-        <div class="compact-grid weapon-ammo-grid">
+        <div class="compact-grid three-columns">
           <label>
             <span>{{localize "STARFRONTIERS.Item.AmmoUse"}}</span>
             <select name="system.ammo.uses">{{selectOptions choices.ammoUse selected=system.ammo.uses}}</select>
@@ -134,8 +134,9 @@
           {{#if weaponUsesSeu}}
             <label><span>{{localize "STARFRONTIERS.Item.SEUPerHit"}}</span><input type="number" name="system.ammo.seuPerShot" value="{{system.ammo.seuPerShot}}" min="0" /></label>
           {{/if}}
-          {{#if weaponUsesSeu}}
-            {{#if expandedRules}}
+          {{#if expandedRules}}
+            <label><span>{{localize "STARFRONTIERS.Item.RateOfFire"}}</span><input type="number" name="system.mechanics.rateOfFire" value="{{system.mechanics.rateOfFire}}" min="1" /></label>
+            {{#if weaponUsesSeu}}
               <label><span>{{localize "STARFRONTIERS.Item.VariableMin"}}</span><input type="number" name="system.ammo.variableSetting.min" value="{{system.ammo.variableSetting.min}}" min="0" /></label>
               <label><span>{{localize "STARFRONTIERS.Item.VariableMax"}}</span><input type="number" name="system.ammo.variableSetting.max" value="{{system.ammo.variableSetting.max}}" min="0" /></label>
             {{/if}}

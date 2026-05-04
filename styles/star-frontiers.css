@@ -1002,43 +1002,68 @@ button.roll-label-main:focus-visible {
   width: auto;
 }
 
-.weapon-ammo-actions {
-  align-items: center;
+.weapon-gear-wrap {
+  display: inline-flex;
+  position: relative;
+}
+
+.weapon-gear-panel {
   background: var(--sf-paper);
   border: 1px solid var(--sf-line);
   border-radius: 4px;
-  bottom: calc(100% + 0.55rem);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
-  display: inline-flex;
-  gap: 6px;
-  left: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-flow: row wrap;
+  gap: 4px;
+  min-width: 120px;
   opacity: 0;
-  padding: 4px 5px;
+  padding: 6px;
   pointer-events: none;
   position: absolute;
-  transform: translateX(-50%);
-  /* hide: fade out, then snap visibility off once opacity reaches 0 */
-  transition: opacity 120ms ease 0s, visibility 0s linear 120ms;
+  right: 0;
+  top: calc(100% + 4px);
+  transform: translateY(-6px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 0s linear 120ms;
   visibility: hidden;
   z-index: 100;
 }
 
-.weapon-ammo-actions::after {
-  bottom: -0.65rem;
-  content: "";
-  height: 0.65rem;
-  left: 0;
-  position: absolute;
-  right: 0;
-}
-
-.weapon-ammo-cell:hover .weapon-ammo-actions,
-.weapon-ammo-cell:focus-within .weapon-ammo-actions {
+.weapon-gear-panel--open {
   opacity: 1;
   pointer-events: auto;
-  /* show: snap visibility on after delay, then fade in */
-  transition: opacity 150ms ease 1s, visibility 0s linear 1s;
+  transform: translateY(0);
+  transition: opacity 150ms ease, transform 150ms ease, visibility 0s linear 0s;
   visibility: visible;
+}
+
+.weapon-gear-panel button {
+  align-items: center;
+  display: flex;
+  font-size: 0.82em;
+  gap: 5px;
+  justify-content: center;
+  padding: 4px 8px;
+  width: 100%;
+}
+
+.weapon-gear-panel label {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  grid-template-columns: unset;
+  justify-content: space-between;
+  padding: 2px 4px;
+}
+
+.weapon-gear-panel label > span {
+  font-size: 0.8rem;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.weapon-gear-panel .seu-dial {
+  text-align: center;
+  width: 44px;
 }
 
 .left-column {

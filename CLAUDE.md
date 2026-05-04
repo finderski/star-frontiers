@@ -83,7 +83,7 @@ Doze grenade hit = `unconscious-doze` Active Effect (1 hour). Miss = 1d10 bounce
 - **ActorSheetV2 + HandlebarsApplicationMixin** — v14 sheet base classes. `static PARTS` declares template fragments. `_prepareContext()` builds the data object the template receives. `static DEFAULT_OPTIONS.actions` maps action names to static handler methods.
 - **ApplicationV2 / DialogV2** — v14 dialog system used for all prompts (attack modifier, stat replacement confirmation, etc.).
 - **Active Effects** — duration in seconds for time-bounded effects (1 h = 3600 s). Changes use mode 2 (ADD) to modify `system.*` paths.
-- `CONFIG.SF` — the system's tunables (coverMods, movementMods, raceMovement, skillCosts, abilities list). Range band modifiers (`rangeMods`) are a single source of truth in `CONFIG.SF.rangeMods` — weapons do NOT store per-band mods.
+- `CONFIG.SF` — the system's tunables (coverMods, movementMods, raceMovement, skillCosts, abilities list). Range band modifiers live as the module-level constant `RANGE_BAND_MODS` in `character-sheet.mjs` (`{ pointBlank: 0, short: -10, medium: -20, long: -40, extreme: -80 }`). They were removed from `CONFIG.SF` to prevent stale-reads from old saved weapon data — weapons do NOT store per-band mods.
 - `globalThis.sf` — system namespace (`sf.id`, `sf.config`).
 - **No build step** — plain `.mjs` ES modules, loaded directly by Foundry. No esbuild/rollup.
 
@@ -166,23 +166,38 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - Per-range-band damage formula — band formula overrides base formula when set (supports sonic weapons)
   - Attack chat card → "Roll Damage" follow-up button wired via `renderChatMessageHTML` hook; carries `bandKey` for per-band damage
   - Range band availability — a band is only offered in the attack dialog if its min/max distances are configured on the weapon (handles Gyrojet PB/Short exclusion)
+  - Auto-hit (01–05) and auto-miss in Expanded (96–00) handled by `#isHit()` helper
+  - Token targeting — attack auto-detects distance via `canvas.grid.measurePath`; range band is resolved automatically when a target token is selected; falls back to manual range selection when no target
+  - Rate of Fire (Expanded) — `mechanics.rateOfFire` on weapon; attack dialog shows shot count field when RoF > 1; each additional shot gets −20 cumulative penalty; ammo consumed for all shots
+  - STR and DEX as explicit weapon skill keys — Basic rules attack profile handles `str` → uses STR score directly; `dex` → uses DEX score directly; `melee` → ½ max(STR, DEX)
   - Race item drop → modifiers applied, stamina synced
   - Item CRUD (create, delete, duplicate, open sheet)
   - Weapon carry state cycling (ready/carried/stored) on character sheet; carryState NOT on item sheet
   - Inline ammo field edits on the sheet; SEU weapons show battery icon
-  - Hover reload button on weapon ammo cell (1-second hover delay)
+  - Weapon gear panel — gear button (⚙) between carry-state and delete opens a dropdown panel with: Open Item, Reload (if linked ammo), Current Setting SEU dial (for SEU weapons). Replaces the old hover-based reload button.
+  - `variableSetting.current` — editable via the gear panel SEU dial; saved to `system.ammo.variableSetting.current`; attack roll reads it for SEU consumption
   - Item sheet (generic, all subtypes, ammo-linking by drag)
   - Item sheet image is clickable (opens FilePicker); renders as theme-aware mask so icon color matches `--sf-ink`
   - Default per-type item icons set via `preCreateItem` hook
+  - Ammo item `ammoType` is a dropdown (Rounds / SEU); `quantity` field removed from ammo schema
+  - Range band cells on character sheet weapon rows show max distance only (not min–max)
 
 ### Weapon data model (current)
 - `weaponType` choices: `melee` · `beam` · `projectile` · `gyrojet` · `grenade`
+- `weaponSkillKey` choices: `""` · `dex` · `str` · `beam` · `gyrojet` · `projectile` · `thrown` · `melee` — `str` and `dex` are valid Basic-rules skill keys
 - `damageType` choices (UI label "Defense"): `albedo` · `gaussAS` · `sonic` · `sonicAS` · `inertia` · `reactionSpeed` · `stamina` · `ir`
 - `ammo.uses` choices: `seu` · `rounds` · `none` (default `none`; auto-defaults when weaponType changes in item sheet)
 - `ammo.capacity` / `ammo.consumed` / `ammo.seuPerShot` — tracked on weapon, NOT shown on item sheet (character sheet only)
-- `ammo.variableSetting.min` / `.max` — shown on item sheet in Expanded mode; `.current` belongs on character sheet weapon row (not yet implemented)
+- `ammo.variableSetting.min` / `.max` — shown on item sheet for any SEU weapon in Expanded mode; `.current` is editable on the character sheet via the gear panel SEU dial
+- `mechanics.rateOfFire` — shown on item sheet in Expanded mode; drives multi-shot dialog
 - `rangeBands[key].damageFormula` — optional per-band damage formula; empty = use weapon base formula
 - Range band availability: a band with both `min === null` and `max === null` is unavailable for that weapon
+- Range band display on character sheet shows max distance only
+
+### Ammo item data model (current)
+- `ammoType`: dropdown — `rounds` · `seu` (no longer free text)
+- `shots`: capacity of one container (clip / pack)
+- `quantity` field was **removed** — ammo items no longer track how many spare containers exist; reload simply refills from the linked item
 
 ### Not yet started
 - Phase 3 (dedicated dice/combat module) — rolls are currently inline in `character-sheet.mjs`
@@ -191,16 +206,15 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 - Phase 6+ (Expanded rules UI, skills, trained abilities, screens, SEU economy)
 - NPC and creature sheets
 - Vehicle actor sheet
-- `variableSetting.current` on character sheet weapon row (Expanded mode only)
+- Variable SEU damage formula (e.g. `@seuSetting`d10 scaling with dial) — dial saves current but damage formula doesn't yet interpolate it
 
 ---
 
-## Outstanding issues (from notes.md)
+## Outstanding issues
 
-- **variableSetting.current** — the per-shot SEU dial should appear on the character sheet weapon row in Expanded mode; not yet implemented
+- **Variable SEU damage** — `variableSetting.current` is saved and read for ammo consumption, but there is no formula interpolation yet (e.g. firing at 3 SEU should do 3d10 for a laser pistol). Needs: injecting `seuSetting` into roll data so formulas like `@seuSetting`d10 work.
 - **Race item sheet** — "Key" field shows redundantly under Name; Name and Race are both shown (simplify); walking/running should display with "m" unit; hourly field should be hidden in Basic rules mode; hourly should display with "km" unit; auto-populate the linked pair field if empty (e.g. STR filled → STA auto-fills with same value unless overridden)
-- **Rate of Fire** — not yet incorporated for Expanded rules
-- **Token targeting** — auto-calculate distance and range band from selected token (eliminate the manual pop-up range selection); distance penalties are universal so no per-weapon configuration needed
+- **Ammo quantity tracking** — `quantity` was removed from ammo items. Reload now just refills from the linked ammo item unconditionally. If multi-clip tracking is needed in the future, discuss approach before re-adding.
 - **Party sheet** — nice-to-have GM tool; show whole party stats + group initiative button
 
 ---
