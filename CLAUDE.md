@@ -83,7 +83,7 @@ Doze grenade hit = `unconscious-doze` Active Effect (1 hour). Miss = 1d10 bounce
 - **ActorSheetV2 + HandlebarsApplicationMixin** — v14 sheet base classes. `static PARTS` declares template fragments. `_prepareContext()` builds the data object the template receives. `static DEFAULT_OPTIONS.actions` maps action names to static handler methods.
 - **ApplicationV2 / DialogV2** — v14 dialog system used for all prompts (attack modifier, stat replacement confirmation, etc.).
 - **Active Effects** — duration in seconds for time-bounded effects (1 h = 3600 s). Changes use mode 2 (ADD) to modify `system.*` paths.
-- `CONFIG.SF` — the system's tunables (coverMods, movementMods, raceMovement, skillCosts, abilities list). Range band modifiers live on each weapon's `system.rangeBands[key].mod`.
+- `CONFIG.SF` — the system's tunables (coverMods, movementMods, raceMovement, skillCosts, abilities list). Range band modifiers (`rangeMods`) are a single source of truth in `CONFIG.SF.rangeMods` — weapons do NOT store per-band mods.
 - `globalThis.sf` — system namespace (`sf.id`, `sf.config`).
 - **No build step** — plain `.mjs` ES modules, loaded directly by Foundry. No esbuild/rollup.
 
@@ -111,7 +111,7 @@ module/data/item-data.mjs       Item TypeDataModels: Race, Skill, TrainedAbility
                                   Ammo, PowerSource, Gear, Consumable, Vehicle, Computer, Program
 module/sheets/character-sheet.mjs  StarFrontiersCharacterSheet (ActorSheetV2) — all rolls, dialogs, item CRUD
 module/sheets/item-sheet.mjs    StarFrontiersItemSheet (ItemSheetV2) — generic item sheet, ammo linking
-module/migration/migrations.mjs Migration scaffold — no-op currently; add named functions per version
+module/migration/migrations.mjs Schema migration runner — current version 0.2.0
 templates/actor/character-sheet.hbs   Main character sheet (single PARTS template)
 templates/item/item-sheet.hbs         Item sheet (single PARTS template, subtype-conditional sections)
 templates/chat/check-roll-card.hbs    Ability check / damage / initiative chat card
@@ -163,12 +163,26 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - Initiative roll (1d10 + IM)
   - Weapon attack roll (DEX or ½DEX+skill, range band selection, modifier, ammo check, auto-decrement)
   - Weapon damage roll (formula eval, chat card)
-  - Attack chat card → "Roll Damage" follow-up button wired via `renderChatMessageHTML` hook
+  - Per-range-band damage formula — band formula overrides base formula when set (supports sonic weapons)
+  - Attack chat card → "Roll Damage" follow-up button wired via `renderChatMessageHTML` hook; carries `bandKey` for per-band damage
+  - Range band availability — a band is only offered in the attack dialog if its min/max distances are configured on the weapon (handles Gyrojet PB/Short exclusion)
   - Race item drop → modifiers applied, stamina synced
   - Item CRUD (create, delete, duplicate, open sheet)
-  - Weapon carry state cycling (ready/carried/stored)
-  - Inline ammo field edits on the sheet
+  - Weapon carry state cycling (ready/carried/stored) on character sheet; carryState NOT on item sheet
+  - Inline ammo field edits on the sheet; SEU weapons show battery icon
+  - Hover reload button on weapon ammo cell (1-second hover delay)
   - Item sheet (generic, all subtypes, ammo-linking by drag)
+  - Item sheet image is clickable (opens FilePicker); renders as theme-aware mask so icon color matches `--sf-ink`
+  - Default per-type item icons set via `preCreateItem` hook
+
+### Weapon data model (current)
+- `weaponType` choices: `melee` · `beam` · `projectile` · `gyrojet` · `grenade`
+- `damageType` choices (UI label "Defense"): `albedo` · `gaussAS` · `sonic` · `sonicAS` · `inertia` · `reactionSpeed` · `stamina` · `ir`
+- `ammo.uses` choices: `seu` · `rounds` · `none` (default `none`; auto-defaults when weaponType changes in item sheet)
+- `ammo.capacity` / `ammo.consumed` / `ammo.seuPerShot` — tracked on weapon, NOT shown on item sheet (character sheet only)
+- `ammo.variableSetting.min` / `.max` — shown on item sheet in Expanded mode; `.current` belongs on character sheet weapon row (not yet implemented)
+- `rangeBands[key].damageFormula` — optional per-band damage formula; empty = use weapon base formula
+- Range band availability: a band with both `min === null` and `max === null` is unavailable for that weapon
 
 ### Not yet started
 - Phase 3 (dedicated dice/combat module) — rolls are currently inline in `character-sheet.mjs`
@@ -177,12 +191,13 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 - Phase 6+ (Expanded rules UI, skills, trained abilities, screens, SEU economy)
 - NPC and creature sheets
 - Vehicle actor sheet
+- `variableSetting.current` on character sheet weapon row (Expanded mode only)
 
 ---
 
 ## Outstanding issues (from notes.md)
 
-- **Ammo fields** — ammo / ammo-used display on the character sheet needs fixing
+- **variableSetting.current** — the per-shot SEU dial should appear on the character sheet weapon row in Expanded mode; not yet implemented
 - **Race item sheet** — "Key" field shows redundantly under Name; Name and Race are both shown (simplify); walking/running should display with "m" unit; hourly field should be hidden in Basic rules mode; hourly should display with "km" unit; auto-populate the linked pair field if empty (e.g. STR filled → STA auto-fills with same value unless overridden)
 - **Rate of Fire** — not yet incorporated for Expanded rules
 - **Token targeting** — auto-calculate distance and range band from selected token (eliminate the manual pop-up range selection); distance penalties are universal so no per-weapon configuration needed

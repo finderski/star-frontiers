@@ -192,9 +192,26 @@ Hooks.once("ready", async () => {
   await runMigrations();
 });
 
-Hooks.on("preCreateItem", (item, data) => {
-  if (data?.system?.rulesEdition) return;
-  item.updateSource({ "system.rulesEdition": game.settings.get(SYSTEM_ID, "rulesEdition") });
+const ITEM_TYPE_ICONS = {
+  race:           "icons/svg/mystery-man.svg",
+  skill:          "icons/svg/book.svg",
+  trainedAbility: "icons/svg/dice-target.svg",
+  weapon:         "icons/svg/sword.svg",
+  armor:          "icons/svg/shield.svg",
+  screen:         "icons/svg/mage-shield.svg",
+  ammo:           "icons/svg/barrel.svg",
+  powerSource:    "icons/svg/lightning.svg",
+  gear:           "icons/svg/item-bag.svg",
+  consumable:     "icons/svg/pill.svg",
+  vehicle:        "icons/svg/wingfoot.svg",
+  computer:       "icons/svg/clockwork.svg",
+  program:        "icons/svg/aura.svg"
+};
+
+Hooks.on("preCreateItem", (document, data, options, userId) => {
+  if (data.img && data.img !== "icons/svg/item-bag.svg") return;
+  const icon = ITEM_TYPE_ICONS[document.type];
+  if (icon) document.updateSource({ img: icon });
 });
 
 Hooks.on("renderChatMessageHTML", (message, html) => {

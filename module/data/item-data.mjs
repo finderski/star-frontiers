@@ -8,34 +8,29 @@ import {
   textField
 } from "./fields.mjs";
 
-function rangeBandField({ nullableMin = false, mod = 0 } = {}) {
+function rangeBandField({ nullableMin = false } = {}) {
   return schemaField({
     min: numberField({ initial: nullableMin ? null : 0, min: 0, nullable: nullableMin }),
     max: numberField({ initial: null, min: 0, nullable: true }),
-    mod: numberField({ initial: mod })
+    damageFormula: textField()
   });
 }
 
 function rangeBandsField() {
   return schemaField({
-    pointBlank: rangeBandField({ nullableMin: true, mod: 0 }),
-    short: rangeBandField({ mod: -10 }),
-    medium: rangeBandField({ mod: -20 }),
-    long: rangeBandField({ mod: -40 }),
-    extreme: rangeBandField({ mod: -80 })
+    pointBlank: rangeBandField({ nullableMin: true }),
+    short: rangeBandField(),
+    medium: rangeBandField(),
+    long: rangeBandField(),
+    extreme: rangeBandField()
   });
-}
-
-function baseRulesField(initial = "basic") {
-  return textField({ initial, choices: ["basic", "expanded"] });
 }
 
 class StarFrontiersItemData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       key: textField(),
-      description: htmlField(),
-      rulesEdition: baseRulesField()
+      description: htmlField()
     };
   }
 }
@@ -150,15 +145,15 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
       ...super.defineSchema(),
       carryState: textField({ initial: "ready", choices: ["ready", "carried", "stored"] }),
       weaponType: textField({
-        initial: "pistol",
-        choices: ["pistol", "rifle", "grenade", "melee", "heavy", "thrown"]
+        initial: "beam",
+        choices: ["melee", "beam", "projectile", "gyrojet", "grenade"]
       }),
       weaponSkillKey: textField({ choices: ["", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
       damageFormula: textField(),
-      damageType: textField({ choices: ["", "laser", "sonic", "inertia", "gauss", "needler", "acid", "poison", "other"] }),
+      damageType: textField({ choices: ["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"] }),
       rangeBands: rangeBandsField(),
       ammo: schemaField({
-        uses: textField({ initial: "none", choices: ["clip", "powerpack", "seu", "rounds", "none"] }),
+        uses: textField({ initial: "none", choices: ["seu", "rounds", "none"] }),
         capacity: numberField({ initial: 0, min: 0 }),
         consumed: numberField({ initial: 0, min: 0 }),
         clipItem: textField(),
@@ -244,6 +239,7 @@ export class StarFrontiersAmmoData extends StarFrontiersItemData {
       ...super.defineSchema(),
       ammoType: textField(),
       shots: numberField({ initial: 0, min: 0 }),
+      quantity: numberField({ initial: 1, min: 0 }),
       cost: numberField({ initial: 0, min: 0 })
     };
   }

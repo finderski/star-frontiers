@@ -1,6 +1,8 @@
-<section class="star-frontiers-item-sheet {{themeClass}}" data-rules-edition="{{itemRulesEdition}}" autocomplete="off">
+<section class="star-frontiers-item-sheet {{themeClass}}" data-rules-edition="{{rulesEdition}}" autocomplete="off">
   <header class="item-header">
-    <img class="item-image" src="{{item.img}}" alt="{{item.name}}" data-edit="img" />
+    <div class="item-image" data-action="editImage" title="{{localize "STARFRONTIERS.Item.ChangeIcon"}}">
+      <div class="item-image__icon" style="--item-img: url({{item.img}})"></div>
+    </div>
     <div class="item-title">
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Item.Name"}}</span>
@@ -22,15 +24,13 @@
     <fieldset class="paper-box item-common full-width">
       <legend>{{localize "STARFRONTIERS.Item.Common"}}</legend>
       <div class="top-row">
-        <label>
-          <span>{{localize "STARFRONTIERS.Item.Ruleset"}}</span>
-          <select name="system.rulesEdition">
-            {{selectOptions choices.rulesEdition selected=itemRulesEdition}}
-          </select>
-        </label>
-        <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+        {{#if showCost}}
+          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+        {{/if}}
         {{#if expandedRules}}
-          <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
+          {{#if showMass}}
+            <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
+          {{/if}}
         {{/if}}
       </div>
       <div class="stacked item-description-editor">
@@ -82,10 +82,6 @@
         <legend>{{localize "STARFRONTIERS.Item.WeaponData"}}</legend>
         <div class="compact-grid weapon-core-grid">
           <label>
-            <span>{{localize "STARFRONTIERS.Item.CarryState"}}</span>
-            <select name="system.carryState">{{selectOptions choices.carryState selected=system.carryState}}</select>
-          </label>
-          <label>
             <span>{{localize "STARFRONTIERS.Item.WeaponType"}}</span>
             <select name="system.weaponType">{{selectOptions choices.weaponType selected=system.weaponType}}</select>
           </label>
@@ -98,7 +94,7 @@
             <input type="text" name="system.damageFormula" value="{{system.damageFormula}}" />
           </label>
           <label>
-            <span>{{localize "STARFRONTIERS.Item.DamageType"}}</span>
+            <span>{{localize "STARFRONTIERS.Item.Defense"}}</span>
             <select name="system.damageType">{{selectOptions choices.damageType selected=system.damageType}}</select>
           </label>
         </div>
@@ -107,12 +103,12 @@
           <span></span>
           <span>{{localize "STARFRONTIERS.Item.RangeMin"}}</span>
           <span>{{localize "STARFRONTIERS.Item.RangeMax"}}</span>
-          <!--<span>{{localize "STARFRONTIERS.Item.RangeMod"}}</span>-->
+          <span>{{localize "STARFRONTIERS.Item.RangeDamage"}}</span>
           {{#each rangeRows as |row|}}
             <span>{{row.label}}</span>
             <input type="number" name="system.rangeBands.{{row.key}}.min" value="{{row.band.min}}" min="0" />
             <input type="number" name="system.rangeBands.{{row.key}}.max" value="{{row.band.max}}" min="0" />
-            <!--<input type="number" name="system.rangeBands.{{row.key}}.mod" value="{{row.band.mod}}" />-->
+            <input type="text" name="system.rangeBands.{{row.key}}.damageFormula" value="{{row.band.damageFormula}}" placeholder="—" />
           {{/each}}
         </div>
 
@@ -135,10 +131,10 @@
             <span>{{localize "STARFRONTIERS.Item.AmmoUse"}}</span>
             <select name="system.ammo.uses">{{selectOptions choices.ammoUse selected=system.ammo.uses}}</select>
           </label>
-          <label><span>{{localize "STARFRONTIERS.Item.Capacity"}}</span><input type="number" name="system.ammo.capacity" value="{{system.ammo.capacity}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Consumed"}}</span><input type="number" name="system.ammo.consumed" value="{{system.ammo.consumed}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.AmmoPerShot"}}</span><input type="number" name="system.ammo.seuPerShot" value="{{system.ammo.seuPerShot}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.CurrentSetting"}}</span><input type="number" name="system.ammo.variableSetting.current" value="{{system.ammo.variableSetting.current}}" min="0" /></label>
+          {{#if expandedRules}}
+            <label><span>{{localize "STARFRONTIERS.Item.VariableMin"}}</span><input type="number" name="system.ammo.variableSetting.min" value="{{system.ammo.variableSetting.min}}" min="0" /></label>
+            <label><span>{{localize "STARFRONTIERS.Item.VariableMax"}}</span><input type="number" name="system.ammo.variableSetting.max" value="{{system.ammo.variableSetting.max}}" min="0" /></label>
+          {{/if}}
         </div>
       </fieldset>
     {{/if}}
@@ -177,9 +173,8 @@
     {{#if is.armor}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.ArmorData"}}</legend>
-        <div class="compact-grid three-columns">
+        <div class="compact-grid two-columns">
           <label><span>{{localize "STARFRONTIERS.Item.ArmorType"}}</span><input type="text" name="system.armorType" value="{{system.armorType}}" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
           {{#if expandedRules}}
             <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
           {{/if}}
@@ -211,7 +206,7 @@
         <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Item.AmmoType"}}</span><input type="text" name="system.ammoType" value="{{system.ammoType}}" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Shots"}}</span><input type="number" name="system.shots" value="{{system.shots}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Quantity"}}</span><input type="number" name="system.quantity" value="{{system.quantity}}" min="0" /></label>
         </div>
       </fieldset>
     {{/if}}
@@ -219,11 +214,10 @@
     {{#if is.powerSource}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.PowerSourceData"}}</legend>
-        <div class="compact-grid five-columns">
+        <div class="compact-grid four-columns">
           <label><span>{{localize "STARFRONTIERS.Item.SourceType"}}</span><select name="system.sourceType">{{selectOptions choices.sourceType selected=system.sourceType}}</select></label>
           <label><span>{{localize "STARFRONTIERS.Item.Capacity"}}</span><input type="number" name="system.capacity" value="{{system.capacity}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Remaining"}}</span><input type="number" name="system.remaining" value="{{system.remaining}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
           <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Rechargeable"}}</span><input type="checkbox" name="system.rechargeable" {{checked system.rechargeable}} /></label>
         </div>
       </fieldset>
@@ -232,9 +226,8 @@
     {{#if is.gear}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.GearData"}}</legend>
-        <div class="compact-grid four-columns">
+        <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Item.Quantity"}}</span><input type="number" name="system.quantity" value="{{system.quantity}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
           {{#if expandedRules}}
             <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
           {{/if}}
@@ -246,10 +239,9 @@
     {{#if is.consumable}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.ConsumableData"}}</legend>
-        <div class="compact-grid four-columns">
+        <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Item.Uses"}}</span><input type="number" name="system.uses.value" value="{{system.uses.value}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Max"}}</span><input type="number" name="system.uses.max" value="{{system.uses.max}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
           <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ConsumeOnUse"}}</span><input type="checkbox" name="system.consumeOnUse" {{checked system.consumeOnUse}} /></label>
         </div>
       </fieldset>
@@ -285,11 +277,10 @@
     {{#if is.program}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.ProgramData"}}</legend>
-        <div class="compact-grid four-columns">
+        <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Item.ProgramType"}}</span><input type="text" name="system.programType" value="{{system.programType}}" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Level"}}</span><input type="number" name="system.level" value="{{system.level}}" min="1" max="6" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.FunctionPoints"}}</span><input type="number" name="system.functionPoints" value="{{system.functionPoints}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Cost"}}</span><input type="number" name="system.cost" value="{{system.cost}}" min="0" /></label>
         </div>
       </fieldset>
     {{/if}}

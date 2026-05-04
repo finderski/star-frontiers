@@ -20,7 +20,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     },
     dragDrop: [{ dragSelector: null, dropSelector: ".ammo-drop-zone" }],
     actions: {
-      clearAmmo: StarFrontiersItemSheet.#onClearAmmo
+      clearAmmo: StarFrontiersItemSheet.#onClearAmmo,
+      editImage: StarFrontiersItemSheet.#onEditImage
     }
   };
 
@@ -39,8 +40,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.editable = options.editable ?? this.options.editable ?? true;
     context.typeLabel = ITEM_TYPE_LABELS[item.type] ?? item.type;
     context.is = Object.fromEntries(Object.keys(ITEM_TYPE_LABELS).map((type) => [type, item.type === type]));
-    context.itemRulesEdition = item.system.rulesEdition || game.settings.get(SYSTEM_ID, "rulesEdition");
-    context.expandedRules = context.itemRulesEdition === "expanded";
+    context.rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
+    context.expandedRules = context.rulesEdition === "expanded";
     context.showKey = ["race", "skill", "trainedAbility"].includes(item.type);
     context.showCost = !["race", "skill", "trainedAbility"].includes(item.type);
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
@@ -73,12 +74,11 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   #prepareChoices() {
     return {
       ability: this.#choices(["", "str", "sta", "dex", "rs", "int", "log", "per", "ldr"], "STARFRONTIERS.Ability"),
-      ammoUse: this.#choices(["clip", "powerpack", "seu", "rounds", "none"], "STARFRONTIERS.Choice.AmmoUse"),
+      ammoUse: this.#choices(["seu", "rounds", "none"], "STARFRONTIERS.Choice.AmmoUse"),
       carryState: this.#choices(["ready", "carried", "stored"], "STARFRONTIERS.Choice.CarryState"),
-      damageType: this.#choices(["", "laser", "sonic", "inertia", "gauss", "needler", "acid", "poison", "other"], "STARFRONTIERS.Choice.DamageType"),
+      damageType: this.#choices(["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"], "STARFRONTIERS.Choice.DefenseType"),
       armorReduction: this.#choices(["", "half", "full", "flat"], "STARFRONTIERS.Choice.DefenseMode"),
       psa: this.#choices(["", "military", "technological", "biosocial"], "STARFRONTIERS.Choice.PSA"),
-      rulesEdition: this.#choices(["basic", "expanded"], "STARFRONTIERS.Choice.RulesEdition"),
       screenPowerSource: this.#choices(["", "clip", "beltpack", "powerpack"], "STARFRONTIERS.Choice.ScreenPowerSource"),
       screenReduction: this.#choices(["", "half", "full", "absorbsN"], "STARFRONTIERS.Choice.ScreenReduction"),
       screenType: this.#choices(["", "albedo", "inertia", "gauss", "sonic", "chameleon", "holo"], "STARFRONTIERS.Choice.ScreenType"),
@@ -86,8 +86,24 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       sourceType: this.#choices(["", "powerclip", "beltpack", "powerpack", "parabatteryT1", "parabatteryT2", "parabatteryT3", "parabatteryT4", "ammoClip"], "STARFRONTIERS.Choice.SourceType"),
       vehicleDamageType: this.#choices(["", "ground", "flying"], "STARFRONTIERS.Choice.VehicleDamageType"),
       weaponSkill: this.#choices(["", "beam", "gyrojet", "projectile", "thrown", "melee"], "STARFRONTIERS.Choice.WeaponSkill"),
-      weaponType: this.#choices(["pistol", "rifle", "grenade", "melee", "heavy", "thrown"], "STARFRONTIERS.Choice.WeaponType")
+      weaponType: this.#choices(["melee", "beam", "projectile", "gyrojet", "grenade"], "STARFRONTIERS.Choice.WeaponType")
     };
+  }
+
+  _onRender(context, options) {
+    const weaponTypeEl = this.element.querySelector('select[name="system.weaponType"]');
+    const ammoUsesEl = this.element.querySelector('select[name="system.ammo.uses"]');
+    if (weaponTypeEl && ammoUsesEl) {
+      weaponTypeEl.addEventListener("change", () => {
+        ammoUsesEl.value = StarFrontiersItemSheet.#defaultAmmoUses(weaponTypeEl.value);
+      });
+    }
+  }
+
+  static #defaultAmmoUses(weaponType) {
+    if (weaponType === "melee" || weaponType === "grenade") return "none";
+    if (weaponType === "beam") return "seu";
+    return "rounds";
   }
 
   #choices(values, prefix) {
@@ -104,10 +120,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       const ref = sameActor ? document.id : document.uuid;
       const updateData = {
         "system.ammo.clipItem": ref,
-        "system.ammo.uses": "clip"
+        "system.ammo.capacity": document.system.shots ?? 0
       };
-
-      if (document.system.shots > 0) updateData["system.ammo.capacity"] = document.system.shots;
       await this.item.update(updateData);
       ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.AmmoLinked", { name: document.name }));
       return document;
@@ -137,10 +151,18 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     }
   }
 
-  static async #onClearAmmo(event, target) {
-    await this.item.update({
-      "system.ammo.clipItem": "",
-      "system.ammo.uses": "none"
+  static async #onEditImage(event, target) {
+    const fp = new FilePicker({
+      type: "image",
+      current: this.document.img,
+      callback: async (path) => this.document.update({ img: path }),
+      top: this.position.top + 40,
+      left: this.position.left + 10
     });
+    fp.browse(this.document.img);
+  }
+
+  static async #onClearAmmo(event, target) {
+    await this.item.update({ "system.ammo.clipItem": "" });
   }
 }

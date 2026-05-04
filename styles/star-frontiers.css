@@ -222,9 +222,25 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 
 .item-image {
   border: 2px solid var(--sf-line);
+  cursor: pointer;
+  flex-shrink: 0;
   height: 72px;
-  object-fit: cover;
+  overflow: hidden;
   width: 72px;
+}
+
+.item-image__icon {
+  background-color: var(--sf-ink);
+  height: 100%;
+  -webkit-mask-image: var(--item-img);
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-image: var(--item-img);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  width: 100%;
 }
 
 .item-title {
@@ -298,6 +314,13 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
+.compact-grid.weapon-core-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
 .weapon-ammo-grid {
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
 }
@@ -340,7 +363,7 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   align-items: end;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(92px, 1fr) repeat(2, minmax(64px, 0.5fr));
+  grid-template-columns: minmax(92px, 1fr) repeat(2, minmax(64px, 0.5fr)) minmax(80px, 1fr);
   margin: 12px 0;
 }
 
@@ -670,6 +693,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 
 .roll-label-group {
   align-items: center;
+  cursor: context-menu;
   display: inline-flex;
   position: relative;
 }
@@ -752,7 +776,8 @@ button.roll-label-main:focus-visible {
   pointer-events: none;
   visibility: hidden;
 
-  transition: opacity 120ms ease;
+  /* hide: fade out, then snap visibility off once opacity reaches 0 */
+  transition: opacity 120ms ease 0s, visibility 0s linear 120ms;
 }
 
 /* Invisible bridge so moving from label to toolbar doesn't break hover */
@@ -811,6 +836,8 @@ button.roll-label-main:focus-visible {
 .star-frontiers-sheet .roll-label-group:focus-within .roll-label-actions {
   opacity: 1;
   pointer-events: auto;
+  /* show: snap visibility on after delay, then fade in */
+  transition: opacity 150ms ease 1s, visibility 0s linear 1s;
   visibility: visible;
 }
 
@@ -926,14 +953,88 @@ button.roll-label-main:focus-visible {
 
 .weapon-ammo-cell {
   align-items: center;
-  display: grid;
+  cursor: context-menu;
+  display: inline-flex;
   gap: 4px;
-  grid-template-columns: minmax(38px, 1fr) auto;
+  justify-content: center;
+  position: relative;
 }
 
-.weapon-ammo-cell span {
+.weapon-ammo-cell input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--sf-ink);
+  font-family: var(--input);
+  font-size: 1em;
+  min-height: 0;
+  padding: 0;
+  text-align: right;
+  width: 3ch;
+}
+
+.weapon-ammo-cell input[type="number"]::-webkit-outer-spin-button,
+.weapon-ammo-cell input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.weapon-ammo-cell input[type="number"]:focus {
+  border-bottom: 1px solid var(--sf-focus);
+  outline: none;
+}
+
+.weapon-ammo-cell .ammo-sep,
+.weapon-ammo-cell .ammo-cap {
   color: var(--sf-muted);
   white-space: nowrap;
+}
+
+.battery-icon {
+  height: 18px;
+  vertical-align: middle;
+  width: auto;
+}
+
+.weapon-ammo-actions {
+  align-items: center;
+  background: var(--sf-paper);
+  border: 1px solid var(--sf-line);
+  border-radius: 4px;
+  bottom: calc(100% + 0.55rem);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
+  display: inline-flex;
+  gap: 6px;
+  left: 50%;
+  opacity: 0;
+  padding: 4px 5px;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  /* hide: fade out, then snap visibility off once opacity reaches 0 */
+  transition: opacity 120ms ease 0s, visibility 0s linear 120ms;
+  visibility: hidden;
+  z-index: 100;
+}
+
+.weapon-ammo-actions::after {
+  bottom: -0.65rem;
+  content: "";
+  height: 0.65rem;
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+
+.weapon-ammo-cell:hover .weapon-ammo-actions,
+.weapon-ammo-cell:focus-within .weapon-ammo-actions {
+  opacity: 1;
+  pointer-events: auto;
+  /* show: snap visibility on after delay, then fade in */
+  transition: opacity 150ms ease 1s, visibility 0s linear 1s;
+  visibility: visible;
 }
 
 .left-column {
@@ -1178,7 +1279,7 @@ button.roll-label-main:focus-visible {
 .star-frontiers-item-sheet .paper-box .top-row {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
 .star-frontiers-item-sheet .paper-box .top-row .mass,

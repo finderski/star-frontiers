@@ -113,6 +113,17 @@
         "poison": "Poison",
         "sonic": "Sonic"
       },
+      "DefenseType": {
+        "None": "None",
+        "albedo": "Albedo",
+        "gaussAS": "Gauss/A-S",
+        "inertia": "Inertia",
+        "ir": "IR",
+        "reactionSpeed": "Reaction Speed",
+        "sonic": "Sonic",
+        "sonicAS": "Sonic/A-S",
+        "stamina": "Stamina"
+      },
       "DefenseMode": {
         "None": "None",
         "flat": "Flat",
@@ -185,12 +196,11 @@
         "thrown": "Thrown"
       },
       "WeaponType": {
+        "beam": "Beam",
         "grenade": "Grenade",
-        "heavy": "Heavy",
+        "gyrojet": "Gyrojet",
         "melee": "Melee",
-        "pistol": "Pistol",
-        "rifle": "Rifle",
-        "thrown": "Thrown"
+        "projectile": "Projectile"
       }
     },
     "Item": {
@@ -214,11 +224,13 @@
       "ComputerData": "Computer",
       "ConsumableData": "Consumable",
       "ConsumeOnUse": "Consume on Use",
+      "ChangeIcon": "Click to change icon",
       "ClearAmmo": "Clear linked ammo",
       "Consumed": "Consumed",
       "Cost": "Cost",
       "CopyName": "{name} Copy",
       "CurrentSetting": "Current Setting",
+      "Defense": "Defense",
       "CurrentChance": "Current Chance",
       "DamageFormula": "Damage",
       "DamageType": "Damage Type",
@@ -259,6 +271,7 @@
       "Quantity": "Quantity",
       "RaceData": "Race Data",
       "RaceKey": "Race Key",
+      "RangeDamage": "Damage",
       "RangeMax": "Max",
       "RangeMin": "Min",
       "RangeMod": "Modifier",
@@ -295,11 +308,13 @@
         "Weapon": "Weapon"
       },
       "Uses": "Uses",
+      "VariableMin": "SEU Min",
+      "VariableMax": "SEU Max",
       "VehicleClass": "Vehicle Class",
       "VehicleData": "Vehicle",
       "WeaponData": "Weapon",
-      "WeaponSkill": "Weapon Skill",
-      "WeaponType": "Weapon Type",
+      "WeaponSkill": "Skill",
+      "WeaponType": "Type",
       "Weight": "Weight",
       "XPPerPoint": "XP/Point"
     },
@@ -363,10 +378,14 @@
       "DamageFlavor": "{weapon} Damage",
       "DamageFormulaLabel": "Damage Formula",
       "DamageTitle": "{name}: {weapon} Damage",
+      "Defense": "Defense",
       "InvalidDamageFormula": "That weapon's damage formula is invalid.",
       "Name": "Weapon",
       "NoDamageFormula": "That weapon does not have a damage formula yet.",
       "OutOfAmmo": "That weapon does not have enough loaded ammunition.",
+      "CannotReload": "No linked ammunition found for that weapon.",
+      "Reload": "Reload",
+      "Reloaded": "{weapon} reloaded from {ammo} ({remaining} remaining).",
       "AutoRangeDetected": "Range auto-detected from target: {range} ({mod})",
       "Distance": "Distance",
       "Range": "Range",

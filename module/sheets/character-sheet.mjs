@@ -56,6 +56,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       rollWeaponAttack: StarFrontiersCharacterSheet.#onRollWeaponAttack,
       rollWeaponDamage: StarFrontiersCharacterSheet.#onRollWeaponDamage,
       cycleWeaponCarryState: StarFrontiersCharacterSheet.#onCycleWeaponCarryState,
+      reloadWeapon: StarFrontiersCharacterSheet.#onReloadWeapon,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
   };
@@ -83,7 +84,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.generateStatsLabel = context.statsInitialized
       ? "STARFRONTIERS.Character.ReplaceStats"
       : "STARFRONTIERS.Character.GenerateStats";
-    context.weaponRows = this.#prepareWeaponRows(actor);
+    context.weaponRows = await this.#prepareWeaponRows(actor);
     context.armorItems = actor.items.filter((item) => item.type === "armor");
     context.screenItems = actor.items.filter((item) => item.type === "screen");
     context.skillItems = actor.items.filter((item) => item.type === "skill");
@@ -91,10 +92,17 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return context;
   }
 
-  #prepareWeaponRows(actor) {
-    const rows = actor.items
-      .filter((item) => item.type === "weapon")
-      .map((item) => ({
+  async #prepareWeaponRows(actor) {
+    const weapons = actor.items.filter((item) => item.type === "weapon");
+    const rows = await Promise.all(weapons.map(async (item) => {
+      const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, item);
+      const liveCapacity = StarFrontiersCharacterSheet.#getLiveCapacity(item, linkedAmmo);
+      const uses = item.system.ammo?.uses ?? "none";
+      const hasAmmo = uses !== "none";
+      const ammoLoaded = StarFrontiersCharacterSheet.#getLoadedAmmo(item, liveCapacity);
+      const isSEU = uses === "seu";
+      const canReload = hasAmmo && !!linkedAmmo && (linkedAmmo.system.quantity ?? 0) > 0;
+      return {
         key: item.id,
         item,
         editable: true,
@@ -109,29 +117,25 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           medium: this.#formatRangeBand(item.system.rangeBands.medium),
           long: this.#formatRangeBand(item.system.rangeBands.long),
           extreme: this.#formatRangeBand(item.system.rangeBands.extreme),
-          ammo: this.#formatAmmo(item),
-          ammoCapacity: item.system.ammo?.capacity ?? 0,
-          ammoLoaded: StarFrontiersCharacterSheet.#getLoadedAmmo(item),
+          ammoLoaded,
+          ammoCapacity: liveCapacity,
+          hasAmmo,
+          isSEU,
+          batteryIcon: isSEU ? StarFrontiersCharacterSheet.#getBatteryIcon(ammoLoaded, liveCapacity) : null,
+          canReload,
           carryState: item.system.carryState || "ready"
         }
-      }));
+      };
+    }));
 
     while (rows.length < MIN_WEAPON_ROWS) {
       rows.push({
         key: `blank-${rows.length}`,
         editable: false,
         data: {
-          name: "",
-          damage: "",
-          toHit: "",
-          pointBlank: "",
-          short: "",
-          medium: "",
-          long: "",
-          extreme: "",
-          ammo: "",
-          ammoCapacity: "",
-          ammoLoaded: "",
+          name: "", damage: "", toHit: "",
+          pointBlank: "", short: "", medium: "", long: "", extreme: "",
+          ammoLoaded: 0, ammoCapacity: 0, hasAmmo: false, canReload: false,
           carryState: "ready"
         }
       });
@@ -146,16 +150,42 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return `${band.min}-${band.max}`;
   }
 
-  #formatAmmo(item) {
-    const ammo = item.system.ammo;
-    if (!ammo?.capacity) return "";
-    return `${Math.max(ammo.capacity - ammo.consumed, 0)}/${ammo.capacity}`;
+  static #getLiveCapacity(weapon, linkedAmmo) {
+    if (linkedAmmo?.system?.shots > 0) return linkedAmmo.system.shots;
+    return weapon.system.ammo?.capacity ?? 0;
   }
 
-  static #getLoadedAmmo(item) {
-    const ammo = item.system.ammo;
-    if (!ammo?.capacity) return 0;
-    return Math.max(ammo.capacity - ammo.consumed, 0);
+  static #getLoadedAmmo(weapon, liveCapacity) {
+    const capacity = liveCapacity ?? weapon.system.ammo?.capacity ?? 0;
+    if (!capacity) return 0;
+    return Math.max(capacity - (weapon.system.ammo?.consumed ?? 0), 0);
+  }
+
+  static async #resolveWeaponAmmoItem(actor, weapon) {
+    const ref = weapon.system.ammo?.clipItem;
+    if (!ref) return null;
+    const owned = actor.items.get(ref);
+    if (owned) return owned;
+    if (!globalThis.fromUuid) return null;
+    try {
+      return await globalThis.fromUuid(ref);
+    } catch {
+      return null;
+    }
+  }
+
+  static #getBatteryIcon(loaded, capacity) {
+    const base = "assets/images/sheet-icons/";
+    if (!capacity) return `${base}battery_empty.svg`;
+    const pct = (loaded / capacity) * 100;
+    if (pct >= 100) return `${base}battery_full.svg`;
+    if (pct >= 85)  return `${base}battery_85.svg`;
+    if (pct >= 70)  return `${base}batter_70.svg`;
+    if (pct >= 55)  return `${base}battery_55.svg`;
+    if (pct >= 30)  return `${base}battery_30.svg`;
+    if (pct >= 15)  return `${base}battery_15.svg`;
+    if (pct >= 1)   return `${base}battery_1.svg`;
+    return `${base}battery_empty.svg`;
   }
 
   async _onRender(context, options) {
@@ -202,8 +232,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target ??= event.currentTarget;
     const type = target.dataset.type ?? "gear";
     const name = target.dataset.name ?? game.i18n.localize("STARFRONTIERS.Item.New");
-    const system = { rulesEdition: game.settings.get(SYSTEM_ID, "rulesEdition") };
-    const [item] = await this.document.createEmbeddedDocuments("Item", [{ name, type, system }]);
+    const [item] = await this.document.createEmbeddedDocuments("Item", [{ name, type }]);
     item?.sheet?.render(true);
   }
 
@@ -323,20 +352,51 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     await item.update({ "system.carryState": next });
   }
 
+  static async #onReloadWeapon(event, target) {
+    target ??= event.currentTarget;
+    const actor = this.document;
+    const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(actor, target);
+    if (!weapon) return;
+
+    const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
+    if (!linkedAmmo) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.CannotReload"));
+      return;
+    }
+
+    const quantity = linkedAmmo.system.quantity ?? 0;
+    if (quantity <= 0) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
+      return;
+    }
+
+    const newCapacity = linkedAmmo.system.shots ?? weapon.system.ammo?.capacity ?? 0;
+    await Promise.all([
+      weapon.update({ "system.ammo.consumed": 0, "system.ammo.capacity": newCapacity }),
+      linkedAmmo.update({ "system.quantity": quantity - 1 })
+    ]);
+
+    ui.notifications.info(game.i18n.format("STARFRONTIERS.Weapon.Reloaded", {
+      weapon: weapon.name,
+      ammo: linkedAmmo.name,
+      remaining: quantity - 1
+    }));
+  }
+
   static #getItemFromTarget(actor, target) {
     const itemId = target.closest("[data-item-id]")?.dataset.itemId;
     return actor.items.get(itemId);
   }
 
   static async handleChatCardAction(element) {
-    const { action, itemUuid, rollMode } = element.dataset;
+    const { action, itemUuid, rollMode, bandKey } = element.dataset;
     if (!action || !itemUuid || !globalThis.fromUuid) return;
 
     const item = await globalThis.fromUuid(itemUuid);
     if (!item?.actor || item.type !== "weapon") return;
 
     if (action === "rollWeaponDamage") {
-      await StarFrontiersCharacterSheet.#rollWeaponDamage(item.actor, item, rollMode ?? "public");
+      await StarFrontiersCharacterSheet.#rollWeaponDamage(item.actor, item, rollMode ?? "public", bandKey ?? "");
     }
   }
 
@@ -395,8 +455,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (!prompt) return;
 
     const ammoCheck = StarFrontiersCharacterSheet.#getAmmoConsumption(weapon);
+    const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
+    const liveCapacity = StarFrontiersCharacterSheet.#getLiveCapacity(weapon, linkedAmmo);
     if (ammoCheck.amount > 0) {
-      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon);
+      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity);
       if (loaded < ammoCheck.amount) {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
         return;
@@ -405,7 +467,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     const activeBandKey = autoRangeBand?.key ?? prompt.rangeBand;
     const activeRangeLabel = autoRangeBand?.label ?? prompt.rangeLabel;
-    const rangeMod = activeBandKey ? Number(weapon.system.rangeBands[activeBandKey]?.mod ?? 0) : 0;
+    const rangeMod = activeBandKey ? (STAR_FRONTIERS_CONFIG.rangeMods[activeBandKey] ?? 0) : 0;
     const adjustedTarget = StarFrontiersCharacterSheet.#clampAttackTarget(profile.baseTarget + rangeMod + prompt.modifier);
     const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
     const success = roll.total <= adjustedTarget;
@@ -450,12 +512,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     );
 
     if (ammoCheck.amount > 0) {
-      const remaining = Math.max((weapon.system.ammo?.capacity ?? 0) - ((weapon.system.ammo?.consumed ?? 0) + (game.settings.get(SYSTEM_ID, "automateAmmo") ? ammoCheck.amount : 0)), 0);
+      const remaining = Math.max(liveCapacity - ((weapon.system.ammo?.consumed ?? 0) + (game.settings.get(SYSTEM_ID, "automateAmmo") ? ammoCheck.amount : 0)), 0);
       rows.push({
         label: game.i18n.localize("STARFRONTIERS.Weapon.AmmoRemaining"),
-        value: `${remaining}/${weapon.system.ammo?.capacity ?? 0}`
+        value: `${remaining}/${liveCapacity}`
       });
     }
+
+    const bandFormula = activeBandKey ? (weapon.system.rangeBands[activeBandKey]?.damageFormula ?? "") : "";
+    const effectiveDamageFormula = bandFormula || weapon.system.damageFormula || "";
 
     await StarFrontiersCharacterSheet.#createWeaponAttackChatMessage(actor, weapon, {
       rollMode,
@@ -465,19 +530,23 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         : game.i18n.localize("STARFRONTIERS.Character.Failure"),
       outcomeClass: success ? "success" : "failure",
       rollHtml,
-      canRollDamage: Boolean(weapon.system.damageFormula)
+      canRollDamage: Boolean(effectiveDamageFormula),
+      activeBandKey: activeBandKey ?? ""
     });
   }
 
-  static async #rollWeaponDamage(actor, weapon, rollMode = "public") {
-    if (!weapon.system.damageFormula) {
+  static async #rollWeaponDamage(actor, weapon, rollMode = "public", bandKey = "") {
+    const bandFormula = bandKey ? (weapon.system.rangeBands[bandKey]?.damageFormula ?? "") : "";
+    const formula = bandFormula || weapon.system.damageFormula || "";
+
+    if (!formula) {
       ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoDamageFormula"));
       return;
     }
 
     let roll;
     try {
-      roll = await (new Roll(weapon.system.damageFormula)).evaluate({ allowInteractive: false });
+      roll = await (new Roll(formula)).evaluate({ allowInteractive: false });
     } catch {
       ui.notifications.error(game.i18n.localize("STARFRONTIERS.Weapon.InvalidDamageFormula"));
       return;
@@ -494,8 +563,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }),
       subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
       rows: [
-        { label: game.i18n.localize("STARFRONTIERS.Weapon.DamageType"), value: StarFrontiersCharacterSheet.#damageTypeLabel(weapon.system.damageType) },
-        { label: game.i18n.localize("STARFRONTIERS.Weapon.DamageFormulaLabel"), value: weapon.system.damageFormula }
+        { label: game.i18n.localize("STARFRONTIERS.Weapon.Defense"), value: StarFrontiersCharacterSheet.#damageTypeLabel(weapon.system.damageType) },
+        { label: game.i18n.localize("STARFRONTIERS.Weapon.DamageFormulaLabel"), value: formula }
       ],
       rollMode,
       rollHtml
@@ -554,7 +623,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (!item) return;
 
     if (target.dataset.itemAmmoLoaded !== undefined) {
-      const capacity = item.system.ammo?.capacity ?? 0;
+      const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(this.document, item);
+      const capacity = StarFrontiersCharacterSheet.#getLiveCapacity(item, linkedAmmo);
       const loaded = Math.min(Math.max(Number(target.value || 0), 0), capacity);
       await item.update({ "system.ammo.consumed": Math.max(capacity - loaded, 0) });
       return;
@@ -574,8 +644,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     const source = document.toObject();
     delete source._id;
-    source.system ??= {};
-    source.system.rulesEdition ??= game.settings.get(SYSTEM_ID, "rulesEdition");
     const [race] = await this.document.createEmbeddedDocuments("Item", [source]);
     return race;
   }
@@ -644,7 +712,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static #raceModifier(race, ability) {
     const modifiers = race?.system?.modifiers;
     if (!modifiers) return 0;
-    if (race.system.rulesEdition === "expanded") return Number(modifiers[ability] ?? 0);
+    if (game.settings.get(SYSTEM_ID, "rulesEdition") === "expanded") return Number(modifiers[ability] ?? 0);
 
     const direct = modifiers[ability];
     if (direct !== undefined && direct !== null && direct !== 0) return Number(direct);
@@ -687,7 +755,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static #getWeaponAttackProfile(actor, weapon) {
-    const rulesEdition = weapon.system.rulesEdition || game.settings.get(SYSTEM_ID, "rulesEdition");
+    const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
     const skill = StarFrontiersCharacterSheet.#getWeaponSkill(actor, weapon);
     const dex = Number(actor.system.abilities.dex.value ?? 0);
     const str = Number(actor.system.abilities.str.value ?? 0);
@@ -751,7 +819,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       return {
         key,
         label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
-        mod: Number(band.mod ?? 0)
+        mod: STAR_FRONTIERS_CONFIG.rangeMods[key] ?? 0
       };
     }
     return null;
@@ -763,13 +831,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const band = weapon.system.rangeBands?.[key];
       if (!band) continue;
       const hasDistance = band.min !== null || band.max !== null;
-      const hasModifier = Number(band.mod ?? 0) !== 0;
-      if (!hasDistance && !hasModifier) continue;
+      if (!hasDistance) continue;
 
       bands.push({
         key,
         label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
-        modifier: Number(band.mod ?? 0)
+        modifier: STAR_FRONTIERS_CONFIG.rangeMods[key] ?? 0
       });
     }
     return bands;
@@ -839,7 +906,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static #getAmmoConsumption(weapon) {
     const uses = weapon.system.ammo?.uses ?? "none";
     if (uses === "none") return { amount: 0 };
-    if (uses === "clip" || uses === "rounds") return { amount: 1 };
+    if (uses === "rounds") return { amount: 1 };
 
     const variable = Number(weapon.system.ammo?.variableSetting?.current ?? 0);
     const perShot = Number(weapon.system.ammo?.seuPerShot ?? 0);
@@ -847,8 +914,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static #damageTypeLabel(value) {
-    if (!value) return game.i18n.localize("STARFRONTIERS.Choice.DamageType.None");
-    return game.i18n.localize(`STARFRONTIERS.Choice.DamageType.${value}`);
+    if (!value) return game.i18n.localize("STARFRONTIERS.Choice.DefenseType.None");
+    return game.i18n.localize(`STARFRONTIERS.Choice.DefenseType.${value}`);
   }
 
   static #buildRaceApplicationUpdates(actor, race) {
@@ -934,7 +1001,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     outcomeClass,
     rollHtml,
     rollMode = "public",
-    canRollDamage = false
+    canRollDamage = false,
+    activeBandKey = ""
   }) {
     const content = await renderTemplate("systems/star-frontiers/templates/chat/weapon-attack-card.hbs", {
       title: game.i18n.format("STARFRONTIERS.Weapon.AttackTitle", { weapon: weapon.name }),
@@ -946,6 +1014,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       canRollDamage,
       damageButtonLabel: game.i18n.localize("STARFRONTIERS.Weapon.RollDamage"),
       itemUuid: weapon.uuid,
+      bandKey: activeBandKey,
       rollMode
     });
 

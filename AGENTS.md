@@ -52,6 +52,15 @@
 - Rules-specific UI should usually be driven by `system.rulesEdition` or world `rulesEdition`, not forked templates.
 - Styling is centralized in one stylesheet and theme-aware through CSS variables.
 
+## Schema versioning
+
+- Current schema version: **0.2.0** (stored in world setting `schemaVersion`).
+- Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
+- Migration 0.2.0 removes per-weapon range band `mod` fields, per-document `rulesEdition` fields, and remaps old `weaponType`/`ammo.uses` values to the current choices.
+- **New optional fields with schema defaults do not require a migration** — TypeDataModel fills in defaults for stored documents that predate the field.
+
+---
+
 ## Current data model decisions
 
 ### Character abilities and stamina
@@ -75,27 +84,38 @@
 ### Weapon/ammo
 - Weapon rows on the character sheet display **loaded ammo**, not spent ammo.
 - Loaded ammo is computed from `capacity - consumed`.
-- `system.ammo.consumed` is currently the source of truth for depletion on the weapon item.
-- Linked ammo items exist via `system.ammo.clipItem`, but current live ammo depletion is still tracked on the weapon, not on the ammo item itself.
-- This is intentional for now; do not switch ownership of the depletion model without discussing it.
+- `system.ammo.consumed` is the source of truth for depletion; it lives on the weapon item.
+- Linked ammo items exist via `system.ammo.clipItem`. Live capacity is derived from the linked ammo item's `system.shots` at render time (`#getLiveCapacity`), not stored directly. Stored `system.ammo.capacity` is synced on reload.
+- Ammo item `system.quantity` tracks how many clips/packs remain for reload.
+- Do not switch ammo depletion tracking to the ammo item itself without discussing it.
+- **Range modifiers** (`pointBlank: 0, short: -10, medium: -20, long: -40, extreme: -80`) live in `CONFIG.SF.rangeMods`. Weapons do NOT store per-band modifiers.
+- A range band with both `min === null` and `max === null` is treated as **unavailable** for that weapon (e.g. Gyrojet has no PB or Short range). Both the attack dialog and auto-detection from token distance skip null/null bands.
+- Per-band damage formulas: each `rangeBands[key]` now has an optional `damageFormula` text field. When non-empty it overrides the weapon's base `damageFormula` for that range. The active band key is passed from the attack roll → chat card button (`data-band-key`) → damage roll. This supports sonic weapons whose damage scales with range.
 
 ## Item and weapon sheet decisions already made
 - All current item types share one generic `ItemSheetV2`, with conditional sections by item type.
-- Item sheets default `system.rulesEdition` from the world setting on create.
-- Weapon sheets:
+- `rulesEdition` is a **world setting only** — it is never stored per-document. All code reads `game.settings.get(SYSTEM_ID, “rulesEdition”)`. Do not add per-document rulesEdition fields.
+- Item sheet header image: rendered as a CSS `mask-image` over a `<div>` (not an `<img>`), so the icon color tracks `--sf-ink` and adapts automatically to both paper and retro themes. Clicking opens a FilePicker via the `editImage` action.
+- Default icons per item type are set by a `preCreateItem` hook in `star-frontiers.mjs` using Foundry built-in SVGs (e.g. `icons/svg/sword.svg` for weapons).
+- Weapon item sheets:
   - have no extra generic “button row”; the **weapon name** on the actor sheet is the attack trigger
-  - support linked ammo drop onto a drop zone
-  - expose `carryState` (`ready`, `carried`, `stored`)
-  - expose `ammo.uses`, `capacity`, `consumed`, `seuPerShot`, and `variableSetting.current`
+  - support linked ammo drop onto the ammo drop zone (`system.ammo.clipItem` is set; `uses` is NOT forced by the drop — the GM sets it via the dropdown)
+  - do **not** expose `carryState` (carry state is controlled on the actor sheet, not the item sheet)
+  - expose `weaponType` (`melee` · `beam` · `projectile` · `gyrojet` · `grenade`), changing it auto-sets a default `ammo.uses` in the sheet's `_onRender` listener
+  - expose `ammo.uses` (`seu` · `rounds` · `none`); default `none`
+  - do **not** expose `capacity`, `consumed`, or `seuPerShot` (runtime values, managed on the character sheet)
+  - expose `variableSetting.min` / `.max` in Expanded mode only (power dial range); `.current` belongs on the character sheet weapon row, not yet implemented
+  - expose per-band `damageFormula` in the range editor (4-column: label, min, max, damage)
   - hide Expanded-only `mass` when not in Expanded rules
 - Character weapon rows:
   - weapon name rolls attack
   - damage cell rolls damage
-  - attack prompts for range band + situational modifier
-  - damage is always rollable even if the attack failed
-  - carry state is shown as a cycle button on the actor sheet
-  - loaded ammo is editable directly on the actor sheet
-- Weapon attack chat cards include a follow-up **Roll Damage** button.
+  - attack prompts for range band + situational modifier; only bands with configured distances appear
+  - damage uses the active band's formula if set, falls back to weapon base formula
+  - carry state is a cycle button on the actor sheet
+  - loaded ammo is editable directly on the actor sheet; SEU weapons show a battery icon
+  - a reload button appears on hover (1-second delay) when a linked ammo item with quantity > 0 is present
+- Weapon attack chat cards include a follow-up **Roll Damage** button carrying `data-band-key` for per-band damage.
 
 ## Current character sheet behavior
 - Top section is functional:
@@ -139,19 +159,14 @@ This reflects the current local notes and implemented work, not a live Asana syn
 
 ## Current next tasks
 - Weapons:
-  - confirm attack formulas against the actual rules PDFs
+  - add `variableSetting.current` (SEU power dial) to character sheet weapon row in Expanded mode
   - handle Expanded Rules rate of fire
-  - clean up ammo semantics and display
-  - consider global/default range penalties instead of per-weapon editing
-  - optionally use selected token target + measured distance to auto-pick range band/modifiers
+  - confirm attack formulas against the actual rules PDFs
 - Races:
-  - remove/replace the unnecessary extra “Key” display where appropriate
-  - race sheet autofill for paired modifiers in Basic-style cases
-  - hide `Hourly` in Basic rules if desired
+  - race item sheet: remove redundant Key display, hide Hourly in Basic mode, autofill paired modifiers
   - add real editing/support for racial special abilities
 - General:
   - continue section-by-section on character sheet
-  - improve styling consistency across item sheets
   - build compendium content after core item/actor workflows settle
 
 ## Things not to change without asking
@@ -159,8 +174,10 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not merge `system.abilities.sta.value` and `system.stamina.value`.
 - Do not rename document/item types (`weapon`, `race`, `skill`, etc.) without a migration plan.
 - Do not remove the world setting distinction between Basic and Expanded rules.
+- Do not add per-document `rulesEdition` fields; this was intentionally removed — the world setting is the sole source.
 - Do not replace the current theme model (paper vs retro) with template forks unless explicitly decided.
-- Do not move ammo depletion to the ammo item itself yet; current logic assumes weapon-local consumption.
+- Do not move ammo depletion to the ammo item itself; current logic tracks depletion on the weapon via `system.ammo.consumed`.
+- Do not store range band modifiers on weapon items; they belong in `CONFIG.SF.rangeMods` only.
 - Do not treat the current weapon attack formulas as permanently settled; verify them before broadening automation.
 
 ## Testing and runtime expectations

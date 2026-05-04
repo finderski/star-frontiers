@@ -179,7 +179,6 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
         statsGenerated: boolField()
       }),
 
-      rulesEdition: textField({ initial: "basic", choices: ["basic", "expanded"] }),
       warnings: arrayField(warningField())
     };
   }
