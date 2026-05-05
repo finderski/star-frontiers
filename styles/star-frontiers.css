@@ -1118,6 +1118,12 @@ button.roll-label-main:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.reverse-grid.skills-equipment-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+}
+
 .reverse-grid textarea {
   min-height: 150px;
 }
@@ -1126,6 +1132,88 @@ button.roll-label-main:focus-visible {
   border-bottom: 2px solid var(--sf-line);
   min-height: 150px;
   padding: 4px 0;
+}
+
+.equipment-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.equipment-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.encumbrance-summary {
+  align-items: center;
+  display: inline-flex;
+  font-family: var(--input);
+  font-size: 0.95em;
+  gap: 8px;
+}
+
+.encumbrance-summary--encumbered {
+  color: var(--sf-focus);
+}
+
+.encumbrance-label {
+  color: var(--sf-muted);
+  text-transform: uppercase;
+}
+
+.encumbrance-values {
+  font-weight: bold;
+}
+
+.encumbrance-badge {
+  align-items: center;
+  background: var(--sf-focus);
+  border-radius: 3px;
+  color: var(--sf-paper);
+  display: inline-flex;
+  font-size: 0.85em;
+  gap: 4px;
+  padding: 2px 6px;
+  text-transform: uppercase;
+}
+
+.equipment-list {
+  border-bottom: 2px solid var(--sf-line);
+  min-height: 80px;
+  padding: 2px 0;
+}
+
+.equipment-grid {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 60px 60px 32px auto;
+  padding: 3px 4px;
+}
+
+.equipment-grid--header {
+  border-bottom: 1px solid var(--sf-row-line);
+  color: var(--sf-muted);
+  font-size: 0.85em;
+  text-transform: uppercase;
+}
+
+.equipment-row {
+  border-bottom: 1px solid var(--sf-row-line);
+}
+
+.equipment-row input[type="number"] {
+  background: transparent;
+  border: none;
+  color: var(--sf-ink);
+  font-family: var(--input);
+  min-height: 0;
+  padding: 0;
+  width: 100%;
 }
 
 .compact-list {

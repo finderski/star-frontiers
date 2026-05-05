@@ -98,6 +98,22 @@ function raceKeyFrom(value) {
   return String(value ?? "").toLowerCase().replace(/[^a-z]/g, "");
 }
 
+const MASS_CARRIED_STATES = new Set(["ready", "carried"]);
+
+function computeCarriedMass(actor) {
+  if (!actor?.items) return 0;
+  let total = 0;
+  for (const item of actor.items) {
+    const sys = item.system ?? {};
+    const mass = Number(sys.mass ?? 0);
+    if (!mass) continue;
+    if (sys.carryState && !MASS_CARRIED_STATES.has(sys.carryState)) continue;
+    const qty = Number(sys.quantity ?? 1);
+    total += mass * qty;
+  }
+  return total;
+}
+
 export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
@@ -125,6 +141,9 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
         hourly: numberField({ initial: 0, min: 0 }),
         isWounded: boolField(),
         derivedLimbs: numberField({ initial: 0, min: 0 }),
+        totalMass: numberField({ initial: 0, min: 0, integer: false }),
+        encumbranceThreshold: numberField({ initial: 0, min: 0, integer: false }),
+        encumbered: boolField(),
         paired: schemaField({
           strSta: numberField({ initial: 30 }),
           dexRs: numberField({ initial: 30 }),
@@ -200,9 +219,18 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
       ?? CONFIG.SF?.raceMovement?.[raceKeyFrom(this.race)]
       ?? CONFIG.SF?.raceMovement?.human;
 
-    this.derived.walking = raceMovement?.walking ?? 2;
-    this.derived.running = raceMovement?.running ?? 6;
-    this.derived.hourly = raceMovement?.hourly ?? 0;
+    const baseWalking = raceMovement?.walking ?? 2;
+    const baseRunning = raceMovement?.running ?? 6;
+    const baseHourly = raceMovement?.hourly ?? 0;
+
+    this.derived.totalMass = computeCarriedMass(this.parent);
+    this.derived.encumbranceThreshold = (abilities.str.value || 0) / 2;
+    this.derived.encumbered = this.derived.totalMass > this.derived.encumbranceThreshold;
+
+    const movementFactor = this.derived.encumbered ? 0.5 : 1;
+    this.derived.walking = Math.floor(baseWalking * movementFactor);
+    this.derived.running = Math.floor(baseRunning * movementFactor);
+    this.derived.hourly = Math.floor(baseHourly * movementFactor);
 
     this.stamina.max = Math.max(0, abilities.sta.value + this.stamina.temp);
     this.stamina.value = clamp(this.stamina.value, Math.min(0, this.stamina.value), this.stamina.max);

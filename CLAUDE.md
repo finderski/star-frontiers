@@ -73,6 +73,19 @@ Doze grenade hit = `unconscious-doze` Active Effect (1 hour). Miss = 1d10 bounce
 - Staydose: stabilizes a ≤0 STA actor for 24 hours (must be administered within 10 turns of going down).
 - Hospital: 1 Credit per STA point restored.
 
+### Encumbrance (Expanded only)
+
+- A character can carry up to **STR kg** total. **Encumbered when carried mass > STR/2** kg.
+- Encumbered effects:
+  - Movement (walking/running/hourly) **halved** (applied in `Character.prepareDerivedData`).
+  - **Attacker encumbered: −10 to attack roll.**
+  - **Target encumbered: +10 to attacker's roll.**
+- Combat modifiers above are **always applied** in Expanded; not configurable.
+- Two world settings extend the −10 penalty to ability/skill checks:
+  - `encumbranceAffectsPhysical` (default off) — applies to STR, STA, DEX, RS rolls.
+  - `encumbranceAffectsNonPhysical` (default off) — applies to INT, LOG, PER, LDR rolls.
+- In **Basic** rules: encumbered status is computed and displayed (UI indicator) but applies **no penalty and no movement halving**. Display-only.
+
 ---
 
 ## FoundryVTT v14 architecture
@@ -149,6 +162,8 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 | `automateAmmo` | bool | `true` | Auto-decrement weapon ammo on attack |
 | `automateActiveEffects` | bool | `true` | Reserved for future Active Effects automation |
 | `chargenWizardOnNew` | bool | `false` | Reserved for future chargen wizard |
+| `encumbranceAffectsPhysical` | bool | `false` | When encumbered (Expanded), apply −10 to STR/STA/DEX/RS checks |
+| `encumbranceAffectsNonPhysical` | bool | `false` | When encumbered (Expanded), apply −10 to INT/LOG/PER/LDR checks |
 
 ---
 
@@ -181,11 +196,20 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - Default per-type item icons set via `preCreateItem` hook
   - Ammo item `ammoType` is a dropdown (Rounds / SEU); `quantity` field removed from ammo schema
   - Range band cells on character sheet weapon rows show max distance only (not min–max)
+  - **Equipment section** — restructured grid showing per-item Name | Quantity | Mass | Carry State | Actions; same 3-state cycle button as weapons (`cycleCarryState` action, generic for any item type)
+  - **Encumbrance** — `Character.prepareDerivedData` computes `derived.totalMass` (sum of `mass × quantity` across all items where `carryState ∈ {ready, carried}`), `derived.encumbranceThreshold` (STR/2), `derived.encumbered`. Movement halved when encumbered. Indicator badge in Equipment section header.
+  - **Combat encumbrance modifiers (Expanded)** — `#getCombatEncumbranceMods` adds −10 if attacker encumbered, +10 if target token's actor encumbered. Shown as separate rows in attack chat card.
+  - **Optional encumbrance penalty on ability checks** — `#getAbilityEncumbranceMod` reads the two world settings and applies −10 to the relevant check target (split by physical vs non-physical).
+  - **Skills section** — visible only in Expanded rules; "Add Skill" button likewise hidden in Basic. Section legend reads "Equipment" in Basic, "Skills and Equipment" in Expanded.
+  - **Reload behavior** — requires linked ammo with `quantity > 0` AND `carryState ≠ "stored"`; reload decrements linked ammo `quantity` by 1 (reverses prior "always refills" behavior). Reload button only appears in gear panel when both conditions met.
 
 ### Weapon data model (current)
 - `weaponType` choices: `melee` · `beam` · `projectile` · `gyrojet` · `grenade`
 - `weaponSkillKey` choices: `""` · `dex` · `str` · `beam` · `gyrojet` · `projectile` · `thrown` · `melee` — `str` and `dex` are valid Basic-rules skill keys
 - `damageType` choices (UI label "Defense"): `albedo` · `gaussAS` · `sonic` · `sonicAS` · `inertia` · `reactionSpeed` · `stamina` · `ir`
+- `carryState` (default `"ready"`): `ready` · `carried` · `stored`
+- `quantity` (default `1`): edited via the character sheet weapon **gear panel**, NOT on the item sheet (avoids cluttering item sheet with character-tied data)
+- `mass` — used in encumbrance total via `mass × quantity`
 - `ammo.uses` choices: `seu` · `rounds` · `none` (default `none`; auto-defaults when weaponType changes in item sheet)
 - `ammo.capacity` / `ammo.consumed` / `ammo.seuPerShot` — tracked on weapon, NOT shown on item sheet (character sheet only)
 - `ammo.variableSetting.min` / `.max` — shown on item sheet for any SEU weapon in Expanded mode; `.current` is editable on the character sheet via the gear panel SEU dial
@@ -197,7 +221,16 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 ### Ammo item data model (current)
 - `ammoType`: dropdown — `rounds` · `seu` (no longer free text)
 - `shots`: capacity of one container (clip / pack)
-- `quantity` field was **removed** — ammo items no longer track how many spare containers exist; reload simply refills from the linked item
+- `carryState` (default `"carried"`): `ready` · `carried` · `stored`
+- `quantity` (default `1`) — **re-added** after a brief period without it. Tracks how many spare containers the character has. Reload decrements by 1; if `quantity = 0` or `carryState = "stored"`, reload is blocked. Reload button is hidden in the gear panel until conditions are met.
+- `mass` — per-container mass; counted in encumbrance via `mass × quantity`
+
+### Other equipment item models (carryState/quantity additions)
+- `gear`: already had `quantity` and `mass`; now also `carryState` (default `"carried"`).
+- `consumable`: now has `quantity`, `mass`, `carryState` (default `"carried"`); `uses.value/.max` is the per-instance dose count, separate from how many you own.
+- `powerSource`: now has `quantity` and `carryState` (default `"carried"`); already had `mass`.
+- `armor`: now has `carryState` (default `"carried"`); no `quantity` (single-instance assumption).
+- `screen`: now has `carryState` (default `"carried"`) and `mass`; no `quantity`.
 
 ### Not yet started
 - Phase 3 (dedicated dice/combat module) — rolls are currently inline in `character-sheet.mjs`
@@ -214,7 +247,8 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 
 - **Variable SEU damage** — `variableSetting.current` is saved and read for ammo consumption, but there is no formula interpolation yet (e.g. firing at 3 SEU should do 3d10 for a laser pistol). Needs: injecting `seuSetting` into roll data so formulas like `@seuSetting`d10 work.
 - **Race item sheet** — "Key" field shows redundantly under Name; Name and Race are both shown (simplify); walking/running should display with "m" unit; hourly field should be hidden in Basic rules mode; hourly should display with "km" unit; auto-populate the linked pair field if empty (e.g. STR filled → STA auto-fills with same value unless overridden)
-- **Ammo quantity tracking** — `quantity` was removed from ammo items. Reload now just refills from the linked ammo item unconditionally. If multi-clip tracking is needed in the future, discuss approach before re-adding.
+- **Encumbrance indicator placement** — currently the Total Mass / Encumbered badge lives in the Equipment section header, but the underlying total counts weapons/armor/screens too. Easy to misread as "Equipment-section mass." Candidate fixes: relabel to "Total Mass" + relocate near Walking/Running, or add a per-section breakdown tooltip.
+- **Linked weapon accessories (scopes, sights, etc.)** — parked. Three options sketched in `notes.md`: Active Effects (Rich's preference), drop-linked accessory items with structured modifier fields, or a hybrid. Defer until AE automation is stood up or a concrete need surfaces.
 - **Party sheet** — nice-to-have GM tool; show whole party stats + group initiative button
 
 ---

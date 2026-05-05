@@ -154,6 +154,24 @@ Hooks.once("init", () => {
     default: true
   });
 
+  game.settings.register(SYSTEM_ID, "encumbranceAffectsPhysical", {
+    name: "STARFRONTIERS.Settings.EncumbranceAffectsPhysical.Name",
+    hint: "STARFRONTIERS.Settings.EncumbranceAffectsPhysical.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
+  game.settings.register(SYSTEM_ID, "encumbranceAffectsNonPhysical", {
+    name: "STARFRONTIERS.Settings.EncumbranceAffectsNonPhysical.Name",
+    hint: "STARFRONTIERS.Settings.EncumbranceAffectsNonPhysical.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
   game.settings.register(SYSTEM_ID, "automateActiveEffects", {
     name: "STARFRONTIERS.Settings.AutomateActiveEffects.Name",
     hint: "STARFRONTIERS.Settings.AutomateActiveEffects.Hint",

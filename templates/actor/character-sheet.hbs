@@ -235,7 +235,7 @@
           {{/if}}
           {{#if row.editable}}
             <div class="item-actions">
-              <button type="button" class="weapon-carry-state weapon-carry-state--{{row.data.carryState}}" data-action="cycleWeaponCarryState" title="{{localize "STARFRONTIERS.Item.CarryState"}}" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}"></button>
+              <button type="button" class="weapon-carry-state weapon-carry-state--{{row.data.carryState}}" data-action="cycleCarryState" title="{{localize "STARFRONTIERS.Item.CarryState"}}" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}"></button>
               <div class="weapon-gear-wrap">
                 <button type="button" class="weapon-row-action weapon-gear-btn" data-action="toggleWeaponGear" title="{{localize "STARFRONTIERS.Weapon.Configure"}}">
                   <i class="fa-solid fa-gear"></i>
@@ -249,6 +249,10 @@
                       <i class="fa-solid fa-rotate-right"></i>
                     </button>
                   {{/if}}
+                  <label class="seu-dial-label">
+                    <span>{{localize "STARFRONTIERS.Item.Quantity"}}</span>
+                    <input type="number" class="seu-dial" min="0" step="1" value="{{row.data.quantity}}" data-item-field="system.quantity" aria-label="{{localize "STARFRONTIERS.Item.Quantity"}}" />
+                  </label>
                   {{#if row.data.isSEU}}
                     <label class="seu-dial-label">
                       <span>{{localize "STARFRONTIERS.Item.CurrentSetting"}}</span>
@@ -360,14 +364,50 @@
     </fieldset>
 
     <fieldset class="paper-box reverse-side full-width">
-      <legend>{{localize "STARFRONTIERS.Character.ReverseSide"}}</legend>
-      <div class="reverse-grid">
-        <section class="stacked">
-          <span>{{localize "STARFRONTIERS.Character.Skills"}}</span>
-          <div class="item-list">
-            {{#each skillItems as |item|}}
-              <div class="item-row" data-item-id="{{item.id}}">
-                <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
+      <legend>{{#if expandedRules}}{{localize "STARFRONTIERS.Character.ReverseSide"}}{{else}}{{localize "STARFRONTIERS.Character.ReverseSideBasic"}}{{/if}}</legend>
+      <div class="reverse-grid skills-equipment-grid">
+        {{#if expandedRules}}
+          <section class="stacked">
+            <span>{{localize "STARFRONTIERS.Character.Skills"}}</span>
+            <div class="item-list">
+              {{#each skillItems as |item|}}
+                <div class="item-row" data-item-id="{{item.id}}">
+                  <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
+                  <div class="item-actions">
+                    <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
+                    <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                </div>
+              {{/each}}
+            </div>
+          </section>
+        {{/if}}
+        <section class="stacked equipment-section">
+          <div class="equipment-header">
+            <span>{{localize "STARFRONTIERS.Character.Equipment"}}</span>
+            <div class="encumbrance-summary{{#if encumbrance.encumbered}} encumbrance-summary--encumbered{{/if}}" title="{{localize "STARFRONTIERS.Character.EncumbranceTooltip"}}">
+              <span class="encumbrance-label">{{localize "STARFRONTIERS.Character.TotalMass"}}</span>
+              <span class="encumbrance-values">{{encumbrance.totalMass}} / {{encumbrance.threshold}}</span>
+              {{#if encumbrance.encumbered}}
+                <span class="encumbrance-badge"><i class="fa-solid fa-weight-hanging"></i> {{localize "STARFRONTIERS.Character.Encumbered"}}</span>
+              {{/if}}
+            </div>
+          </div>
+          <div class="equipment-grid equipment-grid--header">
+            <span>{{localize "STARFRONTIERS.Item.Name"}}</span>
+            <span class="ls-Center">{{localize "STARFRONTIERS.Item.Quantity"}}</span>
+            <span class="ls-Center">{{localize "STARFRONTIERS.Item.Mass"}}</span>
+            <span class="ls-Center">{{localize "STARFRONTIERS.Item.CarryState"}}</span>
+            <span></span>
+          </div>
+          <div class="equipment-list">
+            {{#each equipmentRows as |row|}}
+              <div class="equipment-grid equipment-row" data-item-id="{{row.id}}">
+                <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{row.name}}</button>
+                <input type="number" class="ls-Center" min="0" step="1" value="{{row.quantity}}" data-item-field="system.quantity" aria-label="{{localize "STARFRONTIERS.Item.Quantity"}}" />
+                <span class="ls-Center">{{row.mass}}</span>
+                <button type="button" class="weapon-carry-state weapon-carry-state--{{row.carryState}}" data-action="cycleCarryState" title="{{localize "STARFRONTIERS.Item.CarryState"}}" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}"></button>
                 <div class="item-actions">
                   <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
                   <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
@@ -377,31 +417,14 @@
             {{/each}}
           </div>
         </section>
-        <section class="stacked">
-          <span>{{localize "STARFRONTIERS.Character.Equipment"}}</span>
-          <div class="item-list">
-            {{#each equipmentItems as |item|}}
-              <div class="item-row" data-item-id="{{item.id}}">
-                <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
-                <div class="item-actions">
-                  <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
-                  <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
-                  <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
-                </div>
-              </div>
-            {{/each}}
-          </div>
-        </section>
-        <label class="stacked">
-          <span>{{localize "STARFRONTIERS.Character.Notes"}}</span>
-          <textarea name="system.personalFile.notes">{{system.personalFile.notes}}</textarea>
-        </label>
       </div>
       <div class="placeholder-controls">
-        <button type="button" data-action="createItem" data-type="skill" data-name="{{localize "STARFRONTIERS.Item.NewSkill"}}" title="{{localize "STARFRONTIERS.Character.AddSkill"}}">
-          <i class="fa-solid fa-plus"></i>
-          <span>{{localize "STARFRONTIERS.Character.AddSkill"}}</span>
-        </button>
+        {{#if expandedRules}}
+          <button type="button" data-action="createItem" data-type="skill" data-name="{{localize "STARFRONTIERS.Item.NewSkill"}}" title="{{localize "STARFRONTIERS.Character.AddSkill"}}">
+            <i class="fa-solid fa-plus"></i>
+            <span>{{localize "STARFRONTIERS.Character.AddSkill"}}</span>
+          </button>
+        {{/if}}
         <button type="button" data-action="createItem" data-type="gear" data-name="{{localize "STARFRONTIERS.Item.NewGear"}}" title="{{localize "STARFRONTIERS.Character.AddEquipment"}}">
           <i class="fa-solid fa-plus"></i>
           <span>{{localize "STARFRONTIERS.Character.AddEquipment"}}</span>
@@ -415,6 +438,19 @@
           <span>{{localize "STARFRONTIERS.Character.AddPowerSource"}}</span>
         </button>
       </div>
+    </fieldset>
+
+    <fieldset class="paper-box reverse-side full-width">
+      <legend>{{localize "STARFRONTIERS.Character.Notes"}}</legend>
+      <prose-mirror
+          name="system.personalFile.notes"
+          data-document-u-u-i-d="{{actor.uuid}}"
+          value="{{system.personalFile.notes}}"
+          collaborate="true"
+          toggled="true"
+        >
+          {{{senrichedPersonalNotes}}}
+        </prose-mirror>
     </fieldset>
 
     {{#if expandedRules}}

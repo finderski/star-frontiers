@@ -57,7 +57,7 @@
 - Current schema version: **0.2.0** (stored in world setting `schemaVersion`).
 - Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
 - Migration 0.2.0 removes per-weapon range band `mod` fields, per-document `rulesEdition` fields, and remaps old `weaponType`/`ammo.uses` values to the current choices.
-- **New optional fields with schema defaults do not require a migration** — TypeDataModel fills in defaults for stored documents that predate the field.
+- **New optional fields with schema defaults do not require a migration** — TypeDataModel fills in defaults for stored documents that predate the field. The encumbrance/equipment additions (carryState/quantity/mass on gear, consumable, ammo, powerSource, armor, screen, weapon) all rely on this — no migration was bumped.
 
 ---
 
@@ -86,16 +86,31 @@
 - Loaded ammo is computed from `capacity - consumed`.
 - `system.ammo.consumed` is the source of truth for depletion; it lives on the weapon item.
 - Linked ammo items exist via `system.ammo.clipItem`. Live capacity is derived from the linked ammo item's `system.shots` at render time (`#getLiveCapacity`), not stored directly. Stored `system.ammo.capacity` is synced on reload.
-- Ammo item `system.quantity` **has been removed**. Reload refills the weapon unconditionally from the linked item. Do not re-add quantity without discussing the approach.
-- Do not switch ammo depletion tracking to the ammo item itself without discussing it.
+- Ammo item `system.quantity` is back (was removed in 0.2.0, re-added with the equipment/encumbrance work). Reload now requires `quantity > 0` AND `carryState ≠ "stored"`, and decrements `quantity` by 1 on success. Reload button is hidden in the gear panel until both conditions are met. Do not switch ammo depletion tracking (per-shot, on the weapon's `system.ammo.consumed`) to the ammo item itself without discussing it — quantity is the *spare-clip count*, `consumed` is the *shots-fired count*, they are different.
 - **Range modifiers** (`pointBlank: 0, short: -10, medium: -20, long: -40, extreme: -80`) live as the module-level constant `RANGE_BAND_MODS` in `character-sheet.mjs`. They were removed from `CONFIG.SF` to prevent stale-read bugs from old database values. Weapons do NOT store per-band modifiers.
 - A range band with both `min === null` and `max === null` is treated as **unavailable** for that weapon (e.g. Gyrojet has no PB or Short range). Both the attack dialog and auto-detection from token distance skip null/null bands.
 - Per-band damage formulas: each `rangeBands[key]` now has an optional `damageFormula` text field. When non-empty it overrides the weapon's base `damageFormula` for that range. The active band key is passed from the attack roll → chat card button (`data-band-key`) → damage roll. This supports sonic weapons whose damage scales with range.
 - **Token targeting**: when the player has a target selected, `#getTargetDistance` measures distance via `canvas.grid.measurePath` and `#getRangeBandFromDistance` walks the weapon's band min/max to resolve the band automatically. The attack dialog skips the range selector and shows the auto-detected band as info text instead. Falls back to manual selection when no target.
 - **Rate of Fire** (Expanded only): `weapon.system.mechanics.rateOfFire`. When > 1, the attack dialog shows a shot-count field. Each shot beyond the first gets −20 cumulative penalty. Total ammo is checked and consumed for all shots at once.
-- **Weapon skill keys**: `weaponSkillKey` now includes `str` and `dex` as explicit choices. In Basic rules: `str` → use STR score; `dex` → use DEX; `melee` → ½ max(STR, DEX). In Expanded: same but halved + skill level/bonus.
+- **Weapon skill keys**: `weaponSkillKey` now includes `str` and `dex` as explicit choices. In Basic rules: `str` → use STR score; `dex` → use DEX; `melee` → max(STR, DEX) (no halving in Basic). In Expanded: same but halved + skill level/bonus.
 - **Variable SEU dial**: `system.ammo.variableSetting.current` is editable on the character sheet via the weapon gear panel. The attack roll reads it for SEU consumption. Damage formula interpolation from this value is not yet implemented.
 - **Ammo type**: `ammoType` on ammo items is now a dropdown (`rounds` · `seu`), not free text.
+- **Weapon quantity**: `weapon.system.quantity` is on the schema. It is **not** exposed on the weapon item sheet — edit it via the character sheet's weapon **gear panel** (slide-up). This keeps character-tied data off the item sheet.
+
+### Encumbrance / equipment / carry state
+- Carry state is universal: every wearable/carryable item type (weapon, armor, screen, ammo, powerSource, gear, consumable) has `system.carryState ∈ {ready, carried, stored}`. Default is `"ready"` for weapons, `"carried"` for everything else.
+- `cycleCarryState` action (formerly `cycleWeaponCarryState`) is the generic cycle-button handler used by both weapon rows and equipment rows. The 3-state visual button class is shared (`weapon-carry-state weapon-carry-state--<state>`).
+- **Quantity** is on weapon, ammo, powerSource, gear, consumable. Not on armor, screen.
+- **Mass** is on weapon, ammo, powerSource, gear, consumable, armor, screen.
+- **Encumbrance is computed in `Character.prepareDerivedData`** via the module-level `computeCarriedMass(actor)` helper:
+  - Walks `actor.items`, sums `mass × (quantity ?? 1)` for every item where `carryState ∈ {ready, carried}` AND `mass > 0`.
+  - Stored items skipped. Items without a `mass` field skipped.
+- `derived.totalMass`, `derived.encumbranceThreshold` (= STR/2), `derived.encumbered` are available on the actor for sheet display, roll modifiers, and any future Active Effects integration.
+- Movement (walking/running/hourly) is **halved** when encumbered, applied right in `prepareDerivedData` after race-movement lookup. Basic rules ignore this — but the flag is still set.
+- **Combat encumbrance modifiers (Expanded only):** `#getCombatEncumbranceMods(actor, rulesEdition)` returns `{ attackerMod, targetMod }`. Attacker encumbered = −10. Target token's actor encumbered = +10 to the attacker's roll. Always applied in Expanded; not gated by world settings. Shown as separate rows in the attack chat card.
+- **Optional encumbrance penalty on ability checks (Expanded only):** `#getAbilityEncumbranceMod(actor, ability)` checks `encumbranceAffectsPhysical` (STR/STA/DEX/RS) or `encumbranceAffectsNonPhysical` (INT/LOG/PER/LDR) world settings and applies −10 to the check's target value (not the die roll). The dialog shows the post-encumbrance target.
+- **Equipment section UI** (character sheet): five-column grid (Name | Quantity | Mass | Carry State | Actions). Header row shows `Carried: <total> / <threshold>` with an "Encumbered" badge when over. The total counts items across **all** slots (weapons, armor, screens, equipment items) — see Outstanding issues for the labeling concern.
+- **Skills section** is **Expanded-only**. The fieldset legend reads "Equipment" in Basic and "Skills and Equipment" in Expanded. The "Add Skill" button is similarly hidden in Basic.
 
 ## Item and weapon sheet decisions already made
 - All current item types share one generic `ItemSheetV2`, with conditional sections by item type.
@@ -175,6 +190,11 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Races:
   - race item sheet: remove redundant Key display, hide Hourly in Basic mode, autofill paired modifiers
   - add real editing/support for racial special abilities
+- Equipment / encumbrance:
+  - decide whether to relocate the Total Mass / Encumbered indicator out of the Equipment section header (it counts weapons + armor + screens too, so the placement misleads)
+  - per-section breakdown tooltip (weapons / armor / screens / equipment) is a nice-to-have if relocation isn't enough
+- Linked weapon accessories:
+  - parked design discussion in `notes.md` (Active Effects vs drop-linked items vs hybrid). Rich's preference is the AE approach. Defer until AE automation is stood up or a concrete need surfaces.
 - General:
   - continue section-by-section on character sheet
   - build compendium content after core item/actor workflows settle
@@ -186,9 +206,12 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not remove the world setting distinction between Basic and Expanded rules.
 - Do not add per-document `rulesEdition` fields; this was intentionally removed — the world setting is the sole source.
 - Do not replace the current theme model (paper vs retro) with template forks unless explicitly decided.
-- Do not move ammo depletion to the ammo item itself; current logic tracks depletion on the weapon via `system.ammo.consumed`.
+- Do not move ammo depletion to the ammo item itself; current logic tracks per-shot depletion on the weapon via `system.ammo.consumed`. Ammo `system.quantity` tracks **spare containers**, which is a different concept.
 - Do not store range band modifiers on weapon items; they are the `RANGE_BAND_MODS` constant in `character-sheet.mjs` and must not be stored in the database or on weapon documents.
 - Do not treat the current weapon attack formulas as permanently settled; verify them before broadening automation.
+- Do not change Basic-rules encumbrance from "display only, no penalty, no movement halving." Basic intentionally has no encumbrance enforcement — only Expanded does.
+- Do not gate the attacker/target combat encumbrance modifiers behind the two `encumbranceAffectsPhysical/NonPhysical` world settings. Those settings only extend the −10 to ability/skill checks. Combat mods are core Expanded rules and always applied.
+- Do not expose `weapon.system.quantity` on the weapon item sheet — it lives on the gear panel slide-up on the character sheet by design (character-tied data, not item-template data).
 
 ## Testing and runtime expectations
 - There is no automated test suite beyond validation scripts.

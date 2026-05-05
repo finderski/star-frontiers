@@ -144,6 +144,7 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
     return {
       ...super.defineSchema(),
       carryState: textField({ initial: "ready", choices: ["ready", "carried", "stored"] }),
+      quantity: numberField({ initial: 1, min: 0 }),
       weaponType: textField({
         initial: "beam",
         choices: ["melee", "beam", "projectile", "gyrojet", "grenade"]
@@ -197,6 +198,7 @@ export class StarFrontiersArmorData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
+      carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
       armorType: textField(),
       reductions: arrayField(schemaField({
         damageType: textField(),
@@ -216,6 +218,8 @@ export class StarFrontiersScreenData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
+      carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
+      mass: numberField({ initial: 0, min: 0, integer: false }),
       screenType: textField({ choices: ["", "albedo", "inertia", "gauss", "sonic", "chameleon", "holo"] }),
       defends: setField(textField()),
       reduction: textField({ choices: ["", "half", "full", "absorbsN"] }),
@@ -237,6 +241,9 @@ export class StarFrontiersAmmoData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
+      carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
+      quantity: numberField({ initial: 1, min: 0 }),
+      mass: numberField({ initial: 0, min: 0, integer: false }),
       ammoType: textField({ choices: ["rounds", "seu"] }),
       shots: numberField({ initial: 0, min: 0 }),
       cost: numberField({ initial: 0, min: 0 })
@@ -248,6 +255,8 @@ export class StarFrontiersPowerSourceData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
+      carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
+      quantity: numberField({ initial: 1, min: 0 }),
       sourceType: textField({
         choices: ["", "powerclip", "beltpack", "powerpack", "parabatteryT1", "parabatteryT2", "parabatteryT3", "parabatteryT4", "ammoClip"]
       }),
@@ -268,6 +277,7 @@ export class StarFrontiersGearData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
+      carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
       quantity: numberField({ initial: 1, min: 0 }),
       mass: numberField({ initial: 0, min: 0, integer: false }),
       cost: numberField({ initial: 0, min: 0 }),
@@ -287,6 +297,9 @@ export class StarFrontiersConsumableData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
+      carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
+      quantity: numberField({ initial: 1, min: 0 }),
+      mass: numberField({ initial: 0, min: 0, integer: false }),
       uses: schemaField({
         value: numberField({ initial: 1, min: 0 }),
         max: numberField({ initial: 1, min: 0 })

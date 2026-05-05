@@ -56,7 +56,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       rollInitiative: StarFrontiersCharacterSheet.#onRollInitiative,
       rollWeaponAttack: StarFrontiersCharacterSheet.#onRollWeaponAttack,
       rollWeaponDamage: StarFrontiersCharacterSheet.#onRollWeaponDamage,
-      cycleWeaponCarryState: StarFrontiersCharacterSheet.#onCycleWeaponCarryState,
+      cycleCarryState: StarFrontiersCharacterSheet.#onCycleCarryState,
       reloadWeapon: StarFrontiersCharacterSheet.#onReloadWeapon,
       toggleWeaponGear: StarFrontiersCharacterSheet.#onToggleWeaponGear,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
@@ -90,7 +90,17 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.armorItems = actor.items.filter((item) => item.type === "armor");
     context.screenItems = actor.items.filter((item) => item.type === "screen");
     context.skillItems = actor.items.filter((item) => item.type === "skill");
-    context.equipmentItems = actor.items.filter((item) => ["gear", "consumable", "ammo", "powerSource"].includes(item.type));
+    context.equipmentRows = StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
+    context.encumbrance = StarFrontiersCharacterSheet.#prepareEncumbranceContext(actor);
+    context.enrichedPersonalNotes = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      actor.system.personalFile?.notes ?? "",
+      {
+        secrets: actor.isOwner,
+        relativeTo: actor,
+        rollData: actor.getRollData?.() ?? {},
+        async: true
+      }
+    );
     return context;
   }
 
@@ -103,7 +113,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const hasAmmo = uses !== "none";
       const ammoLoaded = StarFrontiersCharacterSheet.#getLoadedAmmo(item, liveCapacity);
       const isSEU = uses === "seu";
-      const canReload = hasAmmo && !!linkedAmmo;
+      const ammoQty = Number(linkedAmmo?.system?.quantity ?? 0);
+      const ammoCarried = linkedAmmo ? linkedAmmo.system?.carryState !== "stored" : false;
+      const canReload = hasAmmo && !!linkedAmmo && ammoQty > 0 && ammoCarried;
       return {
         key: item.id,
         item,
@@ -126,6 +138,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           batteryIcon: isSEU ? StarFrontiersCharacterSheet.#getBatteryIcon(ammoLoaded, liveCapacity) : null,
           canReload,
           carryState: item.system.carryState || "ready",
+          quantity: Number(item.system.quantity ?? 1),
           seuCurrent: isSEU ? (item.system.ammo.variableSetting?.current || 1) : 1,
           seuMin: isSEU ? (item.system.ammo.variableSetting?.min || 1) : 1,
           seuMax: isSEU ? (item.system.ammo.variableSetting?.max || null) : null
@@ -153,6 +166,35 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (!band || (band.min === null && band.max === null)) return "";
     if (band.max === null) return "";
     return String(band.max);
+  }
+
+  static #prepareEquipmentRows(actor) {
+    const types = ["gear", "consumable", "ammo", "powerSource"];
+    return actor.items
+      .filter((item) => types.includes(item.type))
+      .map((item) => {
+        const sys = item.system ?? {};
+        const quantity = Number(sys.quantity ?? 1);
+        const mass = Number(sys.mass ?? 0);
+        return {
+          id: item.id,
+          name: item.name,
+          img: item.img,
+          quantity,
+          mass,
+          totalMass: Number((mass * quantity).toFixed(2)),
+          carryState: sys.carryState || "carried"
+        };
+      });
+  }
+
+  static #prepareEncumbranceContext(actor) {
+    const derived = actor.system.derived ?? {};
+    return {
+      totalMass: Number((derived.totalMass ?? 0).toFixed(2)),
+      threshold: Number((derived.encumbranceThreshold ?? 0).toFixed(2)),
+      encumbered: Boolean(derived.encumbered)
+    };
   }
 
   static #getLiveCapacity(weapon, linkedAmmo) {
@@ -350,14 +392,14 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     await StarFrontiersCharacterSheet.#rollWeaponDamage(this.document, weapon, target.dataset.rollMode ?? "public");
   }
 
-  static async #onCycleWeaponCarryState(event, target) {
+  static async #onCycleCarryState(event, target) {
     target ??= event.currentTarget;
 
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
 
     const states = ["ready", "carried", "stored"];
-    const current = item.system.carryState || "ready";
+    const current = item.system.carryState || "carried";
     const next = states[(states.indexOf(current) + 1) % states.length];
 
     await item.update({ "system.carryState": next });
@@ -375,8 +417,20 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       return;
     }
 
+    const ammoQty = Number(linkedAmmo.system?.quantity ?? 0);
+    if (ammoQty <= 0) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoAmmoAvailable"));
+      return;
+    }
+
+    if (linkedAmmo.system?.carryState === "stored") {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AmmoStored"));
+      return;
+    }
+
     const newCapacity = linkedAmmo.system.shots ?? weapon.system.ammo?.capacity ?? 0;
     await weapon.update({ "system.ammo.consumed": 0, "system.ammo.capacity": newCapacity });
+    await linkedAmmo.update({ "system.quantity": ammoQty - 1 });
 
     ui.notifications.info(game.i18n.format("STARFRONTIERS.Weapon.Reloaded", {
       weapon: weapon.name,
@@ -416,10 +470,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static async #rollAbilityCheck(actor, ability, rollMode = "public") {
     const target = StarFrontiersCharacterSheet.#getAbilityCheckTarget(actor, ability);
-    const modifier = await StarFrontiersCharacterSheet.#promptAbilityModifier(actor, ability, target.target);
+    const encumbranceMod = StarFrontiersCharacterSheet.#getAbilityEncumbranceMod(actor, ability);
+    const modifier = await StarFrontiersCharacterSheet.#promptAbilityModifier(actor, ability, target.target + encumbranceMod);
     if (modifier === null) return;
 
-    const adjustedTarget = target.target + modifier;
+    const adjustedTarget = target.target + modifier + encumbranceMod;
     const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
     const success = roll.total <= adjustedTarget;
     const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
@@ -428,11 +483,19 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     });
 
     const rows = [
-      { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(target.target) },
+      { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(target.target) }
+    ];
+    if (encumbranceMod) {
+      rows.push({
+        label: game.i18n.localize("STARFRONTIERS.Character.EncumbranceModifier"),
+        value: encumbranceMod >= 0 ? `+${encumbranceMod}` : String(encumbranceMod)
+      });
+    }
+    rows.push(
       { label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: modifier >= 0 ? `+${modifier}` : String(modifier) },
       { label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(adjustedTarget) },
       { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(roll.total).padStart(2, "0") }
-    ];
+    );
 
     if (target.sourceLabel) {
       rows.unshift({
@@ -477,6 +540,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const rangeMod = activeBandKey ? (RANGE_BAND_MODS[activeBandKey] ?? 0) : 0;
     const shots = prompt.shots ?? 1;
     const totalAmmo = ammoCheck.amount * shots;
+    const encumbrance = StarFrontiersCharacterSheet.#getCombatEncumbranceMods(actor, profile.rulesEdition);
 
     if (ammoCheck.amount > 0) {
       const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity);
@@ -505,13 +569,21 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.Range"), value: activeRangeLabel });
       rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.RangeModifier"), value: rangeMod >= 0 ? `+${rangeMod}` : String(rangeMod) });
     }
+    if (encumbrance.attackerMod) {
+      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.AttackerEncumbered"), value: encumbrance.attackerMod >= 0 ? `+${encumbrance.attackerMod}` : String(encumbrance.attackerMod) });
+    }
+    if (encumbrance.targetMod) {
+      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.TargetEncumbered"), value: encumbrance.targetMod >= 0 ? `+${encumbrance.targetMod}` : String(encumbrance.targetMod) });
+    }
     rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: prompt.modifier >= 0 ? `+${prompt.modifier}` : String(prompt.modifier) });
 
     const allRollHtmls = [];
     let hitCount = 0;
     for (let i = 0; i < shots; i++) {
       const shotPenalty = i * -20;
-      const shotTarget = StarFrontiersCharacterSheet.#clampAttackTarget(profile.baseTarget + rangeMod + prompt.modifier + shotPenalty);
+      const shotTarget = StarFrontiersCharacterSheet.#clampAttackTarget(
+        profile.baseTarget + rangeMod + prompt.modifier + shotPenalty + encumbrance.attackerMod + encumbrance.targetMod
+      );
       const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
       const hit = StarFrontiersCharacterSheet.#isHit(roll.total, shotTarget, profile.rulesEdition);
       if (hit) hitCount++;
@@ -827,6 +899,28 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static #formatAttackTarget(value) {
     return value === null || value === undefined ? "" : String(value);
+  }
+
+  static #getAbilityEncumbranceMod(actor, ability) {
+    const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
+    if (rulesEdition !== "expanded") return 0;
+    if (!actor.system.derived?.encumbered) return 0;
+
+    const physical = new Set(["str", "sta", "dex", "rs"]);
+    const isPhysical = physical.has(ability);
+    const setting = isPhysical ? "encumbranceAffectsPhysical" : "encumbranceAffectsNonPhysical";
+    return game.settings.get(SYSTEM_ID, setting) ? -10 : 0;
+  }
+
+  static #getCombatEncumbranceMods(actor, rulesEdition) {
+    if (rulesEdition !== "expanded") return { attackerMod: 0, targetMod: 0 };
+    const attackerMod = actor.system.derived?.encumbered ? -10 : 0;
+
+    let targetMod = 0;
+    const target = [...(game.user?.targets ?? [])][0];
+    const targetActor = target?.actor;
+    if (targetActor?.system?.derived?.encumbered) targetMod = 10;
+    return { attackerMod, targetMod };
   }
 
   static #getTargetDistance(actor) {
