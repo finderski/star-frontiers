@@ -124,8 +124,8 @@
   - loaded ammo is editable directly on the actor sheet; SEU weapons show a battery icon
   - a **gear button (⚙)** opens a dropdown panel for each ammo weapon; panel contains: Open Item (pencil), Reload (when linked ammo is present), Current Setting dial (for SEU weapons)
   - the Open Item (pencil) button that was in the `item-actions` row has been removed; it now lives only inside the gear panel
-  - the actions column for ammo weapons is: carry-state · gear · delete
-  - the actions column for non-ammo weapons is: carry-state · open · delete (no gear button)
+  - the actions column for all editable weapons is: carry-state · gear · delete
+  - the gear button (⚙) is present on every weapon; the panel content varies by weapon type
 - Weapon attack chat cards include a follow-up **Roll Damage** button carrying `data-band-key` for per-band damage.
 
 ## Current character sheet behavior

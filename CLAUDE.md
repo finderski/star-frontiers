@@ -35,7 +35,7 @@ STR/STA · DEX/RS · INT/LOG · PER/LDR. Each pair shares a base score rolled at
 
 ### Combat (percentile)
 
-- **To-hit (Basic):** roll 1d100 ≤ DEX (ranged) or ½(STR or DEX, whichever higher) (melee).
+- **To-hit (Basic):** roll 1d100 ≤ DEX (ranged) or max(STR, DEX) (melee). Full ability score — no halving in Basic.
 - **To-hit (Expanded):** roll 1d100 ≤ ½DEX + (skill level × 10) + skill bonus.
 - **Auto-hit:** roll 01–05 always hits regardless of modifiers.
 - **Auto-miss (Expanded only):** roll 96–00 always misses.

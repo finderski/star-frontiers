@@ -185,7 +185,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const pct = (loaded / capacity) * 100;
     if (pct >= 100) return `${base}battery_full.svg`;
     if (pct >= 85)  return `${base}battery_85.svg`;
-    if (pct >= 70)  return `${base}batter_70.svg`;
     if (pct >= 55)  return `${base}battery_55.svg`;
     if (pct >= 30)  return `${base}battery_30.svg`;
     if (pct >= 15)  return `${base}battery_15.svg`;
@@ -740,11 +739,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       ?? null;
   }
 
-  static #getActiveRace(actor) {
-    return StarFrontiersCharacterSheet.#getSelectedRace(actor)
-      ?? actor.items.find((item) => item.type === "race");
-  }
-
   static #raceModifier(race, ability) {
     const modifiers = race?.system?.modifiers;
     if (!modifiers) return 0;
@@ -802,7 +796,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     let baseTarget;
     if (rulesEdition === "basic") {
       if (isStr) baseTarget = str;
-      else if (isMelee) baseTarget = Math.ceil(Math.max(str, dex) / 2);
+      else if (isMelee) baseTarget = Math.max(str, dex);
       else baseTarget = dex;
     } else {
       const levelBonus = Number(skill?.system.level ?? 0) * 10;

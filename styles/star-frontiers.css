@@ -192,6 +192,13 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 
 .star-frontiers-sheet.theme-retro,
 .star-frontiers-item-sheet.theme-retro {
+  --sf-ink: #d8f6ff;
+  --sf-paper: #10151d;
+  --sf-line: #4bdcff;
+  --sf-muted: #83a9b8;
+  --sf-focus: #ff3fb4;
+  --sf-button-hover: rgba(255, 63, 180, 0.16);
+  --sf-row-line: rgba(75, 220, 255, 0.28);
   background:
     linear-gradient(rgba(75, 220, 255, 0.05) 50%, transparent 50%) 0 0 / 100% 4px,
     var(--sf-paper);
@@ -957,8 +964,9 @@ button.roll-label-main:focus-visible {
 
 .weapon-ammo-cell {
   align-items: center;
-  cursor: context-menu;
+  border-bottom: 2px solid var(--sf-line);
   display: inline-flex;
+  font-family: var(--input);
   gap: 4px;
   justify-content: center;
   position: relative;
@@ -997,9 +1005,17 @@ button.roll-label-main:focus-visible {
 }
 
 .battery-icon {
+  background-color: var(--sf-ink);
+  display: inline-block;
+  flex-shrink: 0;
   height: 18px;
-  vertical-align: middle;
-  width: auto;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  width: 18px;
 }
 
 .weapon-gear-wrap {

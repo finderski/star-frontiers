@@ -49,12 +49,5 @@ export const STAR_FRONTIERS_CONFIG = {
     military: [3, 6, 9, 12, 15, 18],
     technological: [4, 8, 12, 16, 20, 24],
     biosocial: [5, 10, 15, 20, 25, 30]
-  },
-  rangeMods: {
-    pointBlank: 0,
-    short: -10,
-    medium: -20,
-    long: -40,
-    extreme: -80
   }
 };

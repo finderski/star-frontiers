@@ -219,7 +219,7 @@
             {{#if row.data.hasAmmo}}
               <div class="weapon-ammo-cell">
                 {{#if row.data.isSEU}}
-                  <img class="battery-icon" src="systems/star-frontiers/{{row.data.batteryIcon}}" alt="" />
+                  <div class="battery-icon" style="-webkit-mask-image: url('systems/star-frontiers/{{row.data.batteryIcon}}'); mask-image: url('systems/star-frontiers/{{row.data.batteryIcon}}');"></div>
                   <input type="number" value="{{row.data.ammoLoaded}}" min="0" max="{{row.data.ammoCapacity}}" data-item-ammo-loaded aria-label="{{localize "STARFRONTIERS.Item.Loaded"}}" />
                 {{else}}
                   <input type="number" value="{{row.data.ammoLoaded}}" min="0" max="{{row.data.ammoCapacity}}" data-item-ammo-loaded aria-label="{{localize "STARFRONTIERS.Item.Loaded"}}" />
@@ -228,37 +228,35 @@
                 {{/if}}
               </div>
             {{else}}
-              <span></span>
+              <div class="weapon-ammo-cell"></div>
             {{/if}}
           {{else}}
-            <span></span>
+            <div class="weapon-ammo-cell"></div>
           {{/if}}
           {{#if row.editable}}
             <div class="item-actions">
               <button type="button" class="weapon-carry-state weapon-carry-state--{{row.data.carryState}}" data-action="cycleWeaponCarryState" title="{{localize "STARFRONTIERS.Item.CarryState"}}" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}"></button>
-              {{#if row.data.hasAmmo}}
-                <div class="weapon-gear-wrap">
-                  <button type="button" class="weapon-row-action weapon-gear-btn" data-action="toggleWeaponGear" title="{{localize "STARFRONTIERS.Weapon.Configure"}}">
-                    <i class="fa-solid fa-gear"></i>
+              <div class="weapon-gear-wrap">
+                <button type="button" class="weapon-row-action weapon-gear-btn" data-action="toggleWeaponGear" title="{{localize "STARFRONTIERS.Weapon.Configure"}}">
+                  <i class="fa-solid fa-gear"></i>
+                </button>
+                <div class="weapon-gear-panel">
+                  <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
+                    <i class="fa-solid fa-pen-to-square"></i>
                   </button>
-                  <div class="weapon-gear-panel">
-                    <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
-                      <i class="fa-solid fa-pen-to-square"></i>
+                  {{#if row.data.canReload}}
+                    <button type="button" data-action="reloadWeapon" title="{{localize "STARFRONTIERS.Weapon.Reload"}}">
+                      <i class="fa-solid fa-rotate-right"></i>
                     </button>
-                    {{#if row.data.canReload}}
-                      <button type="button" data-action="reloadWeapon" title="{{localize "STARFRONTIERS.Weapon.Reload"}}">
-                        <i class="fa-solid fa-rotate-right"></i>
-                      </button>
-                    {{/if}}
-                    {{#if row.data.isSEU}}
-                      <label class="seu-dial-label">
-                        <span>{{localize "STARFRONTIERS.Item.CurrentSetting"}}</span>
-                        <input type="number" class="seu-dial" min="{{row.data.seuMin}}" max="{{row.data.seuMax}}" value="{{row.data.seuCurrent}}" data-item-seu-dial aria-label="{{localize "STARFRONTIERS.Item.CurrentSetting"}}" />
-                      </label>
-                    {{/if}}
-                  </div>
+                  {{/if}}
+                  {{#if row.data.isSEU}}
+                    <label class="seu-dial-label">
+                      <span>{{localize "STARFRONTIERS.Item.CurrentSetting"}}</span>
+                      <input type="number" class="seu-dial" min="{{row.data.seuMin}}" max="{{row.data.seuMax}}" value="{{row.data.seuCurrent}}" data-item-seu-dial aria-label="{{localize "STARFRONTIERS.Item.CurrentSetting"}}" />
+                    </label>
+                  {{/if}}
                 </div>
-              {{/if}}
+              </div>
               <button type="button" class="weapon-row-action" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}">
                 <i class="fa-solid fa-trash"></i>
               </button>
