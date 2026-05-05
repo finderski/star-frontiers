@@ -1236,6 +1236,13 @@ button.roll-label-main:focus-visible {
 
 /* --- 9a. Equipment grid + encumbrance summary --- */
 
+.star-frontiers-sheet .sheet-tab-panel.skills-and-equipment.sheet-tab-panel--active {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(45%, 1fr));
+  align-items: start;
+}
+
 .equipment-section {
   display: flex;
   flex-direction: column;

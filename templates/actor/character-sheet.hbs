@@ -378,9 +378,9 @@
 
     </div>
 
-    <div class="sheet-tab-panel" data-tab-panel="skills-equipment" role="tabpanel">
+    <div class="sheet-tab-panel skills-and-equipment" data-tab-panel="skills-equipment" role="tabpanel">
       {{#if expandedRules}}
-        <fieldset class="paper-box skills-box full-width">
+        <fieldset class="paper-box skills-box">
           <legend>{{localize "STARFRONTIERS.Character.Skills"}}</legend>
           <div class="item-list">
             {{#each skillItems as |item|}}
@@ -403,7 +403,7 @@
         </fieldset>
       {{/if}}
 
-      <fieldset class="paper-box equipment-box full-width">
+      <fieldset class="paper-box equipment-box">
         <legend>{{localize "STARFRONTIERS.Character.Equipment"}}</legend>
         <div class="equipment-header">
           <div class="encumbrance-summary{{#if encumbrance.encumbered}} encumbrance-summary--encumbered{{/if}}" title="{{localize "STARFRONTIERS.Character.EncumbranceTooltip"}}">
