@@ -104,6 +104,17 @@ Doze grenade hit = `unconscious-doze` Active Effect (1 hour). Miss = 1d10 bounce
 
 `ActorSheetV2` form validation does **not** propagate nested item data. Any field on an owned item must be updated via `item.update({ ... })`, not through the actor's form submission. Use `data-item-field` + `data-item-id` attributes and a `change` listener pattern (see `_onRender` in `character-sheet.mjs`).
 
+### Character sheet tab system
+
+The character sheet uses three custom icon tabs (Profile / Skills+Equipment / Notes). Tab UI is built from scratch (not Foundry's `tabGroups`):
+- `<nav class="sheet-tabs">` holds three `<button class="sheet-tab" data-tab="...">` elements with masked-SVG icons.
+- Each tab's content lives in a `<div class="sheet-tab-panel" data-tab-panel="...">`. Only the panel matching the active tab gets `.sheet-tab-panel--active` and is shown.
+- Active state is held on the sheet instance as `this._activeTab`. `#applyActiveTab()` toggles classes on the buttons + panels. The click listener swaps tabs **without re-rendering** — re-render would be expensive on every click.
+- `submitOnChange: true` triggers a full re-render on input changes, which calls `_onRender` again, which re-applies the active-tab classes from `this._activeTab`. So tab selection sticks across edits.
+- `_activeTab` resets when the sheet closes; not yet persisted per-actor or per-user.
+
+Profile tab content: Physical Data, Medical Record, Weapons, Defenses+Energy column, Personal File. Skills+Equipment tab: split into separate Skills (Expanded only) and Equipment fieldsets. Notes tab: ProseMirror notes + the Expanded Rules notes textarea.
+
 ### Roll API
 
 ```js
@@ -131,7 +142,9 @@ templates/chat/check-roll-card.hbs    Ability check / damage / initiative chat c
 templates/chat/stat-roll-card.hbs     Stats generation chat card
 templates/chat/weapon-attack-card.hbs Attack roll chat card (includes "Roll Damage" follow-up button)
 lang/en.json                    All localization strings (namespace: STARFRONTIERS.*)
-styles/star-frontiers.css       All styles; two themes: paper (default), retro
+styles/star-frontiers.css       All styles; two themes: paper (default), retro.
+                                  Organized into 16 numbered sections with a TOC
+                                  at the top — see file header for navigation.
 assets/fonts/                   av05-logotype, michroma, prosto-one, noto-emoji
 assets/images/                  background.jpg, sheet icons (battery levels, carry states), UPF logo
 tools/check-i18n.mjs            Dev tool — checks for missing/unused i18n keys
@@ -202,6 +215,8 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - **Optional encumbrance penalty on ability checks** — `#getAbilityEncumbranceMod` reads the two world settings and applies −10 to the relevant check target (split by physical vs non-physical).
   - **Skills section** — visible only in Expanded rules; "Add Skill" button likewise hidden in Basic. Section legend reads "Equipment" in Basic, "Skills and Equipment" in Expanded.
   - **Reload behavior** — requires linked ammo with `quantity > 0` AND `carryState ≠ "stored"`; reload decrements linked ammo `quantity` by 1 (reverses prior "always refills" behavior). Reload button only appears in gear panel when both conditions met.
+  - **Tabbed character sheet** — three custom icon tabs (Profile / Skills+Equipment / Notes). Profile is everything except skills/equipment/notes. Skills+Equipment splits the old combined fieldset into two. Notes holds the main ProseMirror plus the Expanded Rules notes textarea. Tab switching is class-toggled via `#applyActiveTab()`, no re-render. Tab state is instance-only (`this._activeTab`).
+  - **Schema 0.2.0 migration** covers world Items, world Actors, AND scene-embedded synthetic actors (unlinked tokens). Earlier drafts only walked `game.actors`, missing weapons on token-pinned actors — fixed by adding a scene-walk loop to the same migration.
 
 ### Weapon data model (current)
 - `weaponType` choices: `melee` · `beam` · `projectile` · `gyrojet` · `grenade`

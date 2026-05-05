@@ -211,19 +211,19 @@ Hooks.once("ready", async () => {
 });
 
 const ITEM_TYPE_ICONS = {
-  race:           "icons/svg/mystery-man.svg",
-  skill:          "icons/svg/book.svg",
-  trainedAbility: "icons/svg/dice-target.svg",
-  weapon:         "icons/svg/sword.svg",
-  armor:          "icons/svg/shield.svg",
-  screen:         "icons/svg/mage-shield.svg",
-  ammo:           "icons/svg/barrel.svg",
-  powerSource:    "icons/svg/lightning.svg",
-  gear:           "icons/svg/item-bag.svg",
-  consumable:     "icons/svg/pill.svg",
-  vehicle:        "icons/svg/wingfoot.svg",
-  computer:       "icons/svg/clockwork.svg",
-  program:        "icons/svg/aura.svg"
+  race:           "systems/star-frontiers/assets/images/sheet-icons/mystery-man.svg",
+  skill:          "systems/star-frontiers/assets/images/sheet-icons/book.svg",
+  trainedAbility: "systems/star-frontiers/assets/images/sheet-icons/beams-aura.svg",
+  weapon:         "systems/star-frontiers/assets/images/sheet-icons/bolter-gun.svg",
+  armor:          "systems/star-frontiers/assets/images/sheet-icons/shield.svg",
+  screen:         "systems/star-frontiers/assets/images/sheet-icons/belt-armor.svg",
+  ammo:           "systems/star-frontiers/assets/images/sheet-icons/ammo-box.svg",
+  powerSource:    "systems/star-frontiers/assets/images/sheet-icons/power-generator.svg",
+  gear:           "systems/star-frontiers/assets/images/sheet-icons/light-backpack.svg",
+  consumable:     "systems/star-frontiers/assets/images/sheet-icons/pill.svg",
+  vehicle:        "systems/star-frontiers/assets/images/sheet-icons/steering-wheel.svg",
+  computer:       "systems/star-frontiers/assets/images/sheet-icons/tablet.svg",
+  program:        "systems/star-frontiers/assets/images/sheet-icons/computing.svg"
 };
 
 Hooks.on("preCreateItem", (document, data, options, userId) => {

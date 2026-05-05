@@ -1,3 +1,65 @@
+/* =====================================================================
+ * STAR FRONTIERS (Alpha Dawn) — System stylesheet
+ *
+ * Two themes: paper (default) and retro. Theme switches via the world
+ * setting `sheetTheme`, which sets `data-star-frontiers-theme="retro"`
+ * on `<body>` and `.theme-retro` on the sheet root. All colors derive
+ * from CSS custom properties defined in section 2; everything else
+ * references them so a theme swap is one variable change.
+ *
+ * ----- TABLE OF CONTENTS -----
+ *   1. Fonts & Foundry-global UI (#pause)
+ *   2. Theme tokens (CSS custom properties, both themes)
+ *   3. Shared sheet base — character AND item sheet
+ *      3a. Container / typography
+ *      3b. Form fields (input, textarea, select)
+ *      3c. Buttons (default)
+ *      3d. Retro theme decoration (scanlines, glow)
+ *      3e. ProseMirror menu reset
+ *   4. Shared layout primitives
+ *      4a. Paper-box (fieldset wrapper)
+ *      4b. Field lines / stacked / labels
+ *      4c. Section-controls / placeholder-controls (button rows)
+ *      4d. Item-list / item-row (generic list pattern)
+ *   5. Shared interactive controls
+ *      5a. Roll-label controls (clickable roll label + hover toolbar)
+ *      5b. Carry-state cycle button (3-state visual button)
+ *   6. Character sheet — header & identity block
+ *   7. Character sheet — tab nav (Profile / Skills+Equipment / Notes)
+ *   8. Character sheet — Profile tab
+ *      8a. Physical Data fieldset
+ *      8b. Medical Record fieldset
+ *      8c. Weapons box (full-width)
+ *      8d. Defenses (left column)
+ *      8e. Energy Record
+ *      8f. Personal File
+ *   9. Character sheet — Skills & Equipment tab
+ *      9a. Equipment grid + encumbrance summary
+ *  10. Character sheet — Notes tab (Expanded rules notes)
+ *  11. Item sheet — generic structure
+ *      11a. Header / image / meta
+ *      11b. Grid utilities (compact-grid, *-columns)
+ *      11c. Common labels & legends
+ *  12. Item sheet — weapon-specific
+ *      12a. Weapon core grid
+ *      12b. Range editor
+ *      12c. Ammo drop zone
+ *      12d. Checkbox line
+ *  13. Item sheet — ProseMirror editor
+ *  14. Chat cards (stat-roll, check-roll, outcomes, actions)
+ *  15. Responsive (max-width: 820px)
+ *  16. Possibly orphaned / vestigial — candidates for cleanup
+ * ===================================================================== */
+
+
+/* =====================================================================
+ * 1. Fonts & Foundry-global UI
+ *
+ * @font-face declarations and the Foundry pause-screen overlay (UPF
+ * logo + AV05 caption). Pause overlay is global Foundry chrome, NOT
+ * sheet content.
+ * ===================================================================== */
+
 @font-face {
   font-family: "av05";
   src: url("../assets/fonts/av05-logotype.otf.woff2") format("woff2");
@@ -45,6 +107,22 @@
   font-size: 2.5em;
 }
 
+
+/* =====================================================================
+ * 2. Theme tokens
+ *
+ * Every sheet color, line, and shadow is a custom property. Two themes:
+ *   - paper (default): warm cream + dark ink
+ *   - retro: dark navy + cyan, with a magenta accent
+ *
+ * Theme swap is driven by `data-star-frontiers-theme` on <body> AND a
+ * matching `.theme-retro` class on the sheet root (set by the sheet
+ * class itself). Either path applies the override.
+ *
+ * The `--logo / --fieldset / --input / --symbol` font-family bindings
+ * also live here so all sheets share the same typeface tokens.
+ * ===================================================================== */
+
 .star-frontiers-sheet,
 .star-frontiers-item-sheet {
   --logo: "av05";
@@ -91,6 +169,16 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   overflow-y: auto;
 }
 
+
+/* =====================================================================
+ * 3. Shared sheet base — character AND item sheet
+ *
+ * Anything in this section is selected via both `.star-frontiers-sheet`
+ * and `.star-frontiers-item-sheet`. Edits here change BOTH sheets.
+ * ===================================================================== */
+
+/* --- 3a. Container / typography --- */
+
 .star-frontiers-sheet,
 .star-frontiers-item-sheet {
   background: var(--sf-paper);
@@ -102,6 +190,8 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   overflow-y: auto;
   padding: 18px;
 }
+
+/* --- 3b. Form fields (input, textarea, select) --- */
 
 .star-frontiers-sheet input,
 .star-frontiers-sheet textarea,
@@ -150,22 +240,10 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   resize: vertical;
 }
 
-.star-frontiers-sheet span.labelSpan {
-  color: var(--sf-ink);
-  font-family: var(--fieldset);
-}
-
-.star-frontiers-sheet .weapons-heading .labelSpan {
-  width: 100%;
-  font-size: .8rem;
-  line-height: 1.2;
-}
-
-.star-frontiers-sheet .weapons-grid input,
-.star-frontiers-sheet .weapons-grid select,
-.star-frontiers-sheet .weapons-grid button {
-  font-size: .85em;
-}
+/* --- 3c. Buttons (default) ---
+ * Specific button categories (roll-label, carry-state, weapon-roll,
+ * sheet-tab) override these in their own sections below.
+ */
 
 .star-frontiers-sheet button,
 .star-frontiers-item-sheet button {
@@ -189,6 +267,12 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 .star-frontiers-item-sheet button:focus {
   background: var(--sf-button-hover);
 }
+
+/* --- 3d. Retro theme decoration ---
+ * Adds the scanline background pattern, glow on the input wells, and a
+ * faint shadow on buttons when retro theme is active. Scoped to
+ * .theme-retro on the sheet root.
+ */
 
 .star-frontiers-sheet.theme-retro,
 .star-frontiers-item-sheet.theme-retro {
@@ -219,215 +303,56 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   box-shadow: 0 0 10px rgba(75, 220, 255, 0.15);
 }
 
-.item-header {
-  align-items: center;
-  display: grid;
-  gap: 14px;
-  grid-template-columns: 72px minmax(0, 1fr);
-  margin-bottom: 16px;
+/* --- 3e. ProseMirror menu reset ---
+ * Strips the default Foundry editor toolbar background so the editor
+ * blends into the sheet instead of showing the OS-default chrome.
+ */
+
+.star-frontiers-sheet prose-mirror menu,
+.star-frontiers-item-sheet prose-mirror menu {
+  background: unset;
 }
 
-.item-image {
+
+/* =====================================================================
+ * 4. Shared layout primitives
+ *
+ * Building blocks reused on both the character sheet and item sheet.
+ * Section 8+ wires these into specific UI areas.
+ * ===================================================================== */
+
+/* --- 4a. Paper-box (fieldset wrapper) ---
+ * Used for every fieldset on both sheets. `.full-width` makes a fieldset
+ * span all columns of the surrounding grid (sheet-grid or sheet-tab-panel).
+ */
+
+.paper-box {
   border: 2px solid var(--sf-line);
-  cursor: pointer;
-  flex-shrink: 0;
-  height: 72px;
-  overflow: hidden;
-  width: 72px;
+  margin: 0;
+  min-width: 0;
+  padding: 20px 18px 16px;
+  position: relative;
 }
 
-.item-image__icon {
-  background-color: var(--sf-ink);
-  height: 100%;
-  -webkit-mask-image: var(--item-img);
-  -webkit-mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
-  mask-image: var(--item-img);
-  mask-position: center;
-  mask-repeat: no-repeat;
-  mask-size: contain;
-  width: 100%;
-}
-
-.item-title {
-  display: grid;
-  gap: 8px;
-}
-
-.item-meta {
-  align-items: end;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
-}
-
-.item-meta > span {
-  color: var(--sf-muted);
-  font-size: 1rem;
+.paper-box legend {
+  background: var(--sf-paper);
+  font-size: 1.5em;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 0 8px;
   text-transform: uppercase;
-}
-
-.item-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 1fr;
-}
-
-.item-common textarea {
-  min-height: 130px;
-}
-
-.compact-grid {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.auto-columns {
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-}
-
-.three-columns {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.four-columns {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.five-columns {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.compact-grid label,
-.item-common label {
-  align-items: start;
-  display: grid;
-  gap: 5px;
-  grid-template-columns: 1fr;
-}
-
-.star-frontiers-item-sheet .paper-box label > span,
-.star-frontiers-item-sheet .paper-box .stacked > span,
-.star-frontiers-item-sheet .range-editor > span,
-.star-frontiers-item-sheet .ammo-drop-zone > span {
-  font-size: .85em;
-  line-height: 1.1;
   font-family: var(--fieldset);
 }
 
-.star-frontiers-item-sheet .paper-box legend {
-  font-size: 1.7rem;
+.full-width {
+  grid-column: 1 / -1;
 }
 
-.weapon-core-grid {
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-}
-
-.compact-grid.weapon-core-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-bottom: 12px;
-}
-
-.weapon-ammo-grid {
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-}
-
-.ammo-drop-zone {
-  align-items: center;
-  border: 1px dashed var(--sf-line);
-  display: grid;
-  gap: 8px;
-  grid-template-columns: max-content minmax(0, 1fr);
-  margin: 12px 0;
-  min-height: 38px;
-  padding: 6px 8px;
-}
-
-.ammo-drop-zone > div {
-  align-items: center;
-  color: var(--sf-muted);
-  display: flex;
-  gap: 8px;
-  min-width: 0;
-}
-
-.ammo-drop-zone strong {
-  color: var(--sf-ink);
-}
-
-.checkbox-line {
-  align-items: center;
-  grid-template-columns: 1fr 24px;
-}
-
-.checkbox-line input {
-  height: 18px;
-  justify-self: end;
-  width: 18px;
-}
-
-.range-editor {
-  align-items: end;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(92px, 1fr) repeat(2, minmax(64px, 0.5fr)) minmax(80px, 1fr);
-  margin: 12px 0;
-}
-
-.range-editor > span {
-  text-transform: uppercase;
-}
-
-.paper-header {
-  display: grid;
-  gap: 36px;
-  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
-  grid-template-rows: [row1] auto [row2] auto;
-  margin-bottom: 25px;
-}
-
-.identity-block {
-  display: grid;
-  gap: 8px;
-}
-
-.identity-block.compact {
-  align-content: end;
-}
-
-.identity-block input {
-  font-size: 1.35em;
-}
-
-.input-with-unit {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.35rem;
-  border-bottom: 2px solid var(--sf-ink);
-}
-
-.input-with-unit input,
-.input-with-unit .readonly-value {
-  font-family: var(--input);
-}
-
-.input-with-unit .unit {
-  font-family: var(--input);
-  text-transform: lowercase;
-}
-
-.player-name-row {
-  align-items: center;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  width: 100%;
-  grid-column: 1 / span2;
-}
+/* --- 4b. Field lines / stacked / labels ---
+ * `.field-line` and `.paper-box label`: a label-text + input pair laid
+ * out side-by-side. `.stacked` flips it to vertical (label above input).
+ * Used in every fieldset that has key/value rows.
+ */
 
 .field-line,
 .paper-box label {
@@ -463,238 +388,103 @@ label.field-line,
   font-size: 1.15em;
 }
 
-.player-name span {
-  font-size: 2rem;
+.stacked {
+  align-items: start;
+  grid-template-columns: 1fr;
 }
 
-.player-name input[name="system.playerName"] {
-  font-size: 2rem;
-}
-
-.player-name-row button {
-  height: 32px;
-  padding-inline: 10px;
-}
-
-.movement-row {
-  display: grid;
-  gap: 28px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.sheet-grid {
-  display: grid;
-  gap: 18px 20px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.chat-message .star-frontiers.stat-roll-card {
-  --sf-chat-ink: #1f1f1f;
-  --sf-chat-paper: #f8f7f1;
-  --sf-chat-line: rgba(31, 31, 31, 0.18);
-  background: var(--sf-chat-paper);
-  color: var(--sf-chat-ink);
-  display: grid;
-  gap: 12px;
-  padding: 4px;
-}
-
-body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.stat-roll-card {
-  --sf-chat-ink: #d8f6ff;
-  --sf-chat-paper: #10151d;
-  --sf-chat-line: rgba(75, 220, 255, 0.2);
-}
-
-.chat-message .star-frontiers.check-roll-card {
-  --sf-chat-ink: #1f1f1f;
-  --sf-chat-paper: #f8f7f1;
-  --sf-chat-line: rgba(31, 31, 31, 0.18);
-  background: var(--sf-chat-paper);
-  color: var(--sf-chat-ink);
-  display: grid;
-  gap: 12px;
-  padding: 4px;
-}
-
-body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll-card {
-  --sf-chat-ink: #d8f6ff;
-  --sf-chat-paper: #10151d;
-  --sf-chat-line: rgba(75, 220, 255, 0.2);
-}
-
-.stat-roll-card__header {
-  border-bottom: 1px solid var(--sf-chat-line);
-  display: grid;
-  gap: 4px;
-  padding-bottom: 10px;
-}
-
-.stat-roll-card__header h3 {
-  font-family: var(--fieldset, "Roboto Condensed", "Arial Narrow", Arial, sans-serif);
-  font-size: 1.2rem;
-  line-height: 1.15;
-  margin: 0;
-  text-transform: uppercase;
-}
-
-.stat-roll-card__header p {
-  color: color-mix(in srgb, var(--sf-chat-ink) 68%, transparent);
-  font-size: 0.95rem;
-  margin: 0;
-}
-
-.check-roll-card__header {
-  border-bottom: 1px solid var(--sf-chat-line);
-  display: grid;
-  gap: 4px;
-  padding-bottom: 10px;
-}
-
-.check-roll-card__header h3 {
-  font-family: var(--fieldset, "Roboto Condensed", "Arial Narrow", Arial, sans-serif);
-  font-size: 1.2rem;
-  line-height: 1.15;
-  margin: 0;
-  text-transform: uppercase;
-}
-
-.check-roll-card__header p {
-  color: color-mix(in srgb, var(--sf-chat-ink) 68%, transparent);
-  font-size: 0.95rem;
-  margin: 0;
-}
-
-.stat-roll-card__rows {
-  display: grid;
-  gap: 8px;
-}
-
-.check-roll-card__rows {
-  display: grid;
-  gap: 8px;
-}
-
-.stat-roll-card__row {
-  align-items: baseline;
-  border-bottom: 1px solid var(--sf-chat-line);
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(72px, max-content) max-content max-content max-content minmax(0, 1fr);
-  padding-bottom: 8px;
-}
-
-.check-roll-card__row {
-  align-items: baseline;
-  border-bottom: 1px solid var(--sf-chat-line);
-  display: grid;
-  gap: 8px;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  padding-bottom: 8px;
-}
-
-.stat-roll-card__row:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.check-roll-card__row:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.stat-roll-card__label,
-.stat-roll-card__roll,
-.stat-roll-card__arrow,
-.stat-roll-card__result,
-.stat-roll-card__applied {
-  line-height: 1.2;
-}
-
-.check-roll-card__label,
-.check-roll-card__value {
-  line-height: 1.2;
-}
-
-.stat-roll-card__label {
-  font-weight: 700;
-}
-
-.stat-roll-card__result {
-  font-size: 1.05rem;
-}
-
-.stat-roll-card__applied {
-  color: color-mix(in srgb, var(--sf-chat-ink) 72%, transparent);
-  justify-self: end;
-  text-align: right;
-}
-
-.check-roll-card__value {
-  font-size: 1.05rem;
-}
-
-.check-roll-card__outcome {
-  border: 1px solid var(--sf-chat-line);
-  font-weight: 700;
-  padding: 6px 8px;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.check-roll-card__outcome--success {
-  background: rgba(34, 197, 94, 0.12);
-}
-
-.check-roll-card__outcome--failure {
-  background: rgba(220, 38, 38, 0.12);
-}
-
-.paper-box {
-  border: 2px solid var(--sf-line);
-  margin: 0;
-  min-width: 0;
-  padding: 20px 18px 16px;
-  position: relative;
-}
-
-.paper-box legend {
-  background: var(--sf-paper);
-  font-size: 1.5em;
-  letter-spacing: 0;
-  line-height: 1;
-  padding: 0 8px;
-  text-transform: uppercase;
+.star-frontiers-sheet span.labelSpan {
+  color: var(--sf-ink);
   font-family: var(--fieldset);
 }
 
-.full-width {
-  grid-column: 1 / -1;
-}
+/* --- 4c. Section-controls / placeholder-controls ---
+ * Right-aligned button row appearing at the bottom of a fieldset.
+ * `.section-controls` is the live class; `.placeholder-controls` is
+ * orphaned (see section 16).
+ */
 
-.physical-data {
-  display: grid;
+.section-controls {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
 }
 
-.paired-stat,
-.single-stat {
+/* --- 4d. Item-list / item-row pattern ---
+ * Generic vertical list of items with name + action buttons. Used for
+ * armor list, screen list (Profile tab), skills list (Skills tab), and
+ * other small item lists. `.compact-list` shrinks the min-height for
+ * the side-by-side armor/screen lists.
+ */
+
+.item-list {
+  border-bottom: 2px solid var(--sf-line);
+  min-height: 150px;
+  padding: 4px 0;
+}
+
+.compact-list {
+  min-height: 74px;
+}
+
+.item-row {
   align-items: center;
+  background: transparent;
+  border-bottom: 1px solid var(--sf-row-line);
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
   display: grid;
-  gap: 8px;
-  grid-template-columns: 132px minmax(54px, 1fr) 18px minmax(54px, 1fr);
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 28px;
+  padding: 4px;
 }
 
-.single-stat {
-  grid-template-columns: 132px minmax(54px, 1fr);
+.item-name-button {
+  border: 0;
+  border-radius: 0;
+  height: auto;
+  justify-content: start;
+  min-height: 24px;
+  min-width: 0;
+  padding: 0 4px;
+  text-align: left;
+  width: 100%;
 }
 
-.paired-stat button,
-.single-stat button,
-.weapons-grid button {
-  height: 26px;
+.item-actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.item-actions button {
+  height: 24px;
   padding: 0;
-  width: 28px;
+  width: 24px;
 }
+
+
+/* =====================================================================
+ * 5. Shared interactive controls
+ *
+ * Specialized button widgets used across multiple panels.
+ * ===================================================================== */
+
+/* --- 5a. Roll-label controls ---
+ * Clickable roll label with a hover-revealed toolbar offering blind
+ * and GM-whisper variants. The label itself is a button styled as
+ * inline text. The toolbar is absolutely positioned above with an
+ * invisible bridge so the cursor can move from label to toolbar.
+ *
+ * Used by:
+ *   - Physical Data ability rolls (Profile tab)
+ *   - Initiative roll (Profile tab)
+ *   - Weapon attack/damage rolls (Profile tab → Weapons box)
+ */
 
 .roll-label-pair {
   align-items: center;
@@ -744,7 +534,6 @@ button.roll-label-main:focus-visible .roll-label-main__icon {
   opacity: 0.5;
   z-index: 10;
 }
-
 
 button.roll-label-main:hover,
 button.roll-label-main:focus-visible {
@@ -870,6 +659,277 @@ button.roll-label-main:focus-visible {
   transform: none;
 }
 
+/* --- 5b. Carry-state cycle button ---
+ * Three-state visual button (ready / carried / stored). The base button
+ * is rendered as a CSS mask of an SVG; the variant class swaps the mask.
+ *
+ * Used by:
+ *   - Weapon rows (Profile tab → Weapons box)
+ *   - Equipment rows (Skills+Equipment tab → Equipment box)
+ *
+ * The class name still says "weapon-carry-state" for historical reasons;
+ * it is generic across all carryable item types.
+ */
+
+.star-frontiers-sheet button.weapon-carry-state {
+  background-color: var(--sf-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  display: inline-block;
+  height: 1.35rem;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  width: 1.35rem;
+
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.star-frontiers-sheet button.weapon-carry-state:hover,
+.star-frontiers-sheet button.weapon-carry-state:focus-visible {
+  background-color: var(--sf-focus);
+}
+
+.weapon-carry-state--ready {
+  mask-image: url("../assets/images/sheet-icons/equipped.svg");
+  -webkit-mask-image: url("../assets/images/sheet-icons/equipped.svg");
+}
+
+.weapon-carry-state--carried {
+  mask-image: url("../assets/images/sheet-icons/carried.svg");
+  -webkit-mask-image: url("../assets/images/sheet-icons/carried.svg");
+}
+
+.weapon-carry-state--stored {
+  mask-image: url("../assets/images/sheet-icons/stashed.svg");
+  -webkit-mask-image: url("../assets/images/sheet-icons/stashed.svg");
+}
+
+.star-frontiers-sheet button.weapon-row-action {
+  height: 1.35rem;
+  min-height: 0;
+  padding: 0;
+  width: 1.35rem;
+}
+
+
+/* =====================================================================
+ * 6. Character sheet — header & identity block
+ *
+ * Top header: Player Name + Roll-for-Stats button on the first row,
+ * then identity (name, handedness, walk/run) and a compact identity
+ * block (race, sex, hourly).
+ * ===================================================================== */
+
+.paper-header {
+  display: grid;
+  gap: 36px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  grid-template-rows: [row1] auto [row2] auto;
+  margin-bottom: 25px;
+}
+
+.identity-block {
+  display: grid;
+  gap: 8px;
+}
+
+.identity-block.compact {
+  align-content: end;
+}
+
+.identity-block input {
+  font-size: 1.35em;
+}
+
+.input-with-unit {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border-bottom: 2px solid var(--sf-ink);
+}
+
+.input-with-unit input,
+.input-with-unit .readonly-value {
+  font-family: var(--input);
+}
+
+.input-with-unit .unit {
+  font-family: var(--input);
+  text-transform: lowercase;
+}
+
+.player-name-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  width: 100%;
+  grid-column: 1 / span2;
+}
+
+.player-name span {
+  font-size: 2rem;
+}
+
+.player-name input[name="system.playerName"] {
+  font-size: 2rem;
+}
+
+.player-name-row button {
+  height: 32px;
+  padding-inline: 10px;
+}
+
+.movement-row {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+
+/* =====================================================================
+ * 7. Character sheet — tab nav
+ *
+ * Three icon-only tabs (Profile / Skills+Equipment / Notes) below the
+ * header. Active state: icon recolored to --sf-focus + a 3px focus-color
+ * bar overlaying the nav's bottom separator under the active tab.
+ *
+ * The `.star-frontiers-sheet .sheet-tab` selector wins specificity (0,2,0)
+ * over the global `.star-frontiers-sheet button` rule (0,1,1) so the tab
+ * buttons can drop the default border without `!important`.
+ *
+ * Tab content is wrapped in `.sheet-tab-panel` divs; only the one with
+ * `.sheet-tab-panel--active` is displayed. State is managed in JS by
+ * #applyActiveTab() in character-sheet.mjs.
+ * ===================================================================== */
+
+.sheet-tabs {
+  align-items: stretch;
+  border-bottom: 2px solid var(--sf-line);
+  display: flex;
+  gap: 4px;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.star-frontiers-sheet .sheet-tab {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  display: inline-flex;
+  height: auto;
+  padding: 8px 12px;
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.sheet-tab:hover {
+  background: color-mix(in srgb, var(--sf-line) 14%, transparent);
+}
+
+.sheet-tab--active {
+  cursor: default;
+}
+
+.sheet-tab--active::after {
+  background: var(--sf-focus, var(--sf-ink));
+  bottom: -2px;
+  content: "";
+  height: 3px;
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+
+.sheet-tab--active .sheet-tab-icon {
+  background-color: var(--sf-focus, var(--sf-ink));
+}
+
+.sheet-tab-icon {
+  background-color: var(--sf-ink);
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 22px;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  width: 22px;
+}
+
+.sheet-tabs-content {
+  padding-top: 18px;
+}
+
+.sheet-tab-panel {
+  display: none;
+  gap: 18px 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.sheet-tab-panel--active {
+  display: grid;
+}
+
+/* The .sheet-grid class is no longer used in the actor template (each
+ * tab panel is its own grid container) but the rule is retained in case
+ * any other template references it. */
+.sheet-grid {
+  display: grid;
+  gap: 18px 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+
+/* =====================================================================
+ * 8. Character sheet — Profile tab
+ *
+ * Default tab. Two-column grid containing Physical Data, Medical Record,
+ * Weapons (full-width), Defenses+Energy (left column), and Personal File.
+ * ===================================================================== */
+
+/* --- 8a. Physical Data fieldset ---
+ * Eight ability scores in four paired-stat rows + initiative single-stat.
+ * Each label is a roll-label control (see section 5a).
+ */
+
+.physical-data {
+  display: grid;
+  gap: 8px;
+}
+
+.paired-stat,
+.single-stat {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 132px minmax(54px, 1fr) 18px minmax(54px, 1fr);
+}
+
+.single-stat {
+  grid-template-columns: 132px minmax(54px, 1fr);
+}
+
+.paired-stat button,
+.single-stat button,
+.weapons-grid button {
+  height: 26px;
+  padding: 0;
+  width: 28px;
+}
+
 .paired-stat span,
 .single-stat span {
   font-family: var(--fieldset);
@@ -887,19 +947,23 @@ button.roll-label-main:focus-visible {
   font-size: 1.5em;
 }
 
+/* --- 8b. Medical Record fieldset --- */
+
 .medical-record {
   display: grid;
   gap: 24px;
 }
 
-.stacked {
-  align-items: start;
-  grid-template-columns: 1fr;
-}
-
 .medical-record textarea {
   min-height: 126px;
 }
+
+/* --- 8c. Weapons box (full-width) ---
+ * 10-column grid. Header row + one row per weapon. Weapon-name and damage
+ * cells are roll-label buttons; range cells are read-only inputs;
+ * ammo cell shows loaded/capacity (or battery icon for SEU); actions
+ * column is carry-state · gear · delete.
+ */
 
 .weapons-box {
   display: grid;
@@ -923,6 +987,18 @@ button.roll-label-main:focus-visible {
   font-size: 1.25rem;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.star-frontiers-sheet .weapons-heading .labelSpan {
+  width: 100%;
+  font-size: .8rem;
+  line-height: 1.2;
+}
+
+.star-frontiers-sheet .weapons-grid input,
+.star-frontiers-sheet .weapons-grid select,
+.star-frontiers-sheet .weapons-grid button {
+  font-size: .85em;
 }
 
 .weapons-grid .weapon-roll-button {
@@ -961,6 +1037,22 @@ button.roll-label-main:focus-visible {
   justify-self: center;
   text-align: center;
 }
+
+.weapons-grid .item-actions {
+  display: grid;
+  gap: 4px;
+  /*grid-template-columns: minmax(92px, 1fr) 24px 24px;*/
+  grid-template-columns: repeat(3, 24px);
+}
+
+.weapons-grid .item-actions select {
+  font-size: 0.95rem;
+  height: 24px;
+  min-width: 0;
+  padding-inline: 2px;
+}
+
+/* Weapon ammo cell (loaded / capacity, or SEU battery icon) */
 
 .weapon-ammo-cell {
   align-items: center;
@@ -1008,15 +1100,20 @@ button.roll-label-main:focus-visible {
   background-color: var(--sf-ink);
   display: inline-block;
   flex-shrink: 0;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   -webkit-mask-position: center;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-size: contain;
   mask-position: center;
   mask-repeat: no-repeat;
   mask-size: contain;
-  width: 18px;
 }
+
+/* Weapon gear panel (slide-up from the gear ⚙ button on each row).
+ * Contains: Open Item, Reload (when linked ammo present), Quantity,
+ * SEU dial (for SEU weapons). Toggled via .weapon-gear-panel--open by
+ * #onToggleWeaponGear in character-sheet.mjs. */
 
 .weapon-gear-wrap {
   display: inline-flex;
@@ -1082,6 +1179,13 @@ button.roll-label-main:focus-visible {
   width: 44px;
 }
 
+/* --- 8d. Defenses (left column) ---
+ * `.left-column` is the wrapper holding both Defenses and Energy Record.
+ * `.defenses-box` is the Defenses fieldset. `.defense-lists` is the
+ * two-column subgrid for Armor list + Screen list. The lists themselves
+ * use the shared item-list / item-row pattern (section 4d).
+ */
+
 .left-column {
   display: grid;
   gap: 18px;
@@ -1098,10 +1202,14 @@ button.roll-label-main:focus-visible {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+/* --- 8e. Energy Record --- */
+
 .energy-record textarea {
   min-height: 185px;
   width: 100%;
 }
+
+/* --- 8f. Personal File --- */
 
 .personal-file {
   display: grid;
@@ -1112,27 +1220,21 @@ button.roll-label-main:focus-visible {
   min-height: 155px;
 }
 
-.reverse-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
 
-.reverse-grid.skills-equipment-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-}
+/* =====================================================================
+ * 9. Character sheet — Skills & Equipment tab
+ *
+ * Two stacked fieldsets:
+ *   - Skills box (Expanded only) — uses the shared item-list pattern
+ *     (section 4d) for the skill list.
+ *   - Equipment box — five-column grid Name | Qty | Mass | Carry | Actions.
+ *     Encumbrance summary lives in this fieldset's header.
+ *
+ * The Add Skill / Add Gear / Add Ammo / Add Power Source buttons live in
+ * each fieldset's `.section-controls` row at the bottom.
+ * ===================================================================== */
 
-.reverse-grid textarea {
-  min-height: 150px;
-}
-
-.item-list {
-  border-bottom: 2px solid var(--sf-line);
-  min-height: 150px;
-  padding: 4px 0;
-}
+/* --- 9a. Equipment grid + encumbrance summary --- */
 
 .equipment-section {
   display: flex;
@@ -1216,111 +1318,443 @@ button.roll-label-main:focus-visible {
   width: 100%;
 }
 
-.compact-list {
-  min-height: 74px;
+
+/* =====================================================================
+ * 10. Character sheet — Notes tab
+ *
+ * Main Notes fieldset (ProseMirror) plus, in Expanded mode only, an
+ * "Expanded Rules Notes" textarea fieldset.
+ * ===================================================================== */
+
+.expanded-rules textarea {
+  min-height: 120px;
 }
 
-.item-row {
+
+/* =====================================================================
+ * 11. Item sheet — generic structure
+ *
+ * Used by every item type's sheet (weapon, armor, race, gear, etc.).
+ * Per-item-type variations are gated in the template via {{#if is.X}}.
+ * ===================================================================== */
+
+/* --- 11a. Header / image / meta ---
+ * 72×72 image tile (rendered as a CSS mask-image so theme color tracks
+ * --sf-ink), title block, and a meta row above the description.
+ */
+
+.item-header {
   align-items: center;
-  background: transparent;
-  border-bottom: 1px solid var(--sf-row-line);
-  border-left: 0;
-  border-right: 0;
-  border-top: 0;
   display: grid;
-  gap: 6px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 28px;
-  padding: 4px;
+  gap: 14px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  margin-bottom: 16px;
 }
 
-.item-name-button {
-  border: 0;
-  border-radius: 0;
-  height: auto;
-  justify-content: start;
-  min-height: 24px;
-  min-width: 0;
-  padding: 0 4px;
-  text-align: left;
-  width: 100%;
-}
-
-.item-actions {
-  align-items: center;
-  display: flex;
-  gap: 4px;
-  justify-content: flex-end;
-}
-
-.star-frontiers-sheet button.weapon-carry-state {
-  background-color: var(--sf-ink);
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+.item-image {
+  border: 2px solid var(--sf-line);
   cursor: pointer;
-  display: inline-block;
-  height: 1.35rem;
-  min-height: 0;
-  min-width: 0;
-  padding: 0;
-  width: 1.35rem;
+  flex-shrink: 0;
+  height: 72px;
+  overflow: hidden;
+  width: 72px;
+}
 
-  mask-position: center;
-  mask-repeat: no-repeat;
-  mask-size: contain;
-
+.item-image__icon {
+  background-color: var(--sf-ink);
+  height: 100%;
+  -webkit-mask-image: var(--item-img);
   -webkit-mask-position: center;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-size: contain;
+  mask-image: var(--item-img);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  width: 100%;
 }
 
-.star-frontiers-sheet button.weapon-carry-state:hover,
-.star-frontiers-sheet button.weapon-carry-state:focus-visible {
-  background-color: var(--sf-focus);
+.item-title {
+  display: grid;
+  gap: 8px;
 }
 
-.weapon-carry-state--ready {
-  mask-image: url("../assets/images/sheet-icons/equipped.svg");
-  -webkit-mask-image: url("../assets/images/sheet-icons/equipped.svg");
+.item-meta {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
 }
 
-.weapon-carry-state--carried {
-  mask-image: url("../assets/images/sheet-icons/carried.svg");
-  -webkit-mask-image: url("../assets/images/sheet-icons/carried.svg");
+.item-meta > span {
+  color: var(--sf-muted);
+  font-size: 1rem;
+  text-transform: uppercase;
 }
 
-.weapon-carry-state--stored {
-  mask-image: url("../assets/images/sheet-icons/stashed.svg");
-  -webkit-mask-image: url("../assets/images/sheet-icons/stashed.svg");
+.item-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
 }
 
-.star-frontiers-sheet button.weapon-row-action {
-  height: 1.35rem;
-  min-height: 0;
-  padding: 0;
-  width: 1.35rem;
+.item-common textarea {
+  min-height: 130px;
 }
 
-.weapons-grid .item-actions {
+/* --- 11b. Grid utilities (compact-grid + *-columns) ---
+ * Small helpers for laying out item-sheet field clusters.
+ * `compact-grid` is the base; chain `auto-columns` / `three-columns` /
+ * `four-columns` / `five-columns` to set column count.
+ */
+
+.compact-grid {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auto-columns {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.three-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.four-columns {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.five-columns {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.compact-grid label,
+.item-common label {
+  align-items: start;
+  display: grid;
+  gap: 5px;
+  grid-template-columns: 1fr;
+}
+
+/* --- 11c. Common labels & legends (item sheet) --- */
+
+.star-frontiers-item-sheet .paper-box label > span,
+.star-frontiers-item-sheet .paper-box .stacked > span,
+.star-frontiers-item-sheet .range-editor > span,
+.star-frontiers-item-sheet .ammo-drop-zone > span {
+  font-size: .85em;
+  line-height: 1.1;
+  font-family: var(--fieldset);
+}
+
+.star-frontiers-item-sheet .paper-box legend {
+  font-size: 1.7rem;
+}
+
+.star-frontiers-item-sheet .paper-box .top-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.star-frontiers-item-sheet .paper-box .top-row .mass,
+.star-frontiers-item-sheet .paper-box .top-row .cost {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.star-frontiers-item-sheet fieldset .stacked {
+  margin: 10px 0 0 0;
+}
+
+
+/* =====================================================================
+ * 12. Item sheet — weapon-specific
+ *
+ * Sections that only appear on a weapon item sheet (or, for
+ * checkbox-line, are weapon-adjacent).
+ * ===================================================================== */
+
+/* --- 12a. Weapon core grid --- */
+
+.weapon-core-grid {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.compact-grid.weapon-core-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+/* --- 12b. Range editor ---
+ * Per-band row: label | min | max | per-band damage formula.
+ */
+
+.range-editor {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(92px, 1fr) repeat(2, minmax(64px, 0.5fr)) minmax(80px, 1fr);
+  margin: 12px 0;
+}
+
+.range-editor > span {
+  text-transform: uppercase;
+}
+
+/* --- 12c. Ammo drop zone ---
+ * Drop target on weapon item sheet for linking an Ammo item.
+ * Sets `system.ammo.clipItem` when a compatible ammo is dropped.
+ */
+
+.ammo-drop-zone {
+  align-items: center;
+  border: 1px dashed var(--sf-line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  margin: 12px 0;
+  min-height: 38px;
+  padding: 6px 8px;
+}
+
+.ammo-drop-zone > div {
+  align-items: center;
+  color: var(--sf-muted);
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ammo-drop-zone strong {
+  color: var(--sf-ink);
+}
+
+/* --- 12d. Checkbox line (item sheet) --- */
+
+.checkbox-line {
+  align-items: center;
+  grid-template-columns: 1fr 24px;
+}
+
+.checkbox-line input {
+  height: 18px;
+  justify-self: end;
+  width: 18px;
+}
+
+
+/* =====================================================================
+ * 13. Item sheet — ProseMirror editor
+ *
+ * The rich-text description field on item sheets.
+ * ===================================================================== */
+
+.star-frontiers-item-sheet .editor {
+  border: 1px solid var(--sf-line);
+  min-height: 140px;
+  padding: 6px;
+}
+
+.star-frontiers-item-sheet .editor-content,
+.star-frontiers-item-sheet prose-mirror {
+  min-height: 120px;
+  font-family: var(--input);
+}
+
+.star-frontiers-item-sheet .item-description-editor .editor {
+  border: 1px solid var(--sf-line);
+  min-height: 180px;
+}
+
+.star-frontiers-item-sheet .item-description-editor .editor-content,
+.star-frontiers-item-sheet .item-description-editor prose-mirror {
+  min-height: 160px;
+  padding: 6px;
+}
+
+
+/* =====================================================================
+ * 14. Chat cards
+ *
+ * Three card templates: stat-roll-card, check-roll-card, weapon-attack-card.
+ * (Weapon attack card uses the check-roll styles + chat-card-actions.)
+ * ===================================================================== */
+
+/* --- 14a. Stat-roll card --- */
+
+.chat-message .star-frontiers.stat-roll-card {
+  --sf-chat-ink: #1f1f1f;
+  --sf-chat-paper: #f8f7f1;
+  --sf-chat-line: rgba(31, 31, 31, 0.18);
+  background: var(--sf-chat-paper);
+  color: var(--sf-chat-ink);
+  display: grid;
+  gap: 12px;
+  padding: 4px;
+}
+
+body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.stat-roll-card {
+  --sf-chat-ink: #d8f6ff;
+  --sf-chat-paper: #10151d;
+  --sf-chat-line: rgba(75, 220, 255, 0.2);
+}
+
+.stat-roll-card__header {
+  border-bottom: 1px solid var(--sf-chat-line);
   display: grid;
   gap: 4px;
-  /*grid-template-columns: minmax(92px, 1fr) 24px 24px;*/
-  grid-template-columns: repeat(3, 24px);
+  padding-bottom: 10px;
 }
 
-.weapons-grid .item-actions select {
+.stat-roll-card__header h3 {
+  font-family: var(--fieldset, "Roboto Condensed", "Arial Narrow", Arial, sans-serif);
+  font-size: 1.2rem;
+  line-height: 1.15;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.stat-roll-card__header p {
+  color: color-mix(in srgb, var(--sf-chat-ink) 68%, transparent);
   font-size: 0.95rem;
-  height: 24px;
-  min-width: 0;
-  padding-inline: 2px;
+  margin: 0;
 }
 
-.item-actions button {
-  height: 24px;
-  padding: 0;
-  width: 24px;
+.stat-roll-card__rows {
+  display: grid;
+  gap: 8px;
 }
+
+.stat-roll-card__row {
+  align-items: baseline;
+  border-bottom: 1px solid var(--sf-chat-line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(72px, max-content) max-content max-content max-content minmax(0, 1fr);
+  padding-bottom: 8px;
+}
+
+.stat-roll-card__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.stat-roll-card__label,
+.stat-roll-card__roll,
+.stat-roll-card__arrow,
+.stat-roll-card__result,
+.stat-roll-card__applied {
+  line-height: 1.2;
+}
+
+.stat-roll-card__label {
+  font-weight: 700;
+}
+
+.stat-roll-card__result {
+  font-size: 1.05rem;
+}
+
+.stat-roll-card__applied {
+  color: color-mix(in srgb, var(--sf-chat-ink) 72%, transparent);
+  justify-self: end;
+  text-align: right;
+}
+
+/* --- 14b. Check-roll card (also used by weapon attack/damage) --- */
+
+.chat-message .star-frontiers.check-roll-card {
+  --sf-chat-ink: #1f1f1f;
+  --sf-chat-paper: #f8f7f1;
+  --sf-chat-line: rgba(31, 31, 31, 0.18);
+  background: var(--sf-chat-paper);
+  color: var(--sf-chat-ink);
+  display: grid;
+  gap: 12px;
+  padding: 4px;
+}
+
+body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll-card {
+  --sf-chat-ink: #d8f6ff;
+  --sf-chat-paper: #10151d;
+  --sf-chat-line: rgba(75, 220, 255, 0.2);
+}
+
+.check-roll-card__header {
+  border-bottom: 1px solid var(--sf-chat-line);
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+}
+
+.check-roll-card__header h3 {
+  font-family: var(--fieldset, "Roboto Condensed", "Arial Narrow", Arial, sans-serif);
+  font-size: 1.2rem;
+  line-height: 1.15;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.check-roll-card__header p {
+  color: color-mix(in srgb, var(--sf-chat-ink) 68%, transparent);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.check-roll-card__rows {
+  display: grid;
+  gap: 8px;
+}
+
+.check-roll-card__row {
+  align-items: baseline;
+  border-bottom: 1px solid var(--sf-chat-line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  padding-bottom: 8px;
+}
+
+.check-roll-card__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.check-roll-card__label,
+.check-roll-card__value {
+  line-height: 1.2;
+}
+
+.check-roll-card__value {
+  font-size: 1.05rem;
+}
+
+/* --- 14c. Outcome states (success/failure tint) --- */
+
+.check-roll-card__outcome {
+  border: 1px solid var(--sf-chat-line);
+  font-weight: 700;
+  padding: 6px 8px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.check-roll-card__outcome--success {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.check-roll-card__outcome--failure {
+  background: rgba(220, 38, 38, 0.12);
+}
+
+/* --- 14d. Chat-card actions (e.g. Roll Damage follow-up button) --- */
 
 .chat-card-actions {
   display: flex;
@@ -1342,24 +1776,14 @@ button.roll-label-main:focus-visible {
   background: color-mix(in srgb, var(--sf-chat-ink) 10%, transparent);
 }
 
-.section-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
 
-.placeholder-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 14px;
-}
-
-.expanded-rules textarea {
-  min-height: 120px;
-}
+/* =====================================================================
+ * 15. Responsive (max-width: 820px)
+ *
+ * Collapses every two/three-column grid down to a single column for
+ * narrow windows. Weapons grid keeps a min-width so it scrolls
+ * horizontally instead of squishing.
+ * ===================================================================== */
 
 @media (max-width: 820px) {
   .star-frontiers-sheet,
@@ -1369,8 +1793,8 @@ button.roll-label-main:focus-visible {
 
   .paper-header,
   .sheet-grid,
+  .sheet-tab-panel,
   .movement-row,
-  .reverse-grid,
   .defense-lists,
   .item-header,
   .item-meta,
@@ -1379,8 +1803,7 @@ button.roll-label-main:focus-visible {
   .three-columns,
   .four-columns,
   .five-columns,
-  .weapon-core-grid,
-  .weapon-ammo-grid {
+  .weapon-core-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1410,47 +1833,51 @@ button.roll-label-main:focus-visible {
   }
 }
 
-.star-frontiers-item-sheet .paper-box .top-row {
+
+/* =====================================================================
+ * 16. Possibly orphaned / vestigial
+ *
+ * These rules are no longer referenced by any template after the
+ * tab-based character sheet refactor. Kept for now in case other
+ * compendium content / future templates want to reuse the patterns;
+ * safe to delete if not adopted.
+ *
+ *   .reverse-grid                  — was the 3-col grid inside the old
+ *                                    "Reverse Side" fieldset
+ *   .reverse-grid.skills-equipment-grid
+ *                                  — was the auto-fit override for the
+ *                                    skills+equipment area
+ *   .reverse-grid textarea         — ditto
+ *   .placeholder-controls          — was the bottom-of-section button
+ *                                    row outside the reverse fieldset
+ *   .weapon-ammo-grid              — referenced no template at the
+ *                                    audit time of this comment
+ * ===================================================================== */
+
+.reverse-grid {
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.star-frontiers-item-sheet .paper-box .top-row .mass,
-.star-frontiers-item-sheet .paper-box .top-row .cost {
-  align-items: center;
+.reverse-grid.skills-equipment-grid {
   display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+}
+
+.reverse-grid textarea {
+  min-height: 150px;
+}
+
+.placeholder-controls {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  grid-template-columns: max-content minmax(0, 1fr);
+  justify-content: flex-end;
+  margin-top: 14px;
 }
 
-.star-frontiers-item-sheet fieldset .stacked {
-  margin: 10px 0 0 0;
-}
-
-.star-frontiers-item-sheet .editor {
-  border: 1px solid var(--sf-line);
-  min-height: 140px;
-  padding: 6px;
-}
-
-.star-frontiers-item-sheet .editor-content,
-.star-frontiers-item-sheet prose-mirror {
-  min-height: 120px;
-  font-family: var(--input);
-}
-
-.star-frontiers-item-sheet .item-description-editor .editor {
-  border: 1px solid var(--sf-line);
-  min-height: 180px;
-}
-
-.star-frontiers-item-sheet .item-description-editor .editor-content,
-.star-frontiers-item-sheet .item-description-editor prose-mirror {
-  min-height: 160px;
-  padding: 6px;
-}
-
-.star-frontiers-item-sheet prose-mirror menu {
-  background: unset;
+.weapon-ammo-grid {
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
 }

@@ -46,6 +46,21 @@ const MIGRATIONS = [
           await item.update(item.type === "weapon" ? buildWeaponUpdate(item) : itemUpdate);
         }
       }
+
+      for (const scene of game.scenes) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor) continue;
+          for (const item of tokenDoc.actor.items) {
+            if (item.type !== "weapon") continue;
+            const update = {};
+            const mappedType = weaponTypeMap[item.system.weaponType];
+            if (mappedType) update["system.weaponType"] = mappedType;
+            const mappedUses = ammoUsesMap[item.system.ammo?.uses];
+            if (mappedUses) update["system.ammo.uses"] = mappedUses;
+            if (Object.keys(update).length > 0) await item.update(update);
+          }
+        }
+      }
     }
   }
 ];

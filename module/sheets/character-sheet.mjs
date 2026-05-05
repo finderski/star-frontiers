@@ -29,6 +29,8 @@ const CARRY_STATE_CHOICES = {
   carried: "STARFRONTIERS.Choice.CarryState.carried",
   stored: "STARFRONTIERS.Choice.CarryState.stored"
 };
+const SHEET_TABS = ["profile", "skills-equipment", "notes"];
+const DEFAULT_SHEET_TAB = "profile";
 
 export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static DEFAULT_OPTIONS = {
@@ -246,6 +248,32 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         }
       }
     });
+
+    if (!SHEET_TABS.includes(this._activeTab)) this._activeTab = DEFAULT_SHEET_TAB;
+    this.#applyActiveTab();
+    for (const button of this.element.querySelectorAll(".sheet-tab")) {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const tab = button.dataset.tab;
+        if (!SHEET_TABS.includes(tab) || tab === this._activeTab) return;
+        this._activeTab = tab;
+        this.#applyActiveTab();
+      });
+    }
+  }
+
+  #applyActiveTab() {
+    const root = this.element;
+    if (!root) return;
+    for (const button of root.querySelectorAll(".sheet-tab")) {
+      const isActive = button.dataset.tab === this._activeTab;
+      button.classList.toggle("sheet-tab--active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+    }
+    for (const panel of root.querySelectorAll(".sheet-tab-panel")) {
+      const isActive = panel.dataset.tabPanel === this._activeTab;
+      panel.classList.toggle("sheet-tab-panel--active", isActive);
+    }
   }
 
   async _onDropDocument(event, document) {

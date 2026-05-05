@@ -38,7 +38,7 @@
 - [templates/chat/check-roll-card.hbs](./templates/chat/check-roll-card.hbs): generic check chat card.
 - [templates/chat/stat-roll-card.hbs](./templates/chat/stat-roll-card.hbs): stat generation chat card.
 - [templates/chat/weapon-attack-card.hbs](./templates/chat/weapon-attack-card.hbs): weapon attack chat card with damage follow-up button.
-- [styles/star-frontiers.css](./styles/star-frontiers.css): both paper and retro-futurist themes, sheet layout, roll-action styling.
+- [styles/star-frontiers.css](./styles/star-frontiers.css): both paper and retro-futurist themes, sheet layout, roll-action styling. The file is divided into 16 numbered sections (TOC at the top): theme tokens, shared sheet base, shared layout primitives, shared interactive controls, character-sheet header, tab nav, three character-sheet tab panels, item sheet generic + weapon-specific, ProseMirror, chat cards, responsive, and a final "possibly orphaned" section flagging unused selectors as cleanup candidates. Use the TOC to navigate before editing.
 - [lang/en.json](./lang/en.json): nested localization keys; `npm run check` validates missing keys.
 - [tools/check-i18n.mjs](./tools/check-i18n.mjs): catches broken/missing localization references.
 - [notes.md](./notes.md): current working task list; closest local proxy for roadmap state.
@@ -56,7 +56,9 @@
 
 - Current schema version: **0.2.0** (stored in world setting `schemaVersion`).
 - Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
+- During development (pre-1.0), prefer patch bumps (`0.2.0 → 0.2.1`) for incremental schema fixes rather than jumping minor versions. Reserve minor bumps for end-of-phase milestones.
 - Migration 0.2.0 removes per-weapon range band `mod` fields, per-document `rulesEdition` fields, and remaps old `weaponType`/`ammo.uses` values to the current choices.
+- The 0.2.0 migration walks **world Items, world Actors, AND scene-embedded synthetic actors** (unlinked tokens). When writing a new migration, remember to walk all three or weapons on token-pinned actors will be missed.
 - **New optional fields with schema defaults do not require a migration** — TypeDataModel fills in defaults for stored documents that predate the field. The encumbrance/equipment additions (carryState/quantity/mass on gear, consumable, ammo, powerSource, armor, screen, weapon) all rely on this — no migration was bumped.
 
 ---
@@ -144,6 +146,13 @@
 - Weapon attack chat cards include a follow-up **Roll Damage** button carrying `data-band-key` for per-band damage.
 
 ## Current character sheet behavior
+- Sheet uses a **three-tab layout** (Profile / Skills+Equipment / Notes):
+  - Tab nav is custom (icon buttons, masked SVGs) — not Foundry's `tabGroups`.
+  - Active tab is held on the sheet instance as `this._activeTab`; `#applyActiveTab()` swaps `--active` classes on buttons and panels without forcing a re-render.
+  - Tab state survives `submitOnChange` re-renders because `_onRender` re-applies the active class from the same instance value. Lost on sheet close.
+  - Profile tab: identity header (always visible above tabs), Physical Data, Medical Record, Weapons, Defenses+Energy column, Personal File.
+  - Skills+Equipment tab: Skills fieldset (Expanded only) + Equipment fieldset (always). The old combined "Skills and Equipment" reverse-side fieldset has been split into two separate fieldsets.
+  - Notes tab: ProseMirror notes + (Expanded only) the Expanded Rules notes textarea.
 - Top section is functional:
   - stat generation button
   - race drag/drop updates race and derived movement
@@ -152,12 +161,12 @@
   - translates using the Alpha Dawn table
   - applies racial modifiers if race is already set
   - posts a chat card with raw roll and translated result
-- Physical Data section:
+- Physical Data section (Profile tab):
   - stat labels themselves are clickable roll controls
   - hover reveals blind/private GM options
   - ability checks prompt for a modifier; modifier changes the **target**, not the die roll
   - `STA` checks use a world setting to choose between current stamina and STA score
-- Medical section is partially implemented; `Current STA` is editable and injuries field exists.
+- Medical section (Profile tab) is partially implemented; `Current STA` is editable and injuries field exists.
 
 ## Roadmap status (high level)
 This reflects the current local notes and implemented work, not a live Asana sync.
