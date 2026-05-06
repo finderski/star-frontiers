@@ -214,7 +214,13 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - **Combat encumbrance modifiers (Expanded)** — `#getCombatEncumbranceMods` adds −10 if attacker encumbered, +10 if target token's actor encumbered. Shown as separate rows in attack chat card.
   - **Optional encumbrance penalty on ability checks** — `#getAbilityEncumbranceMod` reads the two world settings and applies −10 to the relevant check target (split by physical vs non-physical).
   - **Skills section** — visible only in Expanded rules; "Add Skill" button likewise hidden in Basic. Section legend reads "Equipment" in Basic, "Skills and Equipment" in Expanded.
-  - **Reload behavior** — requires linked ammo with `quantity > 0` AND `carryState ≠ "stored"`; reload decrements linked ammo `quantity` by 1 (reverses prior "always refills" behavior). Reload button only appears in gear panel when both conditions met.
+  - **Reload behavior — split by weapon type:**
+    - **Rounds-based (gyrojet/projectile/needler/etc.):** strict — requires linked ammo (`weapon.system.ammo.clipItem`) that qualifies (`quantity > 0` AND `carryState ≠ "stored"`). No fallback to other rounds clips. If no clip is linked, warn `"No clip linked to {weapon}. Drop a clip onto the weapon's item sheet to link it."`
+    - **SEU (laser/beam):** flexible — linked clip preferred if it qualifies (silent reload). Else any owned `ammo` with `ammoType: "seu"` carried/equipped is a candidate; multiple → prompt the user to choose; single → use it; none → warn `"No SEU power source carried…"`. Chosen source replaces the link via a `clipItem` update so the weapon row immediately reflects the new capacity.
+    - On success, the source's `quantity` decrements by 1.
+    - The Reload button in the gear panel only renders when `#canReloadWeapon` returns true (uses the same matching logic).
+  - **Linked Ammo selector** — the gear panel shows a `<select>` of all owned `ammo` items whose `ammoType === weapon.system.ammo.uses`. Selecting an option writes `system.ammo.clipItem` via the existing `data-item-field` change handler. Blank option (`—`) un-links. This gives the player an in-character-sheet way to set/change the link without opening the weapon item sheet.
+  - **Out-of-ammo early-out** — `#rollWeaponAttack` checks `loaded < ammoCheck.amount` *before* the attack dialog and aborts with a warning. Avoids making the player fill in range/shots/modifier just to be told the weapon is empty. The post-dialog check still runs to catch "asked for 3 shots but loaded only covers 2."
   - **Tabbed character sheet** — three custom icon tabs (Profile / Skills+Equipment / Notes). Profile is everything except skills/equipment/notes. Skills+Equipment splits the old combined fieldset into two. Notes holds the main ProseMirror plus the Expanded Rules notes textarea. Tab switching is class-toggled via `#applyActiveTab()`, no re-render. Tab state is instance-only (`this._activeTab`).
   - **Schema 0.2.0 migration** covers world Items, world Actors, AND scene-embedded synthetic actors (unlinked tokens). Earlier drafts only walked `game.actors`, missing weapons on token-pinned actors — fixed by adding a scene-walk loop to the same migration.
 
@@ -234,7 +240,7 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 - Range band display on character sheet shows max distance only
 
 ### Ammo item data model (current)
-- `ammoType`: dropdown — `rounds` · `seu` (no longer free text)
+- `ammoType`: dropdown — `rounds` · `seu` (no longer free text). Default is `"rounds"` so newly created ammo items aren't blank.
 - `shots`: capacity of one container (clip / pack)
 - `carryState` (default `"carried"`): `ready` · `carried` · `stored`
 - `quantity` (default `1`) — **re-added** after a brief period without it. Tracks how many spare containers the character has. Reload decrements by 1; if `quantity = 0` or `carryState = "stored"`, reload is blocked. Reload button is hidden in the gear panel until conditions are met.

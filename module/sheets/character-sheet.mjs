@@ -115,9 +115,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const hasAmmo = uses !== "none";
       const ammoLoaded = StarFrontiersCharacterSheet.#getLoadedAmmo(item, liveCapacity);
       const isSEU = uses === "seu";
-      const ammoQty = Number(linkedAmmo?.system?.quantity ?? 0);
-      const ammoCarried = linkedAmmo ? linkedAmmo.system?.carryState !== "stored" : false;
-      const canReload = hasAmmo && !!linkedAmmo && ammoQty > 0 && ammoCarried;
+      const canReload = StarFrontiersCharacterSheet.#canReloadWeapon(actor, item, linkedAmmo);
+      const clipChoices = hasAmmo
+        ? actor.items
+            .filter((it) => it.type === "ammo" && it.system.ammoType === uses)
+            .map((it) => ({ id: it.id, name: it.name }))
+        : [];
+      const linkedClipId = linkedAmmo?.parent === actor ? linkedAmmo.id : "";
       return {
         key: item.id,
         item,
@@ -140,7 +144,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           batteryIcon: isSEU ? StarFrontiersCharacterSheet.#getBatteryIcon(ammoLoaded, liveCapacity) : null,
           canReload,
           carryState: item.system.carryState || "ready",
+          carryStateLabel: game.i18n.localize(`STARFRONTIERS.Choice.CarryState.${item.system.carryState || "ready"}`),
           quantity: Number(item.system.quantity ?? 1),
+          clipChoices,
+          linkedClipId,
           seuCurrent: isSEU ? (item.system.ammo.variableSetting?.current || 1) : 1,
           seuMin: isSEU ? (item.system.ammo.variableSetting?.min || 1) : 1,
           seuMax: isSEU ? (item.system.ammo.variableSetting?.max || null) : null
@@ -178,6 +185,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         const sys = item.system ?? {};
         const quantity = Number(sys.quantity ?? 1);
         const mass = Number(sys.mass ?? 0);
+        const carryState = sys.carryState || "carried";
         return {
           id: item.id,
           name: item.name,
@@ -185,7 +193,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           quantity,
           mass,
           totalMass: Number((mass * quantity).toFixed(2)),
-          carryState: sys.carryState || "carried"
+          carryState,
+          carryStateLabel: game.i18n.localize(`STARFRONTIERS.Choice.CarryState.${carryState}`)
         };
       });
   }
@@ -439,31 +448,104 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(actor, target);
     if (!weapon) return;
 
-    const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
-    if (!linkedAmmo) {
-      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.CannotReload"));
-      return;
+    const sourceAmmo = await StarFrontiersCharacterSheet.#resolveReloadSource(actor, weapon);
+    if (!sourceAmmo) return;
+
+    const sourceQty = Number(sourceAmmo.system?.quantity ?? 0);
+    const newCapacity = sourceAmmo.system.shots ?? weapon.system.ammo?.capacity ?? 0;
+    const updates = { "system.ammo.consumed": 0, "system.ammo.capacity": newCapacity };
+
+    const isSEU = weapon.system.ammo?.uses === "seu";
+    const linkedRef = weapon.system.ammo?.clipItem;
+    if (isSEU && linkedRef !== sourceAmmo.id && linkedRef !== sourceAmmo.uuid) {
+      updates["system.ammo.clipItem"] = sourceAmmo.parent === actor ? sourceAmmo.id : sourceAmmo.uuid;
     }
 
-    const ammoQty = Number(linkedAmmo.system?.quantity ?? 0);
-    if (ammoQty <= 0) {
-      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoAmmoAvailable"));
-      return;
-    }
-
-    if (linkedAmmo.system?.carryState === "stored") {
-      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AmmoStored"));
-      return;
-    }
-
-    const newCapacity = linkedAmmo.system.shots ?? weapon.system.ammo?.capacity ?? 0;
-    await weapon.update({ "system.ammo.consumed": 0, "system.ammo.capacity": newCapacity });
-    await linkedAmmo.update({ "system.quantity": ammoQty - 1 });
+    await weapon.update(updates);
+    await sourceAmmo.update({ "system.quantity": sourceQty - 1 });
 
     ui.notifications.info(game.i18n.format("STARFRONTIERS.Weapon.Reloaded", {
       weapon: weapon.name,
-      ammo: linkedAmmo.name
+      ammo: sourceAmmo.name
     }));
+  }
+
+  static #canReloadWeapon(actor, weapon, linkedAmmo) {
+    const uses = weapon.system.ammo?.uses ?? "none";
+    if (uses === "none") return false;
+
+    const qualifies = (item) =>
+      Number(item?.system?.quantity ?? 0) > 0 && item?.system?.carryState !== "stored";
+
+    if (uses === "seu") {
+      if (linkedAmmo && linkedAmmo.system?.ammoType === "seu" && qualifies(linkedAmmo)) return true;
+      return actor.items.some((it) =>
+        it.type === "ammo" && it.system.ammoType === "seu" && qualifies(it));
+    }
+
+    return !!linkedAmmo && qualifies(linkedAmmo);
+  }
+
+  static async #resolveReloadSource(actor, weapon) {
+    const uses = weapon.system.ammo?.uses ?? "none";
+    if (uses === "none") return null;
+
+    const qualifies = (item) =>
+      Number(item?.system?.quantity ?? 0) > 0 && item?.system?.carryState !== "stored";
+
+    const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
+
+    if (uses === "seu") {
+      if (linkedAmmo && linkedAmmo.system?.ammoType === "seu" && qualifies(linkedAmmo)) return linkedAmmo;
+
+      const candidates = actor.items.filter((it) =>
+        it.type === "ammo" && it.system.ammoType === "seu" && qualifies(it));
+
+      if (!candidates.length) {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoSeuAvailable"));
+        return null;
+      }
+      if (candidates.length === 1) return candidates[0];
+      return await StarFrontiersCharacterSheet.#promptReloadChoice(weapon, candidates);
+    }
+
+    if (!linkedAmmo) {
+      ui.notifications.warn(game.i18n.format("STARFRONTIERS.Weapon.NoLinkedAmmo", { weapon: weapon.name }));
+      return null;
+    }
+    if (Number(linkedAmmo.system?.quantity ?? 0) <= 0) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoAmmoAvailable"));
+      return null;
+    }
+    if (linkedAmmo.system?.carryState === "stored") {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AmmoStored"));
+      return null;
+    }
+    return linkedAmmo;
+  }
+
+  static async #promptReloadChoice(weapon, candidates) {
+    const options = candidates.map((c) => {
+      const qty = Number(c.system?.quantity ?? 0);
+      const shots = Number(c.system?.shots ?? 0);
+      return `<option value="${c.id}">${c.name} (${qty}) — ${shots}</option>`;
+    }).join("");
+
+    const choice = await foundry.applications.api.DialogV2.prompt({
+      window: { title: game.i18n.localize("STARFRONTIERS.Weapon.ChooseAmmoTitle") },
+      content: `
+        <p>${game.i18n.format("STARFRONTIERS.Weapon.ChooseAmmoPrompt", { weapon: weapon.name })}</p>
+        <select name="source" autofocus>${options}</select>
+      `,
+      ok: {
+        label: game.i18n.localize("STARFRONTIERS.Weapon.Reload"),
+        callback: (event, button) => button.form.elements.source.value
+      },
+      modal: true,
+      rejectClose: false
+    });
+
+    return choice ? candidates.find((c) => c.id === choice) : null;
   }
 
   static #onToggleWeaponGear(event, target) {
@@ -551,6 +633,18 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static async #rollWeaponAttack(actor, weapon, rollMode = "public") {
     const profile = StarFrontiersCharacterSheet.#getWeaponAttackProfile(actor, weapon);
 
+    const ammoCheck = StarFrontiersCharacterSheet.#getAmmoConsumption(weapon);
+    const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
+    const liveCapacity = StarFrontiersCharacterSheet.#getLiveCapacity(weapon, linkedAmmo);
+
+    if (ammoCheck.amount > 0) {
+      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity);
+      if (loaded < ammoCheck.amount) {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
+        return;
+      }
+    }
+
     const targetDistance = StarFrontiersCharacterSheet.#getTargetDistance(actor);
     const autoRangeBand = targetDistance !== null
       ? StarFrontiersCharacterSheet.#getRangeBandFromDistance(weapon, targetDistance)
@@ -558,10 +652,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     const prompt = await StarFrontiersCharacterSheet.#promptWeaponAttack(actor, weapon, profile, autoRangeBand);
     if (!prompt) return;
-
-    const ammoCheck = StarFrontiersCharacterSheet.#getAmmoConsumption(weapon);
-    const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
-    const liveCapacity = StarFrontiersCharacterSheet.#getLiveCapacity(weapon, linkedAmmo);
 
     const activeBandKey = autoRangeBand?.key ?? prompt.rangeBand;
     const activeRangeLabel = autoRangeBand?.label ?? prompt.rangeLabel;

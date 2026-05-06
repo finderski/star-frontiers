@@ -257,6 +257,14 @@
                   <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
                     <i class="fa-solid fa-pen-to-square"></i>
                   </button>
+                  {{#if row.data.hasAmmo}}
+                    <label class="seu-dial-label">
+                      <span>{{localize "STARFRONTIERS.Item.LinkedAmmo"}}</span>
+                      <select data-item-field="system.ammo.clipItem" aria-label="{{localize "STARFRONTIERS.Item.LinkedAmmo"}}">
+                        {{selectOptions row.data.clipChoices selected=row.data.linkedClipId blank="—" valueAttr="id" labelAttr="name"}}
+                      </select>
+                    </label>
+                  {{/if}}
                   {{#if row.data.canReload}}
                     <button type="button" data-action="reloadWeapon" title="{{localize "STARFRONTIERS.Weapon.Reload"}}">
                       <i class="fa-solid fa-rotate-right"></i>
@@ -405,20 +413,10 @@
 
       <fieldset class="paper-box equipment-box">
         <legend>{{localize "STARFRONTIERS.Character.Equipment"}}</legend>
-        <div class="equipment-header">
-          <div class="encumbrance-summary{{#if encumbrance.encumbered}} encumbrance-summary--encumbered{{/if}}" title="{{localize "STARFRONTIERS.Character.EncumbranceTooltip"}}">
-            <span class="encumbrance-label">{{localize "STARFRONTIERS.Character.TotalMass"}}</span>
-            <span class="encumbrance-values">{{encumbrance.totalMass}} / {{encumbrance.threshold}}</span>
-            {{#if encumbrance.encumbered}}
-              <span class="encumbrance-badge"><i class="fa-solid fa-weight-hanging"></i> {{localize "STARFRONTIERS.Character.Encumbered"}}</span>
-            {{/if}}
-          </div>
-        </div>
         <div class="equipment-grid equipment-grid--header">
           <span>{{localize "STARFRONTIERS.Item.Name"}}</span>
           <span class="ls-Center">{{localize "STARFRONTIERS.Item.Quantity"}}</span>
           <span class="ls-Center">{{localize "STARFRONTIERS.Item.Mass"}}</span>
-          <span class="ls-Center">{{localize "STARFRONTIERS.Item.CarryState"}}</span>
           <span></span>
         </div>
         <div class="equipment-list">
@@ -427,10 +425,9 @@
               <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{row.name}}</button>
               <input type="number" class="ls-Center" min="0" step="1" value="{{row.quantity}}" data-item-field="system.quantity" aria-label="{{localize "STARFRONTIERS.Item.Quantity"}}" />
               <span class="ls-Center">{{row.mass}}</span>
-              <button type="button" class="weapon-carry-state weapon-carry-state--{{row.carryState}}" data-action="cycleCarryState" title="{{localize "STARFRONTIERS.Item.CarryState"}}" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}"></button>
               <div class="item-actions">
-                <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
-                <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
+                <button type="button" class="weapon-carry-state weapon-carry-state--{{row.carryState}}" data-action="cycleCarryState" title="{{row.carryStateLabel}}" aria-label="{{row.carryStateLabel}}"></button>
+                <!--<button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button> -->
                 <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
               </div>
             </div>
@@ -449,6 +446,13 @@
             <i class="fa-solid fa-plus"></i>
             <span>{{localize "STARFRONTIERS.Character.AddPowerSource"}}</span>
           </button>
+        </div>
+        <div class="encumbrance-total{{#if encumbrance.encumbered}} encumbrance-total--encumbered{{/if}}" title="{{localize "STARFRONTIERS.Character.EncumbranceTooltip"}}">
+          <span class="encumbrance-label">{{localize "STARFRONTIERS.Character.TotalMass"}}:</span>
+          <span class="encumbrance-values">{{encumbrance.totalMass}} / {{encumbrance.threshold}} {{localize "STARFRONTIERS.Character.kilogram-abbr"}}</span>
+          {{#if encumbrance.encumbered}}
+            <span class="encumbrance-badge"><i class="fa-solid fa-weight-hanging"></i> {{localize "STARFRONTIERS.Character.Encumbered"}}</span>
+          {{/if}}
         </div>
       </fieldset>
     </div>

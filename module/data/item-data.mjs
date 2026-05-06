@@ -244,7 +244,7 @@ export class StarFrontiersAmmoData extends StarFrontiersItemData {
       carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
       quantity: numberField({ initial: 1, min: 0 }),
       mass: numberField({ initial: 0, min: 0, integer: false }),
-      ammoType: textField({ choices: ["rounds", "seu"] }),
+      ammoType: textField({ initial: "rounds", choices: ["rounds", "seu"] }),
       shots: numberField({ initial: 0, min: 0 }),
       cost: numberField({ initial: 0, min: 0 })
     };

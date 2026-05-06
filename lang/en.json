@@ -31,6 +31,7 @@
       "Hourly": "Hourly:",
       "InitiativeTitle": "{name}: Initiative",
       "InitiativeModifierLabel": "IM",
+      "kilogram-abbr": "kg",
       "kilometer-abbr": "km",
       "meter-abbr": "m",
       "MedicalRecord": "Medical Record",
@@ -111,7 +112,7 @@
       },
       "CarryState": {
         "carried": "Carried",
-        "ready": "Ready",
+        "ready": "Equipped",
         "stored": "Stored"
       },
       "DamageType": {
@@ -408,7 +409,11 @@
       "OutOfAmmo": "That weapon does not have enough loaded ammunition.",
       "CannotReload": "No linked ammunition found for that weapon.",
       "NoAmmoAvailable": "No spare ammunition available for that weapon.",
+      "NoLinkedAmmo": "No clip linked to {weapon}. Drop a clip onto the weapon's item sheet to link it.",
+      "NoSeuAvailable": "No SEU power source carried — pick up or equip a clip, beltpack, or powerpack to reload.",
       "AmmoStored": "The linked ammunition is stored — bring it to ready or carried to reload.",
+      "ChooseAmmoTitle": "Choose Power Source",
+      "ChooseAmmoPrompt": "Select which power source to load into {weapon}.",
       "AttackerEncumbered": "Attacker Encumbered",
       "TargetEncumbered": "Target Encumbered",
       "Reload": "Reload",

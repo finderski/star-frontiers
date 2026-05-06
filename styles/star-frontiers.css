@@ -1299,20 +1299,70 @@ button.roll-label-main:focus-visible {
 .equipment-grid {
   align-items: center;
   display: grid;
-  gap: 6px;
-  grid-template-columns: minmax(0, 1fr) 60px 60px 32px auto;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 55px 55px 60px;
   padding: 3px 4px;
+}
+
+.equipment-grid > .ls-Center {
+  justify-self: stretch;
+  text-align: center;
+  font-family: var(--input);
 }
 
 .equipment-grid--header {
   border-bottom: 1px solid var(--sf-row-line);
   color: var(--sf-muted);
-  font-size: 0.85em;
+  font-size: 0.55em;
   text-transform: uppercase;
+  font-family: var(--fieldset);
 }
 
 .equipment-row {
   border-bottom: 1px solid var(--sf-row-line);
+}
+
+.equipment-row .item-actions {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.encumbrance-total {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  font-family: var(--input);
+  gap: 8px;
+  margin-top: 8px;
+  padding: 4px 4px 0;
+}
+
+.encumbrance-total .encumbrance-label {
+  color: var(--sf-muted);
+  text-transform: uppercase;
+}
+
+.encumbrance-total .encumbrance-values {
+  font-weight: bold;
+}
+
+.encumbrance-total--encumbered {
+  color: var(--sf-focus);
+}
+
+.encumbrance-total .encumbrance-badge {
+  align-items: center;
+  background: var(--sf-focus);
+  border-radius: 3px;
+  color: var(--sf-paper);
+  display: inline-flex;
+  font-size: 0.85em;
+  gap: 4px;
+  margin-left: auto;
+  padding: 2px 6px;
+  text-transform: uppercase;
 }
 
 .equipment-row input[type="number"] {
