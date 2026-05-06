@@ -304,14 +304,27 @@
     <div class="left-column">
       <fieldset class="paper-box defenses-box">
         <legend>{{localize "STARFRONTIERS.Character.Defenses"}}</legend>
-        <label>
-          <span>{{localize "STARFRONTIERS.Character.Suit"}}</span>
-          <input type="text" name="system.defenses.suit" value="{{system.defenses.suit}}" />
-        </label>
-        <label>
-          <span>{{localize "STARFRONTIERS.Character.Screen"}}</span>
-          <input type="text" name="system.defenses.screen" value="{{system.defenses.screen}}" />
-        </label>
+        <fieldset class="paper-box defenses-box worn-defenses">
+          <legend>{{localize "STARFRONTIERS.Character.WornDefenses"}}</legend>
+          <div class="defense-slot" data-defense-slot="suit">
+            <span class="defense-slot__label">{{localize "STARFRONTIERS.Character.Suit"}}</span>
+            {{#if wornSuit}}
+              <button type="button" class="defense-slot__chip" data-action="openItem" data-item-id="{{wornSuit.id}}" title="{{localize "STARFRONTIERS.Item.Open"}}">{{wornSuit.name}}</button>
+              <button type="button" class="defense-slot__clear" data-action="clearDefenseSlot" data-slot="suit" title="{{localize "STARFRONTIERS.Character.RemoveWorn"}}" aria-label="{{localize "STARFRONTIERS.Character.RemoveWorn"}}"><i class="fa-solid fa-xmark"></i></button>
+            {{else}}
+              <span class="defense-slot__placeholder">{{localize "STARFRONTIERS.Character.DropArmorHere"}}</span>
+            {{/if}}
+          </div>
+          <div class="defense-slot" data-defense-slot="screen">
+            <span class="defense-slot__label">{{localize "STARFRONTIERS.Character.Screen"}}</span>
+            {{#if wornScreen}}
+              <button type="button" class="defense-slot__chip" data-action="openItem" data-item-id="{{wornScreen.id}}" title="{{localize "STARFRONTIERS.Item.Open"}}">{{wornScreen.name}}</button>
+              <button type="button" class="defense-slot__clear" data-action="clearDefenseSlot" data-slot="screen" title="{{localize "STARFRONTIERS.Character.RemoveWorn"}}" aria-label="{{localize "STARFRONTIERS.Character.RemoveWorn"}}"><i class="fa-solid fa-xmark"></i></button>
+            {{else}}
+              <span class="defense-slot__placeholder">{{localize "STARFRONTIERS.Character.DropScreenHere"}}</span>
+            {{/if}}
+          </div>
+        </fieldset>
         <div class="defense-lists">
           <section class="stacked">
             <span>{{localize "STARFRONTIERS.Character.ArmorItems"}}</span>
@@ -320,6 +333,7 @@
                 <div class="item-row" data-item-id="{{item.id}}">
                   <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
                   <div class="item-actions">
+                    <button type="button" class="weapon-carry-state weapon-carry-state--{{item.system.carryState}}" data-action="cycleCarryState" title="{{localize "STARFRONTIERS.Item.CarryState"}}" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}"></button>
                     <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
                     <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
@@ -341,6 +355,7 @@
                 <div class="item-row" data-item-id="{{item.id}}">
                   <button type="button" class="item-name-button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
                   <div class="item-actions">
+                    <button type="button" class="weapon-carry-state weapon-carry-state--{{item.system.carryState}}" data-action="cycleCarryState" title="{{localize "STARFRONTIERS.Item.CarryState"}}" aria-label="{{localize "STARFRONTIERS.Item.CarryState"}}"></button>
                     <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
                     <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>

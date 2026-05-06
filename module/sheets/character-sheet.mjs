@@ -59,6 +59,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       rollWeaponAttack: StarFrontiersCharacterSheet.#onRollWeaponAttack,
       rollWeaponDamage: StarFrontiersCharacterSheet.#onRollWeaponDamage,
       cycleCarryState: StarFrontiersCharacterSheet.#onCycleCarryState,
+      clearDefenseSlot: StarFrontiersCharacterSheet.#onClearDefenseSlot,
       reloadWeapon: StarFrontiersCharacterSheet.#onReloadWeapon,
       toggleWeaponGear: StarFrontiersCharacterSheet.#onToggleWeaponGear,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
@@ -91,6 +92,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.weaponRows = await this.#prepareWeaponRows(actor);
     context.armorItems = actor.items.filter((item) => item.type === "armor");
     context.screenItems = actor.items.filter((item) => item.type === "screen");
+    const suitId = actor.system.defenses?.suit ?? "";
+    const screenId = actor.system.defenses?.screen ?? "";
+    context.wornSuit = suitId ? actor.items.get(suitId) ?? null : null;
+    context.wornScreen = screenId ? actor.items.get(screenId) ?? null : null;
     context.skillItems = actor.items.filter((item) => item.type === "skill");
     context.equipmentRows = StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
     context.encumbrance = StarFrontiersCharacterSheet.#prepareEncumbranceContext(actor);
@@ -286,6 +291,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   async _onDropDocument(event, document) {
+    const slotEl = event.target?.closest?.("[data-defense-slot]");
+    if (slotEl && document.documentName === "Item") {
+      return this.#handleDefenseSlotDrop(event, document, slotEl.dataset.defenseSlot);
+    }
+
     if (document.documentName === "Item" && document.type === "race") {
       const race = await this.#ownRaceItem(document);
       const updates = { "system.race": race.name };
@@ -298,6 +308,31 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
 
     return super._onDropDocument(event, document);
+  }
+
+  async #handleDefenseSlotDrop(event, document, slot) {
+    const expectedType = slot === "suit" ? "armor" : "screen";
+    if (document.type !== expectedType) {
+      ui.notifications.warn(game.i18n.format("STARFRONTIERS.Character.DefenseSlotWrongType", {
+        slot: game.i18n.localize(`STARFRONTIERS.Character.${slot === "suit" ? "Suit" : "Screen"}`)
+      }));
+      return null;
+    }
+
+    let owned = document;
+    if (document.parent !== this.document) {
+      const itemData = document.toObject();
+      delete itemData._id;
+      [owned] = await this.document.createEmbeddedDocuments("Item", [itemData]);
+    }
+    if (!owned) return null;
+
+    if (owned.system.carryState === "stored") {
+      await owned.update({ "system.carryState": "carried" });
+    }
+
+    await this.document.update({ [`system.defenses.${slot}`]: owned.id });
+    return owned;
   }
 
   _processFormData(event, form, formData) {
@@ -400,7 +435,22 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static async #onDeleteItem(event, target) {
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
-    await item?.delete();
+    if (!item) return;
+
+    const actor = this.document;
+    const defenseUpdates = {};
+    if (item.type === "armor" && actor.system.defenses?.suit === item.id) defenseUpdates["system.defenses.suit"] = "";
+    if (item.type === "screen" && actor.system.defenses?.screen === item.id) defenseUpdates["system.defenses.screen"] = "";
+    if (Object.keys(defenseUpdates).length) await actor.update(defenseUpdates);
+
+    await item.delete();
+  }
+
+  static async #onClearDefenseSlot(event, target) {
+    target ??= event.currentTarget;
+    const slot = target.dataset.slot;
+    if (slot !== "suit" && slot !== "screen") return;
+    await this.document.update({ [`system.defenses.${slot}`]: "" });
   }
 
   static async #onRollAbility(event, target) {
@@ -435,9 +485,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
 
-    const states = ["ready", "carried", "stored"];
-    const current = item.system.carryState || "carried";
-    const next = states[(states.indexOf(current) + 1) % states.length];
+    const twoState = item.type === "armor" || item.type === "screen";
+    const states = twoState ? ["carried", "stored"] : ["ready", "carried", "stored"];
+    const current = item.system.carryState || (twoState ? "carried" : "ready");
+    const fallbackIndex = twoState ? 0 : 1;
+    const idx = states.indexOf(current);
+    const next = states[((idx === -1 ? fallbackIndex : idx) + 1) % states.length];
 
     await item.update({ "system.carryState": next });
   }

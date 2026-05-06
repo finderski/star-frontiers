@@ -17,6 +17,10 @@
       "CurrentSta": "Current STA:",
       "CurrentStaminaSource": "Current Stamina",
       "Defenses": "Defenses",
+      "DefenseSlotWrongType": "{slot} slot only accepts that item type.",
+      "DropArmorHere": "Drop armor here",
+      "DropScreenHere": "Drop screen here",
+      "RemoveWorn": "Remove worn item",
       "EnergyRecord": "Energy Record",
       "Encumbered": "Encumbered",
       "EncumbranceModifier": "Encumbrance Mod",
@@ -80,6 +84,7 @@
       "TotalMass": "Carried",
       "Using": "Using",
       "Walking": "Walking:",
+      "WornDefenses": "Worn Defenses",
       "InitiativeModifier-abbr": "IM",
       "Weapons": "Weapons"
     },

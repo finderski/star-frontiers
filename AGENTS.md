@@ -54,11 +54,13 @@
 
 ## Schema versioning
 
-- Current schema version: **0.2.0** (stored in world setting `schemaVersion`).
+- Current schema version: **0.2.2** (stored in world setting `schemaVersion`).
 - Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
 - During development (pre-1.0), prefer patch bumps (`0.2.0 → 0.2.1`) for incremental schema fixes rather than jumping minor versions. Reserve minor bumps for end-of-phase milestones.
-- Migration 0.2.0 removes per-weapon range band `mod` fields, per-document `rulesEdition` fields, and remaps old `weaponType`/`ammo.uses` values to the current choices.
-- The 0.2.0 migration walks **world Items, world Actors, AND scene-embedded synthetic actors** (unlinked tokens). When writing a new migration, remember to walk all three or weapons on token-pinned actors will be missed.
+- **0.2.0** — removes per-weapon range band `mod` fields and per-document `rulesEdition` fields; remaps old `weaponType` / `ammo.uses` values to the current choices.
+- **0.2.1** — repairs items the 0.2.0 walk could not see. Documents that fail schema validation get filtered out of `game.items` / `actor.items` and stashed in `collection.invalidDocumentIds`. 0.2.1 walks those IDs (using `collection.get(id, { invalid: true })`), and walks raw `tokenDoc.delta._source.items` for unlinked tokens (which similarly hides invalid docs). Reads from `_source` because `system.*` may have been replaced with defaults.
+- **0.2.2** — converts `system.defenses.suit` / `.screen` from free text to owned-item-ID refs (resolves stored value against the actor's items; clears if it doesn't point to a valid armor/screen). Also normalizes `carryState === "ready"` on armor/screen items to `"carried"`.
+- **Always walk three places** for any document-data migration: world Items (`game.items`), world Actors (`game.actors` + `actor.items`), and unlinked scene tokens (`scene.tokens` filtered by `actorLink === false` → `tokenDoc.delta._source.items`, then update via `tokenDoc.actor.updateEmbeddedDocuments`). Also walk `invalidDocumentIds` if the migration is about choice-validated fields.
 - **New optional fields with schema defaults do not require a migration** — TypeDataModel fills in defaults for stored documents that predate the field. The encumbrance/equipment additions (carryState/quantity/mass on gear, consumable, ammo, powerSource, armor, screen, weapon) all rely on this — no migration was bumped.
 
 ---
@@ -105,6 +107,18 @@
 - **Variable SEU dial**: `system.ammo.variableSetting.current` is editable on the character sheet via the weapon gear panel. The attack roll reads it for SEU consumption. Damage formula interpolation from this value is not yet implemented.
 - **Ammo type**: `ammoType` on ammo items is now a dropdown (`rounds` · `seu`), not free text.
 - **Weapon quantity**: `weapon.system.quantity` is on the schema. It is **not** exposed on the weapon item sheet — edit it via the character sheet's weapon **gear panel** (slide-up). This keeps character-tied data off the item sheet.
+
+### Defense slots (Suit / Screen)
+- `system.defenses.suit` and `system.defenses.screen` on a character actor hold the **owned-item ID** of the currently-worn armor/screen. They are NOT free text. Free-text values were converted in 0.2.2.
+- The `<div class="defense-slot" data-defense-slot="suit|screen">` elements on the character sheet are the drop targets. `_onDropDocument` checks `event.target.closest("[data-defense-slot]")` to detect a slot drop and routes to `#handleDefenseSlotDrop`.
+- Drop validation: dropped item must be of type `armor` for the suit slot, `screen` for the screen slot. Mismatched types show a notification and reject.
+- Drop from compendium / external actor: `#handleDefenseSlotDrop` auto-creates a copy on this actor (via `createEmbeddedDocuments`) and uses the new copy's ID.
+- Drop with `carryState === "stored"`: auto-promoted to `"carried"` so the worn item is also "in hand".
+- The slot is a single-ref slot — there is exactly one suit and one screen at a time. Setting a new ref replaces the old one; no need to "demote" the previous worn item.
+- "Remove worn without delete" is the `clearDefenseSlot` action; it sets the ref to `""`. The item stays in the owned list.
+- **Item delete cleanup**: `#onDeleteItem` clears `defenses.suit` / `.screen` if it pointed to the deleted item. Without this, a dangling ref would render as "no worn item" because `actor.items.get(staleId)` returns null.
+- **Encumbrance**: armor and screen mass already counts via `computeCarriedMass` (any item where `carryState ∈ {ready, carried}`). Both default to `"carried"`, so the worn-or-not distinction doesn't affect encumbrance — it's always counted unless explicitly stowed.
+- Armor and screen items have a 2-state cycle button (`carried ↔ stored`), not the 3-state cycle other items use. The "worn" state is the character-side ref, not a fourth carry-state value. The schema still has `"ready"` as a valid stored value (for backward compat with old data); 0.2.2 normalizes it to `"carried"` and the cycle button never produces it.
 
 ### Encumbrance / equipment / carry state
 - Carry state is universal: every wearable/carryable item type (weapon, armor, screen, ammo, powerSource, gear, consumable) has `system.carryState ∈ {ready, carried, stored}`. Default is `"ready"` for weapons, `"carried"` for everything else.
@@ -205,6 +219,8 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Weapons:
   - variable SEU damage formula — inject `seuSetting` into roll data so formulas like `@seuSetting`d10 scale with dial
   - confirm attack formulas against the actual rules PDFs
+- Damage application (new):
+  - "Apply damage to target" workflow — read target's `defenses.suit` / `.screen` refs, inspect `armor.system.reductions[]` and `screen.system.defends` / `.reduction` against the weapon's `damageType` (Defense), consume `screen.system.seuPerHit` per absorbed strike. Not yet implemented; defense slot data is already in place to support it.
 - Races:
   - race item sheet: remove redundant Key display, hide Hourly in Basic mode, autofill paired modifiers
   - add real editing/support for racial special abilities
@@ -230,6 +246,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not change Basic-rules encumbrance from "display only, no penalty, no movement halving." Basic intentionally has no encumbrance enforcement — only Expanded does.
 - Do not gate the attacker/target combat encumbrance modifiers behind the two `encumbranceAffectsPhysical/NonPhysical` world settings. Those settings only extend the −10 to ability/skill checks. Combat mods are core Expanded rules and always applied.
 - Do not expose `weapon.system.quantity` on the weapon item sheet — it lives on the gear panel slide-up on the character sheet by design (character-tied data, not item-template data).
+- Do not store free text in `system.defenses.suit` / `system.defenses.screen` — those fields hold owned-item IDs only. The legacy free-text behavior was deprecated in 0.2.2 and the migration cleared stale values.
+- Do not add a fourth `"active"` / `"worn"` carry state for armor/screen — "worn" is tracked on the character via `defenses.suit/screen` refs, not on the item. Armor/screen carry-state is intentionally `carried ↔ stored` only.
+- Do not merge `armor` and `screen` into one item type. They have genuinely different mechanics (per-damage-type reductions vs. defends-set + SEU absorption with power source). The shared item sheet already factors common fields (cost, mass, description, image).
 
 ## Testing and runtime expectations
 - There is no automated test suite beyond validation scripts.

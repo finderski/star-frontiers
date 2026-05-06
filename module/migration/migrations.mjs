@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.2.0";
+export const CURRENT_SCHEMA_VERSION = "0.2.2";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -59,6 +59,97 @@ const MIGRATIONS = [
             if (mappedUses) update["system.ammo.uses"] = mappedUses;
             if (Object.keys(update).length > 0) await item.update(update);
           }
+        }
+      }
+    }
+  },
+  {
+    version: "0.2.1",
+    description: "Repair weapon items missed by 0.2.0 because they failed validation (invalid documents and unlinked-token delta items)",
+    async migrate() {
+      const BANDS = ["pointBlank", "short", "medium", "long", "extreme"];
+      const weaponTypeMap = { pistol: "beam", rifle: "beam", heavy: "beam", thrown: "gyrojet" };
+      const ammoUsesMap = { clip: "rounds", powerpack: "seu" };
+
+      function buildUpdate(systemSource) {
+        const update = Object.fromEntries(BANDS.map(b => [`system.rangeBands.${b}.-=mod`, null]));
+        update["system.-=rulesEdition"] = null;
+        update["system.damageType"] = "";
+
+        const mappedType = weaponTypeMap[systemSource?.weaponType];
+        if (mappedType) update["system.weaponType"] = mappedType;
+
+        const mappedUses = ammoUsesMap[systemSource?.ammo?.uses];
+        if (mappedUses) update["system.ammo.uses"] = mappedUses;
+
+        return update;
+      }
+
+      async function repairInvalidWeapons(collection) {
+        const ids = collection.invalidDocumentIds ?? new Set();
+        for (const id of ids) {
+          const item = collection.get(id, { invalid: true });
+          if (item?.type !== "weapon") continue;
+          await item.update(buildUpdate(item._source?.system));
+        }
+      }
+
+      await repairInvalidWeapons(game.items);
+
+      for (const actor of game.actors) {
+        await repairInvalidWeapons(actor.items);
+      }
+
+      for (const scene of game.scenes) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink) continue;
+          const rawItems = tokenDoc.delta?._source?.items ?? [];
+          const updates = [];
+          for (const itemSrc of rawItems) {
+            if (itemSrc?.type !== "weapon") continue;
+            const partial = buildUpdate(itemSrc.system);
+            if (Object.keys(partial).length > 0) {
+              updates.push({ _id: itemSrc._id, ...partial });
+            }
+          }
+          if (updates.length && tokenDoc.actor) {
+            await tokenDoc.actor.updateEmbeddedDocuments("Item", updates);
+          }
+        }
+      }
+    }
+  },
+  {
+    version: "0.2.2",
+    description: "Convert defenses.suit/screen from free-text to item-id refs; normalize armor/screen carryState 'ready' to 'carried'",
+    async migrate() {
+      function resolveOwnedRef(actor, value, type) {
+        if (!value) return "";
+        const owned = actor.items.get(value);
+        return owned?.type === type ? value : "";
+      }
+
+      for (const actor of game.actors) {
+        if (actor.type !== "character") continue;
+        const updates = {};
+        const suitRef = resolveOwnedRef(actor, actor.system.defenses?.suit, "armor");
+        const screenRef = resolveOwnedRef(actor, actor.system.defenses?.screen, "screen");
+        if (actor.system.defenses?.suit !== suitRef) updates["system.defenses.suit"] = suitRef;
+        if (actor.system.defenses?.screen !== screenRef) updates["system.defenses.screen"] = screenRef;
+        if (Object.keys(updates).length) await actor.update(updates);
+
+        for (const item of actor.items) {
+          if (item.type !== "armor" && item.type !== "screen") continue;
+          if (item.system.carryState === "ready") {
+            await item.update({ "system.carryState": "carried" });
+          }
+        }
+      }
+
+      for (const item of game.items) {
+        if (item.type !== "armor" && item.type !== "screen") continue;
+        if (item.system.carryState === "ready") {
+          await item.update({ "system.carryState": "carried" });
         }
       }
     }
