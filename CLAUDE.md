@@ -12,6 +12,16 @@ This file is read automatically by Claude Code at the start of every session. It
 - Outstanding issues and requests live in `notes.md`. Check it when looking for what to work on next.
 - The detailed phase plan is in `thePlan/` — consult it for design decisions, not as a task list.
 
+### Keeping this file (and AGENTS.md) current
+
+Both Claude Code and Codex work on this repo, so docs need to stay in sync or one agent will silently drift behind the other. After any session that modifies schema, sheets, data models, or migrations:
+
+- Update **CLAUDE.md** → Implementation status (Done list), Outstanding issues, Schema version & migration notes (if bumped).
+- Update **AGENTS.md** → Schema versioning, Current data model decisions, Things not to change (if a new invariant was set), Current next tasks.
+- Be specific — name the action, field, or version. Don't restate what the code already says; document *why*, *invariants*, and *cross-cutting effects*.
+- Prefix new bullets with the relevant version when applicable (`0.2.3 — …`) so future sessions can spot recent changes at a glance.
+- The agent that did the work owns the doc update before ending the session. If Rich did the work, Rich (or whichever agent he's talking to) updates the docs.
+
 ---
 
 ## Game rules summary (Basic Alpha Dawn)
@@ -113,7 +123,7 @@ The character sheet uses three custom icon tabs (Profile / Skills+Equipment / No
 - `submitOnChange: true` triggers a full re-render on input changes, which calls `_onRender` again, which re-applies the active-tab classes from `this._activeTab`. So tab selection sticks across edits.
 - `_activeTab` resets when the sheet closes; not yet persisted per-actor or per-user.
 
-Profile tab content: Physical Data, Medical Record, Weapons, Defenses+Energy column, Personal File. Skills+Equipment tab: split into separate Skills (Expanded only) and Equipment fieldsets. Notes tab: ProseMirror notes + the Expanded Rules notes textarea.
+Profile tab content: Physical Data, Medical Record, Weapons, Defenses, Personal File. Skills+Equipment tab: split into separate Skills (Expanded only) and Equipment fieldsets. Notes tab: ProseMirror notes + the Expanded Rules notes textarea. (The Energy Record fieldset was removed; see migration 0.2.3.)
 
 ### Roll API
 
@@ -227,6 +237,8 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - **Defense slots — Suit and Screen** — `system.defenses.suit` and `.screen` are item-id refs to the currently-worn `armor` / `screen`. Drop zones on the character sheet (`data-defense-slot="suit|screen"`) accept owned items (sets the ref) or external items (auto-creates a copy on the actor, then sets the ref). On drop, if `carryState === "stored"`, it auto-promotes to `"carried"`. Worn item shows as a chip with × clear button (`clearDefenseSlot` action). `#onDeleteItem` clears the ref if it pointed to the deleted item. Encumbrance is unaffected — `computeCarriedMass` already counted armor/screen via `carryState ∈ {ready, carried}` and both default to `"carried"`.
   - **Armor / Screen 2-state cycle** — `#onCycleCarryState` checks item type. Armor and screen cycle `carried ↔ stored` only (no `ready`). All other types keep the 3-state cycle. Schema choices on armor/screen still allow `"ready"` for backward-compat; migration 0.2.2 normalizes any stored `"ready"` to `"carried"`.
   - **Schema 0.2.2 migration** converts free-text `defenses.suit` / `.screen` values to item-id refs by resolving against `actor.items` — keeps the value if it points to a valid armor/screen, clears it otherwise. Also normalizes `carryState === "ready"` on armor/screen items to `"carried"` (world + actor-owned).
+  - **0.2.3 — Schema migration** removes the deprecated `system.energyRecord` field from character actors (world actors + unlinked-token character actors). Field is no longer in the schema; the migration cleans up stored data via the `system.-=energyRecord` deletion syntax.
+  - **0.2.3 — Race item sheet — racial abilities & bonus picks CRUD** (Codex; pending Rich's testing). The race item sheet now supports adding/removing racial-ability rows (`addRaceAbility` / `removeRaceAbility` actions) and bonus-pick rows (`addBonusPick` / `removeBonusPick`). Context provides `raceAbilityRows` and `bonusPickRows` arrays from `system.racialAbilities` / `system.bonusPicks`. New `bonusPickAppliesTo` choice set (`any` · `abilityPair`). New `ammoType` choices block (`rounds` · `seu`). Item sheet's `_onRender` is now `async` and calls `super._onRender` first. Note: behavior not yet validated by Rich at the time of this entry.
 
 ### Weapon data model (current)
 - `weaponType` choices: `melee` · `beam` · `projectile` · `gyrojet` · `grenade`
@@ -271,7 +283,7 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 ## Outstanding issues
 
 - **Variable SEU damage** — `variableSetting.current` is saved and read for ammo consumption, but there is no formula interpolation yet (e.g. firing at 3 SEU should do 3d10 for a laser pistol). Needs: injecting `seuSetting` into roll data so formulas like `@seuSetting`d10 work.
-- **Race item sheet** — "Key" field shows redundantly under Name; Name and Race are both shown (simplify); walking/running should display with "m" unit; hourly field should be hidden in Basic rules mode; hourly should display with "km" unit; auto-populate the linked pair field if empty (e.g. STR filled → STA auto-fills with same value unless overridden)
+- **Race item sheet (cosmetic / UX)** — "Key" field shows redundantly under Name; Name and Race are both shown (simplify); walking/running should display with "m" unit; hourly field should be hidden in Basic rules mode; hourly should display with "km" unit; auto-populate the linked pair field if empty (e.g. STR filled → STA auto-fills with same value unless overridden). Note: racial-abilities and bonus-picks CRUD already shipped in 0.2.3 — this entry is the *remaining* layout/UX cleanup, not the abilities work.
 - **Encumbrance indicator placement** — currently the Total Mass / Encumbered badge lives in the Equipment section header, but the underlying total counts weapons/armor/screens too. Easy to misread as "Equipment-section mass." Candidate fixes: relabel to "Total Mass" + relocate near Walking/Running, or add a per-section breakdown tooltip.
 - **Damage application from rolls** — when "Apply damage to target" exists, look up the target's `defenses.suit` / `.screen` refs to get the worn items, then inspect `armor.system.reductions[]` and `screen.system.defends` / `.reduction` against the weapon's `damageType` (Defense). Active screen consumes `seuPerHit` per absorbed strike. Not yet implemented.
 - **Linked weapon accessories (scopes, sights, etc.)** — parked. Three options sketched in `notes.md`: Active Effects (Rich's preference), drop-linked accessory items with structured modifier fields, or a hybrid. Defer until AE automation is stood up or a concrete need surfaces.

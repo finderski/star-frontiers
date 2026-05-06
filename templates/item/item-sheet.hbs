@@ -74,6 +74,85 @@
           <label><span>{{localize "STARFRONTIERS.Character.Running"}}</span><input type="number" name="system.movement.running" value="{{system.movement.running}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Character.Hourly"}}</span><input type="number" name="system.movement.hourly" value="{{system.movement.hourly}}" min="0" /></label>
         </div>
+
+        <div class="compact-grid race-traits-grid">
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Gliding"}}</span><input type="checkbox" name="system.gliding.available" {{checked system.gliding.available}} /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.MinStartHeight"}}</span><input type="number" name="system.gliding.minStartHeight" value="{{system.gliding.minStartHeight}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.ForbiddenBelow"}}</span><input type="number" name="system.gliding.forbiddenBelow" value="{{system.gliding.forbiddenBelow}}" min="0" step="0.1" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.ForbiddenAbove"}}</span><input type="number" name="system.gliding.forbiddenAbove" value="{{system.gliding.forbiddenAbove}}" min="0" step="0.1" /></label>
+
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.LightSensitivity"}}</span><input type="checkbox" name="system.lightSensitivity.affected" {{checked system.lightSensitivity.affected}} /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Penalty"}}</span><input type="number" name="system.lightSensitivity.penalty" value="{{system.lightSensitivity.penalty}}" /></label>
+
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Elasticity"}}</span><input type="checkbox" name="system.elasticity.available" {{checked system.elasticity.available}} /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.LimbsPerDexBucket"}}</span><input type="number" name="system.elasticity.limbsPerDexBucket" value="{{system.elasticity.limbsPerDexBucket}}" min="1" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.LimbGrowMinutes"}}</span><input type="number" name="system.elasticity.limbGrowMinutes" value="{{system.elasticity.limbGrowMinutes}}" min="0" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.MaxFiringLimbs"}}</span><input type="number" name="system.elasticity.maxFiringLimbs" value="{{system.elasticity.maxFiringLimbs}}" min="0" /></label>
+        </div>
+
+        <div class="race-editor-block">
+          <div class="race-editor-block__header">
+            <span>{{localize "STARFRONTIERS.Item.RacialAbilities"}}</span>
+            <button type="button" data-action="addRaceAbility">
+              <i class="fa-solid fa-plus"></i>
+              <span>{{localize "STARFRONTIERS.Item.AddRaceAbility"}}</span>
+            </button>
+          </div>
+          {{#if raceAbilityRows.length}}
+            <div class="race-ability-list">
+              {{#each raceAbilityRows as |ability index|}}
+                <div class="race-ability-row">
+                  <div class="compact-grid three-columns">
+                    <label><span>{{localize "STARFRONTIERS.Item.Label"}}</span><input type="text" name="system.racialAbilities.{{index}}.label" value="{{ability.label}}" /></label>
+                    <label><span>{{localize "STARFRONTIERS.Item.Key"}}</span><input type="text" name="system.racialAbilities.{{index}}.key" value="{{ability.key}}" /></label>
+                    <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Passive"}}</span><input type="checkbox" name="system.racialAbilities.{{index}}.isPassive" {{checked ability.isPassive}} /></label>
+                  </div>
+                  <label class="stacked">
+                    <span>{{localize "STARFRONTIERS.Item.Description"}}</span>
+                    <textarea name="system.racialAbilities.{{index}}.description">{{ability.description}}</textarea>
+                  </label>
+                  <div class="section-controls">
+                    <button type="button" data-action="removeRaceAbility" data-index="{{index}}">
+                      <i class="fa-solid fa-trash"></i>
+                      <span>{{localize "STARFRONTIERS.Item.RemoveRaceAbility"}}</span>
+                    </button>
+                  </div>
+                </div>
+              {{/each}}
+            </div>
+          {{else}}
+            <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoRaceAbilities"}}</p>
+          {{/if}}
+        </div>
+
+        <div class="race-editor-block">
+          <div class="race-editor-block__header">
+            <span>{{localize "STARFRONTIERS.Item.BonusPicks"}}</span>
+            <button type="button" data-action="addBonusPick">
+              <i class="fa-solid fa-plus"></i>
+              <span>{{localize "STARFRONTIERS.Item.AddBonusPick"}}</span>
+            </button>
+          </div>
+          {{#if bonusPickRows.length}}
+            <div class="race-bonus-list">
+              {{#each bonusPickRows as |pick index|}}
+                <div class="compact-grid four-columns race-bonus-row">
+                  <label><span>{{localize "STARFRONTIERS.Item.Amount"}}</span><input type="number" name="system.bonusPicks.{{index}}.amount" value="{{pick.amount}}" /></label>
+                  <label><span>{{localize "STARFRONTIERS.Item.Slots"}}</span><input type="number" name="system.bonusPicks.{{index}}.slots" value="{{pick.slots}}" min="0" /></label>
+                  <label><span>{{localize "STARFRONTIERS.Item.AppliesTo"}}</span><select name="system.bonusPicks.{{index}}.appliesTo">{{selectOptions @root.choices.bonusPickAppliesTo selected=pick.appliesTo}}</select></label>
+                  <div class="race-bonus-row__actions">
+                    <button type="button" data-action="removeBonusPick" data-index="{{index}}">
+                      <i class="fa-solid fa-trash"></i>
+                      <span>{{localize "STARFRONTIERS.Item.RemoveBonusPick"}}</span>
+                    </button>
+                  </div>
+                </div>
+              {{/each}}
+            </div>
+          {{else}}
+            <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoBonusPicks"}}</p>
+          {{/if}}
+        </div>
       </fieldset>
     {{/if}}
 

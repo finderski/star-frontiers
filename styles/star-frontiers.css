@@ -31,8 +31,7 @@
  *      8b. Medical Record fieldset
  *      8c. Weapons box (full-width)
  *      8d. Defenses (left column)
- *      8e. Energy Record
- *      8f. Personal File
+ *      8e. Personal File
  *   9. Character sheet — Skills & Equipment tab
  *      9a. Equipment grid + encumbrance summary
  *  10. Character sheet — Notes tab (Expanded rules notes)
@@ -313,6 +312,11 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   background: unset;
 }
 
+.star-frontiers-sheet prose-mirror .editor-content {
+  font-family: var(--input);
+  font-size: .85em;
+}
+
 
 /* =====================================================================
  * 4. Shared layout primitives
@@ -446,6 +450,7 @@ label.field-line,
 .item-name-button {
   border: 0;
   border-radius: 0;
+  cursor: grab;
   height: auto;
   justify-content: start;
   min-height: 24px;
@@ -453,6 +458,10 @@ label.field-line,
   padding: 0 4px;
   text-align: left;
   width: 100%;
+}
+
+.item-name-button:active {
+  cursor: grabbing;
 }
 
 .item-actions {
@@ -1204,7 +1213,7 @@ button.roll-label-main:focus-visible {
 }
 
 .paper-box.defenses-box.worn-defenses > legend {
-  font-size: 1em;
+  font-size: 1.25em;
 }
 
 .defense-lists {
@@ -1229,7 +1238,7 @@ button.roll-label-main:focus-visible {
 
 .defense-slot__label {
   font-family: var(--fieldset);
-  font-size: 1.25rem;
+  font-size: 1rem;
   line-height: 1;
   text-transform: uppercase;
 }
@@ -1243,12 +1252,16 @@ button.roll-label-main:focus-visible {
   background: var(--sf-button-hover);
   border: 1px solid var(--sf-line);
   border-radius: 3px;
-  cursor: pointer;
+  cursor: grab;
   font: inherit;
   font-family: var(--input);
   height: 28px;
   padding: 0 10px;
   text-align: left;
+}
+
+.defense-slot__chip:active {
+  cursor: grabbing;
 }
 
 .defense-slot__clear {
@@ -1260,14 +1273,7 @@ button.roll-label-main:focus-visible {
   width: 28px;
 }
 
-/* --- 8e. Energy Record --- */
-
-.energy-record textarea {
-  min-height: 185px;
-  width: 100%;
-}
-
-/* --- 8f. Personal File --- */
+/* --- 8e. Personal File --- */
 
 .personal-file {
   display: grid;
@@ -1662,6 +1668,58 @@ button.roll-label-main:focus-visible {
   height: 18px;
   justify-self: end;
   width: 18px;
+}
+
+.race-traits-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.race-editor-block {
+  border-top: 1px solid var(--sf-row-line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.race-editor-block__header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.race-editor-block__header > span {
+  font-family: var(--fieldset);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+
+.race-editor-block__empty {
+  color: var(--sf-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+.race-ability-list,
+.race-bonus-list {
+  display: grid;
+  gap: 12px;
+}
+
+.race-ability-row,
+.race-bonus-row {
+  border: 1px solid var(--sf-row-line);
+  padding: 10px;
+}
+
+.race-bonus-row {
+  align-items: end;
+}
+
+.race-bonus-row__actions {
+  align-self: end;
+  display: flex;
+  justify-content: flex-end;
 }
 
 

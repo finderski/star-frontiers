@@ -166,7 +166,6 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
           max: numberField({ initial: 0, min: 0 })
         })
       }),
-      energyRecord: htmlField(),
 
       credits: numberField({ initial: 0, min: 0 }),
       ledger: arrayField(schemaField({

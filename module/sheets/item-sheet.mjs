@@ -19,8 +19,12 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       submitOnChange: true
     },
     actions: {
+      addBonusPick: StarFrontiersItemSheet.#onAddBonusPick,
+      addRaceAbility: StarFrontiersItemSheet.#onAddRaceAbility,
       clearAmmo: StarFrontiersItemSheet.#onClearAmmo,
-      editImage: StarFrontiersItemSheet.#onEditImage
+      editImage: StarFrontiersItemSheet.#onEditImage,
+      removeBonusPick: StarFrontiersItemSheet.#onRemoveBonusPick,
+      removeRaceAbility: StarFrontiersItemSheet.#onRemoveRaceAbility
     }
   };
 
@@ -46,6 +50,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
     context.weaponUsesSeu = item.type === "weapon" && item.system.ammo?.uses === "seu";
+    context.raceAbilityRows = item.type === "race" ? Array.from(item.system.racialAbilities ?? []) : [];
+    context.bonusPickRows = item.type === "race" ? Array.from(item.system.bonusPicks ?? []) : [];
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
     context.choices = this.#prepareChoices();
@@ -76,6 +82,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       ability: this.#choices(["", "str", "sta", "dex", "rs", "int", "log", "per", "ldr"], "STARFRONTIERS.Ability"),
       ammoType: this.#choices(["rounds", "seu"], "STARFRONTIERS.Choice.AmmoType"),
       ammoUse: this.#choices(["seu", "rounds", "none"], "STARFRONTIERS.Choice.AmmoUse"),
+      bonusPickAppliesTo: this.#choices(["any", "abilityPair"], "STARFRONTIERS.Choice.BonusPickAppliesTo"),
       carryState: this.#choices(["ready", "carried", "stored"], "STARFRONTIERS.Choice.CarryState"),
       damageType: this.#choices(["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"], "STARFRONTIERS.Choice.DefenseType"),
       armorReduction: this.#choices(["", "half", "full", "flat"], "STARFRONTIERS.Choice.DefenseMode"),
@@ -166,5 +173,46 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
 
   static async #onClearAmmo(event, target) {
     await this.item.update({ "system.ammo.clipItem": "" });
+  }
+
+  static async #onAddRaceAbility(event, target) {
+    const current = Array.from(this.item.system.racialAbilities ?? []);
+    current.push({
+      key: "",
+      label: "",
+      description: "",
+      trainedAbilityRef: "",
+      effectId: "",
+      isPassive: true
+    });
+    await this.item.update({ "system.racialAbilities": current });
+  }
+
+  static async #onRemoveRaceAbility(event, target) {
+    target ??= event.currentTarget;
+    const index = Number(target.dataset.index ?? -1);
+    const current = Array.from(this.item.system.racialAbilities ?? []);
+    if (index < 0 || index >= current.length) return;
+    current.splice(index, 1);
+    await this.item.update({ "system.racialAbilities": current });
+  }
+
+  static async #onAddBonusPick(event, target) {
+    const current = Array.from(this.item.system.bonusPicks ?? []);
+    current.push({
+      amount: 0,
+      slots: 1,
+      appliesTo: "any"
+    });
+    await this.item.update({ "system.bonusPicks": current });
+  }
+
+  static async #onRemoveBonusPick(event, target) {
+    target ??= event.currentTarget;
+    const index = Number(target.dataset.index ?? -1);
+    const current = Array.from(this.item.system.bonusPicks ?? []);
+    if (index < 0 || index >= current.length) return;
+    current.splice(index, 1);
+    await this.item.update({ "system.bonusPicks": current });
   }
 }

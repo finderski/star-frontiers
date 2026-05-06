@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.2.2";
+export const CURRENT_SCHEMA_VERSION = "0.2.3";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -150,6 +150,27 @@ const MIGRATIONS = [
         if (item.type !== "armor" && item.type !== "screen") continue;
         if (item.system.carryState === "ready") {
           await item.update({ "system.carryState": "carried" });
+        }
+      }
+    }
+  },
+  {
+    version: "0.2.3",
+    description: "Remove deprecated character energyRecord field",
+    async migrate() {
+      for (const actor of game.actors) {
+        if (actor.type !== "character") continue;
+        if (foundry.utils.hasProperty(actor._source, "system.energyRecord")) {
+          await actor.update({ "system.-=energyRecord": null });
+        }
+      }
+
+      for (const scene of game.scenes) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor || tokenDoc.actor.type !== "character") continue;
+          if (foundry.utils.hasProperty(tokenDoc.actor._source, "system.energyRecord")) {
+            await tokenDoc.actor.update({ "system.-=energyRecord": null });
+          }
         }
       }
     }

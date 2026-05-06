@@ -108,6 +108,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         async: true
       }
     );
+    context.enrichedPersonalInjuries = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      actor.system.personalFile?.injuries ?? "",
+      {
+        secrets: actor.isOwner,
+        relativeTo: actor,
+        rollData: actor.getRollData?.() ?? {},
+        async: true
+      }
+    );
     return context;
   }
 
@@ -252,8 +261,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   async _onRender(context, options) {
     await super._onRender(context, options);
+    this._restoreScrollPosition();
     for (const input of this.element.querySelectorAll("[data-item-field], [data-item-ammo-loaded], [data-item-seu-dial]")) {
       input.addEventListener("change", this.#onItemFieldChange.bind(this));
+    }
+    for (const dragHandle of this.element.querySelectorAll("[data-item-drag]")) {
+      dragHandle.addEventListener("dragstart", this.#onItemDragStart.bind(this));
     }
     this.element.addEventListener("click", (event) => {
       if (!event.target.closest(".weapon-gear-wrap")) {
@@ -290,21 +303,61 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
   }
 
+  _getScrollElement() {
+    if (!this.element) return null;
+    if (this.element.matches?.(".star-frontiers-sheet")) return this.element;
+    return this.element.querySelector(".star-frontiers-sheet");
+  }
+
+  _rememberScrollPosition(renders = 3) {
+    const scrollEl = this._getScrollElement();
+    this._pendingScrollTop = scrollEl?.scrollTop ?? null;
+    this._pendingScrollRenders = this._pendingScrollTop === null ? 0 : Math.max(Number(renders) || 0, 1);
+  }
+
+  _restoreScrollPosition() {
+    if (
+      this._pendingScrollTop === null
+      || this._pendingScrollTop === undefined
+      || !this._pendingScrollRenders
+    ) return;
+
+    const scrollTop = this._pendingScrollTop;
+    const scrollEl = this._getScrollElement();
+    if (!scrollEl) return;
+
+    requestAnimationFrame(() => {
+      scrollEl.scrollTop = scrollTop;
+      this._pendingScrollRenders = Math.max((this._pendingScrollRenders ?? 1) - 1, 0);
+      if (!this._pendingScrollRenders) {
+        this._pendingScrollTop = null;
+      }
+    });
+  }
+
   async _onDropDocument(event, document) {
     const slotEl = event.target?.closest?.("[data-defense-slot]");
     if (slotEl && document.documentName === "Item") {
+      this._rememberScrollPosition();
       return this.#handleDefenseSlotDrop(event, document, slotEl.dataset.defenseSlot);
     }
 
     if (document.documentName === "Item" && document.type === "race") {
+      this._rememberScrollPosition();
       const race = await this.#ownRaceItem(document);
-      const updates = { "system.race": race.name };
-      if (StarFrontiersCharacterSheet.#isStatsInitialized(this.document)) {
-        Object.assign(updates, StarFrontiersCharacterSheet.#buildRaceApplicationUpdates(this.document, race));
-      }
+      const updates = {
+        "system.race": race.name,
+        ...StarFrontiersCharacterSheet.#buildRaceCharacterUpdates(this.document, race, {
+          applyStats: StarFrontiersCharacterSheet.#isStatsInitialized(this.document)
+        })
+      };
       await this.document.update(updates);
       ui.notifications.info(game.i18n.format("STARFRONTIERS.Character.RaceApplied", { name: race.name }));
       return race;
+    }
+
+    if (document.documentName === "Item") {
+      this._rememberScrollPosition();
     }
 
     return super._onDropDocument(event, document);
@@ -324,15 +377,27 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const itemData = document.toObject();
       delete itemData._id;
       [owned] = await this.document.createEmbeddedDocuments("Item", [itemData]);
+      this._rememberScrollPosition();
     }
     if (!owned) return null;
 
     if (owned.system.carryState === "stored") {
       await owned.update({ "system.carryState": "carried" });
+      this._rememberScrollPosition();
     }
 
     await this.document.update({ [`system.defenses.${slot}`]: owned.id });
     return owned;
+  }
+
+  #onItemDragStart(event) {
+    const target = event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item || !event.dataTransfer) return;
+
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = "copyMove";
+    event.dataTransfer.setData("text/plain", JSON.stringify(item.toDragData()));
   }
 
   _processFormData(event, form, formData) {
@@ -436,12 +501,16 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
+    this._rememberScrollPosition();
 
     const actor = this.document;
     const defenseUpdates = {};
     if (item.type === "armor" && actor.system.defenses?.suit === item.id) defenseUpdates["system.defenses.suit"] = "";
     if (item.type === "screen" && actor.system.defenses?.screen === item.id) defenseUpdates["system.defenses.screen"] = "";
-    if (Object.keys(defenseUpdates).length) await actor.update(defenseUpdates);
+    if (Object.keys(defenseUpdates).length) {
+      await actor.update(defenseUpdates);
+      this._rememberScrollPosition();
+    }
 
     await item.delete();
   }
@@ -450,6 +519,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target ??= event.currentTarget;
     const slot = target.dataset.slot;
     if (slot !== "suit" && slot !== "screen") return;
+    this._rememberScrollPosition();
     await this.document.update({ [`system.defenses.${slot}`]: "" });
   }
 
@@ -484,6 +554,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
+    this._rememberScrollPosition();
 
     const twoState = item.type === "armor" || item.type === "screen";
     const states = twoState ? ["carried", "stored"] : ["ready", "carried", "stored"];
@@ -493,6 +564,16 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const next = states[((idx === -1 ? fallbackIndex : idx) + 1) % states.length];
 
     await item.update({ "system.carryState": next });
+
+    if (twoState && next === "stored") {
+      const actor = this.document;
+      const defensePath = item.type === "armor" ? "system.defenses.suit" : "system.defenses.screen";
+      const equippedId = foundry.utils.getProperty(actor, defensePath);
+      if (equippedId === item.id) {
+        this._rememberScrollPosition();
+        await actor.update({ [defensePath]: "" });
+      }
+    }
   }
 
   static async #onReloadWeapon(event, target) {
@@ -500,6 +581,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const actor = this.document;
     const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(actor, target);
     if (!weapon) return;
+    this._rememberScrollPosition();
 
     const sourceAmmo = await StarFrontiersCharacterSheet.#resolveReloadSource(actor, weapon);
     if (!sourceAmmo) return;
@@ -515,6 +597,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
 
     await weapon.update(updates);
+    this._rememberScrollPosition();
     await sourceAmmo.update({ "system.quantity": sourceQty - 1 });
 
     ui.notifications.info(game.i18n.format("STARFRONTIERS.Weapon.Reloaded", {
@@ -890,6 +973,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const target = event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
+    this._rememberScrollPosition();
 
     if (target.dataset.itemAmmoLoaded !== undefined) {
       const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(this.document, item);
@@ -919,6 +1003,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   async #ownRaceItem(document) {
     if (document.parent === this.document) return document;
+
+    const existing = this.document.items.find((item) => {
+      if (item.type !== "race") return false;
+      if (item.name === document.name) return true;
+      const existingKey = String(item.system?.key ?? "").trim().toLowerCase();
+      const incomingKey = String(document.system?.key ?? "").trim().toLowerCase();
+      return existingKey && incomingKey && existingKey === incomingKey;
+    });
+    if (existing) return existing;
 
     const source = document.toObject();
     delete source._id;
@@ -962,8 +1055,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       return;
     }
 
-    if (raceChanged && statsInitialized) {
-      const updates = StarFrontiersCharacterSheet.#buildRaceApplicationUpdates(actor, selectedRace);
+    if (raceChanged) {
+      const updates = StarFrontiersCharacterSheet.#buildRaceCharacterUpdates(actor, selectedRace, {
+        applyStats: statsInitialized
+      });
       for (const [path, value] of Object.entries(updates)) {
         foundry.utils.setProperty(data, path, value);
       }
@@ -1225,6 +1320,16 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return game.i18n.localize(`STARFRONTIERS.Choice.DefenseType.${value}`);
   }
 
+  static #buildRaceCharacterUpdates(actor, race, { applyStats = false } = {}) {
+    const updates = {};
+    updates["system.personalFile.racialAbilities"] = StarFrontiersCharacterSheet.#buildRaceAbilitySummary(race);
+
+    if (!applyStats) return updates;
+
+    Object.assign(updates, StarFrontiersCharacterSheet.#buildRaceApplicationUpdates(actor, race));
+    return updates;
+  }
+
   static #buildRaceApplicationUpdates(actor, race) {
     const updates = {
       "system.charGen.statsInitialized": true
@@ -1248,6 +1353,83 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
 
     return updates;
+  }
+
+  static #buildRaceAbilitySummary(race) {
+    if (!race?.system) return "";
+
+    const lines = [];
+    for (const ability of Array.from(race.system.racialAbilities ?? [])) {
+      const label = String(ability.label || StarFrontiersCharacterSheet.#humanizeKey(ability.key)).trim();
+      const desc = StarFrontiersCharacterSheet.#plainTextFromHtml(ability.description);
+      const mode = ability.isPassive === false
+        ? game.i18n.localize("STARFRONTIERS.Character.Active-abbr")
+        : "";
+
+      if (!label && !desc) continue;
+      const prefix = label || game.i18n.localize("STARFRONTIERS.Character.RacialAbility");
+      const suffix = mode ? ` (${mode})` : "";
+      lines.push(desc ? `${prefix}${suffix}: ${desc}` : `${prefix}${suffix}`);
+    }
+
+    if (race.system.gliding?.available) {
+      lines.push(game.i18n.format("STARFRONTIERS.Character.RacialAbilityGliding", {
+        minStartHeight: race.system.gliding.minStartHeight ?? 0,
+        forbiddenBelow: race.system.gliding.forbiddenBelow ?? 0,
+        forbiddenAbove: race.system.gliding.forbiddenAbove ?? 0
+      }));
+    }
+
+    if (race.system.lightSensitivity?.affected) {
+      const mitigations = Array.from(race.system.lightSensitivity.mitigations ?? []);
+      const mitigationText = mitigations.length
+        ? game.i18n.format("STARFRONTIERS.Character.RacialAbilityMitigations", {
+            mitigations: mitigations.join(", ")
+          })
+        : "";
+      lines.push(game.i18n.format("STARFRONTIERS.Character.RacialAbilityLightSensitivity", {
+        penalty: race.system.lightSensitivity.penalty ?? 0,
+        mitigations: mitigationText
+      }).trim());
+    }
+
+    if (race.system.elasticity?.available) {
+      lines.push(game.i18n.format("STARFRONTIERS.Character.RacialAbilityElasticity", {
+        limbsPerDexBucket: race.system.elasticity.limbsPerDexBucket ?? 0,
+        limbGrowMinutes: race.system.elasticity.limbGrowMinutes ?? 0,
+        maxFiringLimbs: race.system.elasticity.maxFiringLimbs ?? 0
+      }));
+    }
+
+    for (const pick of Array.from(race.system.bonusPicks ?? [])) {
+      if (!pick) continue;
+      lines.push(game.i18n.format("STARFRONTIERS.Character.RacialAbilityBonusPick", {
+        amount: pick.amount ?? 0,
+        slots: pick.slots ?? 0,
+        appliesTo: game.i18n.localize(`STARFRONTIERS.Choice.BonusPickAppliesTo.${pick.appliesTo || "any"}`)
+      }));
+    }
+
+    return lines.join("\n");
+  }
+
+  static #plainTextFromHtml(value) {
+    return String(value ?? "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim();
+  }
+
+  static #humanizeKey(value) {
+    return String(value ?? "")
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (match) => match.toUpperCase());
   }
 
   static #isAbilityInitialized(actor, key) {
