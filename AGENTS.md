@@ -104,7 +104,7 @@
 
 ## Schema versioning
 
-- Current schema version: **0.2.2** (stored in world setting `schemaVersion`).
+- Current schema version: **0.2.3** (stored in world setting `schemaVersion`).
 - Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
 - During development (pre-1.0), prefer patch bumps (`0.2.0 → 0.2.1`) for incremental schema fixes rather than jumping minor versions. Reserve minor bumps for end-of-phase milestones.
 - **0.2.0** — removes per-weapon range band `mod` fields and per-document `rulesEdition` fields; remaps old `weaponType` / `ammo.uses` values to the current choices.
@@ -134,6 +134,13 @@
 - If stats already exist, racial modifiers are applied from base scores to final scores.
 - Changing race later should recalculate from `base`, not stack modifiers repeatedly.
 - Movement (`walking`, `running`, `hourly`) is derived from the selected/owned race item when possible, with config fallback.
+- Race item modifiers are now authored as **four paired bonuses** (`str`, `dex`, `int`, `per`) plus optional `im`. Secondary fields (`sta`, `rs`, `log`, `ldr`) remain in schema only for backward compatibility and should not be treated as the live authoring model.
+- `IM` is derived as `ceil(RS / 10) + race.system.modifiers.im`. It is not a separate stored actor stat.
+- `race.system.racialAbilityRefs` is the active link model for race-authored special abilities. It stores refs/UUIDs to `trainedAbility` items, which are presented in the UI as **Racial Ability** items.
+- `system.charGen.raceBonusSelections` stores Expanded-rules race bonus-pick choices as one entry per granted slot (`sourceIndex`, `slot`, `amount`, `appliesTo`, `ability`). This is the source of truth for Human-style single-ability boosts.
+- In **Expanded** rules, dropping a race imports linked racial-ability items onto the actor (owned `trainedAbility` items stamped with `system.raceKey`) and fills `system.personalFile.racialAbilities` from those linked items plus bonus-pick text.
+- In **Expanded** rules, dropping a race also prompts for any configured bonus-pick slots, stores the selections on the actor, and applies them on top of paired race modifiers during stat generation, race changes, and manual base-score back-calculation.
+- In **Basic** rules, race drops still apply name/movement/stat mods, but do **not** populate `system.personalFile.racialAbilities`, and existing race-keyed racial-ability items from the previous race are cleaned up on drop.
 
 ### Weapon/ammo
 - Weapon rows on the character sheet display **loaded ammo**, not spent ammo.
@@ -192,6 +199,18 @@
 - `rulesEdition` is a **world setting only** — it is never stored per-document. All code reads `game.settings.get(SYSTEM_ID, “rulesEdition”)`. Do not add per-document rulesEdition fields.
 - Item sheet header image: rendered as a CSS `mask-image` over a `<div>` (not an `<img>`), so the icon color tracks `--sf-ink` and adapts automatically to both paper and retro themes. Clicking opens a FilePicker via the `editImage` action.
 - Default icons per item type are set by a `preCreateItem` hook in `star-frontiers.mjs` using Foundry built-in SVGs (e.g. `icons/svg/sword.svg` for weapons).
+- Race item sheets:
+  - label the header field as **Race**, not Name
+  - do **not** show the `system.key` field in the UI
+  - author racial stat modifiers as four paired fields (`STR/STA`, `DEX/RS`, `INT/LOG`, `PER/LDR`) plus optional `IM`
+  - keep movement fields, bonus-pick rows, and a multi-link drop zone/list for racial abilities
+  - do **not** expose the old gliding/light-sensitivity/elasticity structured controls anymore; those remain hidden compatibility fields for old data only
+- `trainedAbility` is still the internal item type name, but the UI now calls it **Racial Ability**. Do not rename the underlying type without a migration plan.
+- Racial Ability item sheets:
+  - label the header field as **Racial Ability**
+  - do **not** show `system.key`
+  - do **not** show `system.raceKey` (it is managed by race-drop/import logic, not by hand)
+  - currently expose `description`, `baseChance`, `currentChance`, `cap`, and `xpPerPoint`
 - Weapon item sheets:
   - have no extra generic “button row”; the **weapon name** on the actor sheet is the attack trigger
   - support linked ammo drop onto the ammo drop zone (`system.ammo.clipItem` is set; `uses` is NOT forced by the drop — the GM sets it via the dropdown)
@@ -229,10 +248,12 @@
 - Top section is functional:
   - stat generation button
   - race drag/drop updates race and derived movement
+  - Expanded race drag/drop also imports linked racial abilities and updates the `Racial Abilities` character section
 - Stat generation:
   - rolls d100 per paired stat
   - translates using the Alpha Dawn table
   - applies racial modifiers if race is already set
+  - applies optional race `IM` bonus to the derived initiative modifier
   - posts a chat card with raw roll and translated result
 - Physical Data section (Profile tab):
   - stat labels themselves are clickable roll controls
@@ -272,8 +293,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Damage application (new):
   - "Apply damage to target" workflow — read target's `defenses.suit` / `.screen` refs, inspect `armor.system.reductions[]` and `screen.system.defends` / `.reduction` against the weapon's `damageType` (Defense), consume `screen.system.seuPerHit` per absorbed strike. Not yet implemented; defense slot data is already in place to support it.
 - Races:
-  - race item sheet: remove redundant Key display, hide Hourly in Basic mode, autofill paired modifiers
-  - add real editing/support for racial special abilities
+  - decide whether race movement should hide `Hourly` in Basic mode or just remain visible as worldbuilding data
+  - decide whether `currentChance` should remain author-editable on Racial Ability items or move to actor-owned/runtime-only handling later
+  - decide whether the Racial Ability sheet needs an explicit passive/always-on concept versus relying on description + future Active Effects
 - Equipment / encumbrance:
   - decide whether to relocate the Total Mass / Encumbered indicator out of the Equipment section header (it counts weapons + armor + screens too, so the placement misleads)
   - per-section breakdown tooltip (weapons / armor / screens / equipment) is a nice-to-have if relocation isn't enough
@@ -290,6 +312,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not remove the world setting distinction between Basic and Expanded rules.
 - Do not add per-document `rulesEdition` fields; this was intentionally removed — the world setting is the sole source.
 - Do not replace the current theme model (paper vs retro) with template forks unless explicitly decided.
+- Do not treat race secondary modifiers (`sta`, `rs`, `log`, `ldr`) as active authoring fields anymore. The supported race-authoring model is paired modifiers plus optional `im`; human/special-case single-stat tweaks belong in bonus-pick handling.
 - Do not move ammo depletion to the ammo item itself; current logic tracks per-shot depletion on the weapon via `system.ammo.consumed`. Ammo `system.quantity` tracks **spare containers**, which is a different concept.
 - Do not store range band modifiers on weapon items; they are the `RANGE_BAND_MODS` constant in `character-sheet.mjs` and must not be stored in the database or on weapon documents.
 - Do not treat the current weapon attack formulas as permanently settled; verify them before broadening automation.

@@ -20,11 +20,10 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     },
     actions: {
       addBonusPick: StarFrontiersItemSheet.#onAddBonusPick,
-      addRaceAbility: StarFrontiersItemSheet.#onAddRaceAbility,
       clearAmmo: StarFrontiersItemSheet.#onClearAmmo,
       editImage: StarFrontiersItemSheet.#onEditImage,
       removeBonusPick: StarFrontiersItemSheet.#onRemoveBonusPick,
-      removeRaceAbility: StarFrontiersItemSheet.#onRemoveRaceAbility
+      removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility
     }
   };
 
@@ -45,12 +44,17 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.is = Object.fromEntries(Object.keys(ITEM_TYPE_LABELS).map((type) => [type, item.type === type]));
     context.rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
     context.expandedRules = context.rulesEdition === "expanded";
-    context.showKey = ["race", "skill", "trainedAbility"].includes(item.type);
+    context.nameLabel = item.type === "race"
+      ? "STARFRONTIERS.Item.Race"
+      : item.type === "trainedAbility"
+        ? "STARFRONTIERS.Item.RacialAbility"
+        : "STARFRONTIERS.Item.Name";
+    context.showKey = ["skill"].includes(item.type);
     context.showCost = !["race", "skill", "trainedAbility"].includes(item.type);
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
     context.weaponUsesSeu = item.type === "weapon" && item.system.ammo?.uses === "seu";
-    context.raceAbilityRows = item.type === "race" ? Array.from(item.system.racialAbilities ?? []) : [];
+    context.linkedRacialAbilities = item.type === "race" ? await this.#resolveLinkedRacialAbilities(item) : [];
     context.bonusPickRows = item.type === "race" ? Array.from(item.system.bonusPicks ?? []) : [];
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
@@ -124,6 +128,23 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   }
 
   async _onDropDocument(event, document) {
+    if (this.item.type === "race" && document.documentName === "Item" && document.type === "trainedAbility") {
+      const sameActor = document.parent && document.parent === this.item.parent;
+      const ref = sameActor ? document.id : document.uuid;
+      const current = Array.from(this.item.system.racialAbilityRefs ?? []);
+      if (!current.includes(ref)) {
+        current.push(ref);
+        await this.item.update({ "system.racialAbilityRefs": current });
+      }
+      ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.RacialAbilityLinked", { name: document.name }));
+      return document;
+    }
+
+    if (this.item.type === "race" && document.documentName === "Item") {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropRacialAbilityOnly"));
+      return null;
+    }
+
     if (this.item.type === "weapon" && document.documentName === "Item" && document.type === "ammo") {
       const sameActor = document.parent && document.parent === this.item.parent;
       const ref = sameActor ? document.id : document.uuid;
@@ -160,6 +181,32 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     }
   }
 
+  async #resolveLinkedRacialAbilities(item) {
+    if (item.type !== "race") return [];
+    const refs = Array.from(item.system.racialAbilityRefs ?? []);
+    const abilities = [];
+
+    for (const ref of refs) {
+      let doc = item.actor?.items?.get(ref) ?? game.items?.get(ref) ?? null;
+      if (!doc && globalThis.fromUuid) {
+        try {
+          doc = await globalThis.fromUuid(ref);
+        } catch {
+          doc = null;
+        }
+      }
+
+      if (!doc || doc.type !== "trainedAbility") continue;
+      abilities.push({
+        id: ref,
+        name: doc.name,
+        description: doc.system?.description ?? ""
+      });
+    }
+
+    return abilities;
+  }
+
   static async #onEditImage(event, target) {
     const fp = new FilePicker({
       type: "image",
@@ -175,26 +222,14 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     await this.item.update({ "system.ammo.clipItem": "" });
   }
 
-  static async #onAddRaceAbility(event, target) {
-    const current = Array.from(this.item.system.racialAbilities ?? []);
-    current.push({
-      key: "",
-      label: "",
-      description: "",
-      trainedAbilityRef: "",
-      effectId: "",
-      isPassive: true
-    });
-    await this.item.update({ "system.racialAbilities": current });
-  }
-
-  static async #onRemoveRaceAbility(event, target) {
+  static async #onRemoveLinkedRaceAbility(event, target) {
     target ??= event.currentTarget;
-    const index = Number(target.dataset.index ?? -1);
-    const current = Array.from(this.item.system.racialAbilities ?? []);
-    if (index < 0 || index >= current.length) return;
-    current.splice(index, 1);
-    await this.item.update({ "system.racialAbilities": current });
+    const ref = target.dataset.ref ?? "";
+    if (!ref) return;
+    const current = Array.from(this.item.system.racialAbilityRefs ?? []);
+    await this.item.update({
+      "system.racialAbilityRefs": current.filter((entry) => entry !== ref)
+    });
   }
 
   static async #onAddBonusPick(event, target) {

@@ -194,7 +194,14 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
 
       charGen: schemaField({
         statsInitialized: boolField(),
-        statsGenerated: boolField()
+        statsGenerated: boolField(),
+        raceBonusSelections: arrayField(schemaField({
+          sourceIndex: numberField({ initial: 0, min: 0 }),
+          slot: numberField({ initial: 0, min: 0 }),
+          amount: numberField({ initial: 0 }),
+          appliesTo: textField({ initial: "any", choices: ["any", "abilityPair"] }),
+          ability: textField({ initial: "", choices: ["", "str", "sta", "dex", "rs", "int", "log", "per", "ldr"] })
+        }))
       }),
 
       warnings: arrayField(warningField())
@@ -217,6 +224,7 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
       ?? CONFIG.SF?.raceMovement?.[raceItem?.system?.key]
       ?? CONFIG.SF?.raceMovement?.[raceKeyFrom(this.race)]
       ?? CONFIG.SF?.raceMovement?.human;
+    const raceInitiativeMod = Number(raceItem?.system?.modifiers?.im ?? 0);
 
     const baseWalking = raceMovement?.walking ?? 2;
     const baseRunning = raceMovement?.running ?? 6;
@@ -230,6 +238,7 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
     this.derived.walking = Math.floor(baseWalking * movementFactor);
     this.derived.running = Math.floor(baseRunning * movementFactor);
     this.derived.hourly = Math.floor(baseHourly * movementFactor);
+    this.derived.initiativeMod = Math.max(Math.ceil((abilities.rs.value || 0) / 10) + raceInitiativeMod, 0);
 
     this.stamina.max = Math.max(0, abilities.sta.value + this.stamina.temp);
     this.stamina.value = clamp(this.stamina.value, Math.min(0, this.stamina.value), this.stamina.max);

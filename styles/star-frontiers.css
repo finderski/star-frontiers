@@ -1670,8 +1670,8 @@ button.roll-label-main:focus-visible {
   width: 18px;
 }
 
-.race-traits-grid {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+.race-modifier-grid {
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
 }
 
 .race-editor-block {
@@ -1700,20 +1700,65 @@ button.roll-label-main:focus-visible {
   margin: 0;
 }
 
-.race-ability-list,
+.linked-ability-drop-zone {
+  align-items: center;
+  border: 1px dashed var(--sf-line);
+  color: var(--sf-muted);
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.linked-ability-list,
 .race-bonus-list {
   display: grid;
   gap: 12px;
 }
 
-.race-ability-row,
+.linked-ability-row,
 .race-bonus-row {
+  align-items: start;
   border: 1px solid var(--sf-row-line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
   padding: 10px;
+}
+
+.linked-ability-row__body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.linked-ability-row__body > strong {
+  color: var(--sf-ink);
+  font-family: var(--fieldset);
+  font-size: 0.9rem;
+}
+
+.linked-ability-row__description {
+  color: var(--sf-muted);
+  font-size: 0.95rem;
+}
+
+.linked-ability-row__description > :first-child {
+  margin-top: 0;
+}
+
+.linked-ability-row__description > :last-child {
+  margin-bottom: 0;
+}
+
+.linked-ability-row > button {
+  align-self: center;
 }
 
 .race-bonus-row {
   align-items: end;
+  display: grid;
 }
 
 .race-bonus-row__actions {

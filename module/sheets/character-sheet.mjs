@@ -344,11 +344,28 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     if (document.documentName === "Item" && document.type === "race") {
       this._rememberScrollPosition();
+      const previousRace = StarFrontiersCharacterSheet.#getSelectedRace(this.document);
       const race = await this.#ownRaceItem(document);
+      const sameRace = previousRace && StarFrontiersCharacterSheet.#raceLinkKey(previousRace) === StarFrontiersCharacterSheet.#raceLinkKey(race);
+      const raceBonusSelections = await StarFrontiersCharacterSheet.#promptRaceBonusSelections(
+        this.document,
+        race,
+        sameRace ? (this.document.system.charGen?.raceBonusSelections ?? []) : []
+      );
+      if (raceBonusSelections === null) return null;
+      await StarFrontiersCharacterSheet.#syncRaceLinkedAbilities(this.document, race, previousRace);
+      this._rememberScrollPosition();
+      const racialAbilitySummary = await StarFrontiersCharacterSheet.#buildRaceAbilitySummaryAsync(
+        this.document,
+        race,
+        raceBonusSelections
+      );
       const updates = {
         "system.race": race.name,
         ...StarFrontiersCharacterSheet.#buildRaceCharacterUpdates(this.document, race, {
-          applyStats: StarFrontiersCharacterSheet.#isStatsInitialized(this.document)
+          applyStats: StarFrontiersCharacterSheet.#isStatsInitialized(this.document),
+          racialAbilitySummary,
+          raceBonusSelections
         })
       };
       await this.document.update(updates);
@@ -441,6 +458,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static async #onGenerateStats(event, target) {
     const actor = this.document;
     const race = StarFrontiersCharacterSheet.#getSelectedRace(actor);
+    const raceBonusMap = StarFrontiersCharacterSheet.#getRaceBonusMap(
+      race,
+      actor.system.charGen?.raceBonusSelections ?? []
+    );
 
     if (StarFrontiersCharacterSheet.#isStatsInitialized(actor)) {
       const replace = await foundry.applications.api.DialogV2.confirm({
@@ -461,8 +482,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     for (const [primary, secondary] of ABILITY_PAIRS) {
       const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
       const base = StarFrontiersCharacterSheet.#translateAbilityRoll(roll.total);
-      const primaryValue = StarFrontiersCharacterSheet.#clampAbility(base + StarFrontiersCharacterSheet.#raceModifier(race, primary));
-      const secondaryValue = StarFrontiersCharacterSheet.#clampAbility(base + StarFrontiersCharacterSheet.#raceModifier(race, secondary));
+      const primaryValue = StarFrontiersCharacterSheet.#clampAbility(
+        base + StarFrontiersCharacterSheet.#raceModifier(race, primary) + raceBonusMap[primary]
+      );
+      const secondaryValue = StarFrontiersCharacterSheet.#clampAbility(
+        base + StarFrontiersCharacterSheet.#raceModifier(race, secondary) + raceBonusMap[secondary]
+      );
 
       updates[`system.abilities.${primary}.base`] = base;
       updates[`system.abilities.${primary}.initialized`] = true;
@@ -480,7 +505,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
 
     const rsValue = updates["system.abilities.rs.value"];
-    const initiativeMod = Math.ceil(rsValue / 10);
+    const initiativeMod = Math.max(
+      Math.ceil(rsValue / 10) + StarFrontiersCharacterSheet.#raceInitiativeModifier(race),
+      0
+    );
 
     updates["system.stamina.value"] = updates["system.abilities.sta.value"];
     updates["system.stamina.max"] = updates["system.abilities.sta.value"];
@@ -491,7 +519,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     await actor.update(updates);
     await StarFrontiersCharacterSheet.#createStatsChatMessage(actor, results, {
       initiativeMod,
-      rsValue,
+      initiativeSource: StarFrontiersCharacterSheet.#formatInitiativeSource(rsValue, race),
       race
     });
     ui.notifications.info(game.i18n.localize("STARFRONTIERS.Character.StatsGenerated"));
@@ -1023,6 +1051,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const actor = this.actor ?? this.document;
     const submittedRaceValue = foundry.utils.getProperty(data, "system.race") ?? actor.system.race;
     const selectedRace = StarFrontiersCharacterSheet.#getSelectedRace(actor, submittedRaceValue);
+    const raceBonusSelections = foundry.utils.getProperty(data, "system.charGen.raceBonusSelections")
+      ?? actor.system.charGen?.raceBonusSelections
+      ?? [];
+    const raceBonusMap = StarFrontiersCharacterSheet.#getRaceBonusMap(selectedRace, raceBonusSelections);
     const statsInitialized = StarFrontiersCharacterSheet.#isStatsInitialized(actor);
     const manualAbilityChange = ABILITY_KEYS.some((key) => {
       const submitted = foundry.utils.getProperty(data, `system.abilities.${key}.value`);
@@ -1041,7 +1073,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
         const value = StarFrontiersCharacterSheet.#clampAbility(Number(submitted) || 0);
         const base = StarFrontiersCharacterSheet.#clampAbility(
-          value - StarFrontiersCharacterSheet.#raceModifier(selectedRace, key)
+          value - StarFrontiersCharacterSheet.#raceModifier(selectedRace, key) - (raceBonusMap[key] ?? 0)
         );
 
         foundry.utils.setProperty(data, valuePath, value);
@@ -1057,7 +1089,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     if (raceChanged) {
       const updates = StarFrontiersCharacterSheet.#buildRaceCharacterUpdates(actor, selectedRace, {
-        applyStats: statsInitialized
+        applyStats: statsInitialized,
+        raceBonusSelections
       });
       for (const [path, value] of Object.entries(updates)) {
         foundry.utils.setProperty(data, path, value);
@@ -1077,16 +1110,151 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       ?? null;
   }
 
+  static #racePairKeyForAbility(ability) {
+    return ABILITY_PAIRS.find((pair) => pair.includes(ability))?.[0] ?? ability;
+  }
+
   static #raceModifier(race, ability) {
     const modifiers = race?.system?.modifiers;
     if (!modifiers) return 0;
-    if (game.settings.get(SYSTEM_ID, "rulesEdition") === "expanded") return Number(modifiers[ability] ?? 0);
+    return Number(modifiers[StarFrontiersCharacterSheet.#racePairKeyForAbility(ability)] ?? 0);
+  }
 
-    const direct = modifiers[ability];
-    if (direct !== undefined && direct !== null && direct !== 0) return Number(direct);
+  static #raceInitiativeModifier(race) {
+    return Number(race?.system?.modifiers?.im ?? 0);
+  }
 
-    const pairPrimary = ABILITY_PAIRS.find((pair) => pair.includes(ability))?.[0];
-    return Number(modifiers[pairPrimary] ?? 0);
+  static #formatInitiativeSource(rsValue, race) {
+    const bonus = StarFrontiersCharacterSheet.#raceInitiativeModifier(race);
+    if (!bonus) return `${rsValue}/10`;
+    return `${rsValue}/10 ${bonus >= 0 ? "+" : "-"} ${Math.abs(bonus)}`;
+  }
+
+  static #emptyBonusMap() {
+    return Object.fromEntries(ABILITY_KEYS.map((key) => [key, 0]));
+  }
+
+  static #getRaceBonusMap(race, selections = []) {
+    const bonusMap = StarFrontiersCharacterSheet.#emptyBonusMap();
+    if (!race || game.settings.get(SYSTEM_ID, "rulesEdition") !== "expanded") return bonusMap;
+
+    for (const selection of Array.from(selections ?? [])) {
+      const amount = Number(selection?.amount ?? 0);
+      const ability = String(selection?.ability ?? "");
+      if (!amount || !ability) continue;
+
+      if (selection.appliesTo === "abilityPair") {
+        const pair = ABILITY_PAIRS.find(([primary]) => primary === ability);
+        if (!pair) continue;
+        bonusMap[pair[0]] += amount;
+        bonusMap[pair[1]] += amount;
+        continue;
+      }
+
+      if (!Object.hasOwn(bonusMap, ability)) continue;
+      bonusMap[ability] += amount;
+    }
+
+    return bonusMap;
+  }
+
+  static #formatBonusSelectionTarget(selection) {
+    if (!selection?.ability) return "";
+    if (selection.appliesTo === "abilityPair") {
+      const key = StarFrontiersCharacterSheet.#racePairKeyForAbility(selection.ability);
+      return game.i18n.localize(ABILITY_PAIR_LABELS[key] ?? `STARFRONTIERS.Ability.${selection.ability}`);
+    }
+    return game.i18n.localize(`STARFRONTIERS.Ability.${selection.ability}`);
+  }
+
+  static async #promptRaceBonusSelections(actor, race, existingSelections = []) {
+    if (game.settings.get(SYSTEM_ID, "rulesEdition") !== "expanded") return [];
+
+    const prompts = [];
+    for (const [sourceIndex, pick] of Array.from(race?.system?.bonusPicks ?? []).entries()) {
+      const slots = Number(pick?.slots ?? 0);
+      const amount = Number(pick?.amount ?? 0);
+      if (slots <= 0 || !amount) continue;
+      for (let slot = 0; slot < slots; slot += 1) {
+        prompts.push({
+          sourceIndex,
+          slot,
+          amount,
+          appliesTo: pick.appliesTo || "any"
+        });
+      }
+    }
+
+    if (!prompts.length) return [];
+
+    const existingMap = new Map(
+      Array.from(existingSelections ?? []).map((selection) => [
+        `${selection.sourceIndex}:${selection.slot}`,
+        selection
+      ])
+    );
+
+    const content = prompts.map((prompt, index) => {
+      const existing = existingMap.get(`${prompt.sourceIndex}:${prompt.slot}`);
+      const defaultAbility = existing?.ability
+        ?? (prompt.appliesTo === "abilityPair" ? "str" : "str");
+      const optionValues = prompt.appliesTo === "abilityPair"
+        ? ["str", "dex", "int", "per"]
+        : ABILITY_KEYS;
+      const options = optionValues.map((value) => {
+        const label = prompt.appliesTo === "abilityPair"
+          ? game.i18n.localize(ABILITY_PAIR_LABELS[value])
+          : game.i18n.localize(`STARFRONTIERS.Ability.${value}`);
+        const selected = value === defaultAbility ? " selected" : "";
+        return `<option value="${value}"${selected}>${label}</option>`;
+      }).join("");
+      const label = prompt.appliesTo === "abilityPair"
+        ? game.i18n.format("STARFRONTIERS.Character.RaceBonusChoicePair", { index: index + 1 })
+        : game.i18n.format("STARFRONTIERS.Character.RaceBonusChoiceSingle", { index: index + 1 });
+      const amountLabel = game.i18n.format("STARFRONTIERS.Character.Value-abbr", { value: amount });
+
+      return `
+        <label class="dialog-field">
+          <span>${label} (${amountLabel})</span>
+          <select name="race-bonus-${index}">${options}</select>
+        </label>
+      `;
+    }).join("");
+
+    return foundry.applications.api.DialogV2.wait({
+      window: {
+        title: game.i18n.format("STARFRONTIERS.Character.RaceBonusChoiceTitle", {
+          name: race?.name ?? actor.name
+        })
+      },
+      content: `
+        <p>${game.i18n.localize("STARFRONTIERS.Character.RaceBonusChoicePrompt")}</p>
+        ${content}
+      `,
+      buttons: [
+        {
+          action: "apply",
+          label: game.i18n.localize("STARFRONTIERS.Character.RaceBonusChoiceSave"),
+          default: true,
+          callback: (event, button) => {
+            const form = button.form;
+            return prompts.map((prompt, index) => ({
+              sourceIndex: prompt.sourceIndex,
+              slot: prompt.slot,
+              amount: prompt.amount,
+              appliesTo: prompt.appliesTo,
+              ability: form.elements[`race-bonus-${index}`]?.value || ""
+            }));
+          }
+        },
+        {
+          action: "cancel",
+          label: game.i18n.localize("Cancel")
+        }
+      ],
+      modal: true,
+      rejectClose: false
+    });
   }
 
   static #translateAbilityRoll(roll) {
@@ -1320,27 +1488,31 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return game.i18n.localize(`STARFRONTIERS.Choice.DefenseType.${value}`);
   }
 
-  static #buildRaceCharacterUpdates(actor, race, { applyStats = false } = {}) {
+  static #buildRaceCharacterUpdates(actor, race, { applyStats = false, racialAbilitySummary = null, raceBonusSelections = [] } = {}) {
     const updates = {};
-    updates["system.personalFile.racialAbilities"] = StarFrontiersCharacterSheet.#buildRaceAbilitySummary(race);
+    updates["system.charGen.raceBonusSelections"] = Array.from(raceBonusSelections ?? []);
+    updates["system.personalFile.racialAbilities"] = game.settings.get(SYSTEM_ID, "rulesEdition") === "expanded"
+      ? (racialAbilitySummary ?? StarFrontiersCharacterSheet.#buildLegacyRaceAbilitySummary(race, raceBonusSelections))
+      : "";
 
     if (!applyStats) return updates;
 
-    Object.assign(updates, StarFrontiersCharacterSheet.#buildRaceApplicationUpdates(actor, race));
+    Object.assign(updates, StarFrontiersCharacterSheet.#buildRaceApplicationUpdates(actor, race, raceBonusSelections));
     return updates;
   }
 
-  static #buildRaceApplicationUpdates(actor, race) {
+  static #buildRaceApplicationUpdates(actor, race, raceBonusSelections = actor.system.charGen?.raceBonusSelections ?? []) {
     const updates = {
       "system.charGen.statsInitialized": true
     };
+    const bonusMap = StarFrontiersCharacterSheet.#getRaceBonusMap(race, raceBonusSelections);
     for (const key of ABILITY_KEYS) {
       if (!StarFrontiersCharacterSheet.#isAbilityInitialized(actor, key)) continue;
       const base = actor.system.abilities[key].base || actor.system.abilities[key].value;
       updates[`system.abilities.${key}.initialized`] = true;
       updates[`system.abilities.${key}.base`] = base;
       updates[`system.abilities.${key}.value`] = StarFrontiersCharacterSheet.#clampAbility(
-        base + StarFrontiersCharacterSheet.#raceModifier(race, key)
+        base + StarFrontiersCharacterSheet.#raceModifier(race, key) + (bonusMap[key] ?? 0)
       );
     }
 
@@ -1352,10 +1524,35 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       updates["system.stamina.max"] = updates["system.abilities.sta.value"];
     }
 
+    const rsValue = updates["system.abilities.rs.value"] ?? actor.system.abilities.rs.value ?? 0;
+    updates["system.derived.initiativeMod"] = Math.max(
+      Math.ceil(Number(rsValue) / 10) + StarFrontiersCharacterSheet.#raceInitiativeModifier(race),
+      0
+    );
+
     return updates;
   }
 
-  static #buildRaceAbilitySummary(race) {
+  static async #buildRaceAbilitySummaryAsync(actor, race, raceBonusSelections = actor.system.charGen?.raceBonusSelections ?? []) {
+    if (game.settings.get(SYSTEM_ID, "rulesEdition") !== "expanded" || !race?.system) return "";
+
+    const abilityDocs = await StarFrontiersCharacterSheet.#resolveRaceAbilityDocuments(actor, race);
+    const lines = [];
+
+    for (const ability of abilityDocs) {
+      const label = String(ability.name ?? "").trim();
+      const desc = StarFrontiersCharacterSheet.#plainTextFromHtml(ability.system?.description ?? "");
+      if (!label && !desc) continue;
+      lines.push(desc ? `${label}: ${desc}` : label);
+    }
+
+    lines.push(...StarFrontiersCharacterSheet.#buildRaceBonusPickLines(race, raceBonusSelections));
+    if (lines.length) return lines.join("\n");
+    return StarFrontiersCharacterSheet.#buildLegacyRaceAbilitySummary(race, raceBonusSelections);
+  }
+
+  static #buildLegacyRaceAbilitySummary(race, raceBonusSelections = []) {
+    if (game.settings.get(SYSTEM_ID, "rulesEdition") !== "expanded") return "";
     if (!race?.system) return "";
 
     const lines = [];
@@ -1401,16 +1598,116 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }));
     }
 
-    for (const pick of Array.from(race.system.bonusPicks ?? [])) {
-      if (!pick) continue;
-      lines.push(game.i18n.format("STARFRONTIERS.Character.RacialAbilityBonusPick", {
-        amount: pick.amount ?? 0,
-        slots: pick.slots ?? 0,
-        appliesTo: game.i18n.localize(`STARFRONTIERS.Choice.BonusPickAppliesTo.${pick.appliesTo || "any"}`)
-      }));
-    }
+    lines.push(...StarFrontiersCharacterSheet.#buildRaceBonusPickLines(race, raceBonusSelections));
 
     return lines.join("\n");
+  }
+
+  static #buildRaceBonusPickLines(race, raceBonusSelections = []) {
+    const lines = [];
+    const selections = Array.from(raceBonusSelections ?? []);
+    if (selections.length) {
+      for (const selection of selections) {
+        const target = StarFrontiersCharacterSheet.#formatBonusSelectionTarget(selection);
+        if (!target) continue;
+        lines.push(game.i18n.format("STARFRONTIERS.Character.RacialAbilityBonusPick", {
+          amount: selection.amount ?? 0,
+          target
+        }));
+      }
+      return lines;
+    }
+
+    for (const pick of Array.from(race?.system?.bonusPicks ?? [])) {
+      if (!pick || Number(pick.slots ?? 0) <= 0 || Number(pick.amount ?? 0) === 0) continue;
+      lines.push(game.i18n.format("STARFRONTIERS.Character.RacialAbilityBonusPick", {
+        amount: pick.amount ?? 0,
+        target: game.i18n.localize(`STARFRONTIERS.Choice.BonusPickAppliesTo.${pick.appliesTo || "any"}`)
+      }));
+    }
+    return lines;
+  }
+
+  static async #resolveRaceAbilityDocuments(actor, race) {
+    const refs = Array.from(race?.system?.racialAbilityRefs ?? []);
+    const abilities = [];
+
+    for (const ref of refs) {
+      let doc = actor?.items?.get(ref) ?? race.actor?.items?.get(ref) ?? game.items?.get(ref) ?? null;
+      if (!doc && globalThis.fromUuid) {
+        try {
+          doc = await globalThis.fromUuid(ref);
+        } catch {
+          doc = null;
+        }
+      }
+      if (!doc || doc.type !== "trainedAbility") continue;
+      abilities.push(doc);
+    }
+
+    return abilities;
+  }
+
+  static #raceLinkKey(race) {
+    const raw = race?.system?.key || race?.name || "";
+    return String(raw).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  }
+
+  static async #syncRaceLinkedAbilities(actor, race, previousRace = null) {
+    const previousKey = previousRace ? StarFrontiersCharacterSheet.#raceLinkKey(previousRace) : "";
+    const currentKey = StarFrontiersCharacterSheet.#raceLinkKey(race);
+    const expandedRules = game.settings.get(SYSTEM_ID, "rulesEdition") === "expanded";
+
+    if (!expandedRules) {
+      if (previousKey) {
+        const staleIds = actor.items
+          .filter((item) => item.type === "trainedAbility" && item.system.raceKey === previousKey)
+          .map((item) => item.id);
+        if (staleIds.length) {
+          await actor.deleteEmbeddedDocuments("Item", staleIds);
+        }
+      }
+      return;
+    }
+
+    if (previousKey && previousKey !== currentKey) {
+      const staleIds = actor.items
+        .filter((item) => item.type === "trainedAbility" && item.system.raceKey === previousKey)
+        .map((item) => item.id);
+      if (staleIds.length) {
+        await actor.deleteEmbeddedDocuments("Item", staleIds);
+      }
+    }
+
+    const abilityDocs = await StarFrontiersCharacterSheet.#resolveRaceAbilityDocuments(actor, race);
+    const existing = new Set(
+      actor.items
+        .filter((item) => item.type === "trainedAbility" && item.system.raceKey === currentKey)
+        .map((item) => item.name)
+    );
+    const createData = [];
+
+    for (const ability of abilityDocs) {
+      if (ability.parent === actor) {
+        if (ability.system.raceKey !== currentKey) {
+          await ability.update({ "system.raceKey": currentKey });
+        }
+        existing.add(ability.name);
+        continue;
+      }
+
+      if (existing.has(ability.name)) continue;
+      const source = ability.toObject();
+      delete source._id;
+      source.system ??= {};
+      source.system.raceKey = currentKey;
+      createData.push(source);
+      existing.add(ability.name);
+    }
+
+    if (createData.length) {
+      await actor.createEmbeddedDocuments("Item", createData);
+    }
   }
 
   static #plainTextFromHtml(value) {
@@ -1463,7 +1760,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     });
   }
 
-  static async #createStatsChatMessage(actor, results, { initiativeMod, rsValue, race }) {
+  static async #createStatsChatMessage(actor, results, { initiativeMod, initiativeSource, race }) {
     const content = await renderTemplate("systems/star-frontiers/templates/chat/stat-roll-card.hbs", {
       title: game.i18n.format("STARFRONTIERS.Character.RollForStatsTitle", {
         name: StarFrontiersCharacterSheet.#getRollTitleName(actor)
@@ -1473,7 +1770,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       results,
       initiative: {
         label: game.i18n.localize("STARFRONTIERS.Character.InitiativeModifier-abbr"),
-        roll: `${rsValue}/10`,
+        roll: initiativeSource,
         result: String(initiativeMod)
       }
     });

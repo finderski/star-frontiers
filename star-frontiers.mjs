@@ -211,16 +211,16 @@ Hooks.once("ready", async () => {
 });
 
 const ITEM_TYPE_ICONS = {
-  race:           "systems/star-frontiers/assets/images/sheet-icons/mystery-man.svg",
-  skill:          "systems/star-frontiers/assets/images/sheet-icons/book.svg",
+  race:           "icons/svg/mystery-man.svg",
+  skill:          "icons/svg/book.svg",
   trainedAbility: "systems/star-frontiers/assets/images/sheet-icons/beams-aura.svg",
   weapon:         "systems/star-frontiers/assets/images/sheet-icons/bolter-gun.svg",
-  armor:          "systems/star-frontiers/assets/images/sheet-icons/shield.svg",
+  armor:          "icons/svg//shield.svg",
   screen:         "systems/star-frontiers/assets/images/sheet-icons/belt-armor.svg",
   ammo:           "systems/star-frontiers/assets/images/sheet-icons/ammo-box.svg",
   powerSource:    "systems/star-frontiers/assets/images/sheet-icons/power-generator.svg",
   gear:           "systems/star-frontiers/assets/images/sheet-icons/light-backpack.svg",
-  consumable:     "systems/star-frontiers/assets/images/sheet-icons/pill.svg",
+  consumable:     "icons/svg//pill.svg",
   vehicle:        "systems/star-frontiers/assets/images/sheet-icons/steering-wheel.svg",
   computer:       "systems/star-frontiers/assets/images/sheet-icons/tablet.svg",
   program:        "systems/star-frontiers/assets/images/sheet-icons/computing.svg"

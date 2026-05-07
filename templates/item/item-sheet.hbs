@@ -5,7 +5,7 @@
     </div>
     <div class="item-title">
       <label class="field-line">
-        <span>{{localize "STARFRONTIERS.Item.Name"}}</span>
+        <span>{{localize nameLabel}}</span>
         <input type="text" name="name" value="{{item.name}}" />
       </label>
       <div class="item-meta">
@@ -50,73 +50,40 @@
     {{#if is.race}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.RaceData"}}</legend>
-        {{#if expandedRules}}
-          <div class="compact-grid four-columns">
-            <label><span>{{localize "STARFRONTIERS.Ability.str"}}</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.sta"}}</span><input type="number" name="system.modifiers.sta" value="{{system.modifiers.sta}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.dex"}}</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.rs"}}</span><input type="number" name="system.modifiers.rs" value="{{system.modifiers.rs}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.int"}}</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.log"}}</span><input type="number" name="system.modifiers.log" value="{{system.modifiers.log}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.per"}}</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.ldr"}}</span><input type="number" name="system.modifiers.ldr" value="{{system.modifiers.ldr}}" /></label>
-          </div>
-        {{else}}
-          <div class="compact-grid four-columns">
-            <label><span>{{localize "STARFRONTIERS.Ability.Strength-abbr-Stamina-abbr"}}</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.Dexterity-abbr-ReactionSpeed-abbr"}}</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.Intuition-abbr-Logic-abbr"}}</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
-            <label><span>{{localize "STARFRONTIERS.Ability.Personality-abbr-Leadership-abbr"}}</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
-          </div>
-        {{/if}}
+        <div class="compact-grid race-modifier-grid">
+          <label><span>{{localize "STARFRONTIERS.Ability.Strength-abbr-Stamina-abbr"}}</span><input type="number" name="system.modifiers.str" value="{{system.modifiers.str}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Ability.Dexterity-abbr-ReactionSpeed-abbr"}}</span><input type="number" name="system.modifiers.dex" value="{{system.modifiers.dex}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Ability.Intuition-abbr-Logic-abbr"}}</span><input type="number" name="system.modifiers.int" value="{{system.modifiers.int}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Ability.Personality-abbr-Leadership-abbr"}}</span><input type="number" name="system.modifiers.per" value="{{system.modifiers.per}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Character.InitiativeModifier-abbr"}}</span><input type="number" name="system.modifiers.im" value="{{system.modifiers.im}}" /></label>
+        </div>
         <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Character.Walking"}}</span><input type="number" name="system.movement.walking" value="{{system.movement.walking}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Character.Running"}}</span><input type="number" name="system.movement.running" value="{{system.movement.running}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Character.Hourly"}}</span><input type="number" name="system.movement.hourly" value="{{system.movement.hourly}}" min="0" /></label>
         </div>
 
-        <div class="compact-grid race-traits-grid">
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Gliding"}}</span><input type="checkbox" name="system.gliding.available" {{checked system.gliding.available}} /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.MinStartHeight"}}</span><input type="number" name="system.gliding.minStartHeight" value="{{system.gliding.minStartHeight}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.ForbiddenBelow"}}</span><input type="number" name="system.gliding.forbiddenBelow" value="{{system.gliding.forbiddenBelow}}" min="0" step="0.1" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.ForbiddenAbove"}}</span><input type="number" name="system.gliding.forbiddenAbove" value="{{system.gliding.forbiddenAbove}}" min="0" step="0.1" /></label>
-
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.LightSensitivity"}}</span><input type="checkbox" name="system.lightSensitivity.affected" {{checked system.lightSensitivity.affected}} /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Penalty"}}</span><input type="number" name="system.lightSensitivity.penalty" value="{{system.lightSensitivity.penalty}}" /></label>
-
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Elasticity"}}</span><input type="checkbox" name="system.elasticity.available" {{checked system.elasticity.available}} /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.LimbsPerDexBucket"}}</span><input type="number" name="system.elasticity.limbsPerDexBucket" value="{{system.elasticity.limbsPerDexBucket}}" min="1" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.LimbGrowMinutes"}}</span><input type="number" name="system.elasticity.limbGrowMinutes" value="{{system.elasticity.limbGrowMinutes}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.MaxFiringLimbs"}}</span><input type="number" name="system.elasticity.maxFiringLimbs" value="{{system.elasticity.maxFiringLimbs}}" min="0" /></label>
-        </div>
-
         <div class="race-editor-block">
           <div class="race-editor-block__header">
             <span>{{localize "STARFRONTIERS.Item.RacialAbilities"}}</span>
-            <button type="button" data-action="addRaceAbility">
-              <i class="fa-solid fa-plus"></i>
-              <span>{{localize "STARFRONTIERS.Item.AddRaceAbility"}}</span>
-            </button>
           </div>
-          {{#if raceAbilityRows.length}}
-            <div class="race-ability-list">
-              {{#each raceAbilityRows as |ability index|}}
-                <div class="race-ability-row">
-                  <div class="compact-grid three-columns">
-                    <label><span>{{localize "STARFRONTIERS.Item.Label"}}</span><input type="text" name="system.racialAbilities.{{index}}.label" value="{{ability.label}}" /></label>
-                    <label><span>{{localize "STARFRONTIERS.Item.Key"}}</span><input type="text" name="system.racialAbilities.{{index}}.key" value="{{ability.key}}" /></label>
-                    <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Passive"}}</span><input type="checkbox" name="system.racialAbilities.{{index}}.isPassive" {{checked ability.isPassive}} /></label>
+          <div class="linked-ability-drop-zone">
+            <span>{{localize "STARFRONTIERS.Item.DropRacialAbility"}}</span>
+          </div>
+          {{#if linkedRacialAbilities.length}}
+            <div class="linked-ability-list">
+              {{#each linkedRacialAbilities as |ability|}}
+                <div class="linked-ability-row">
+                  <div class="linked-ability-row__body">
+                    <strong>{{ability.name}}</strong>
+                    {{#if ability.description}}
+                      <div class="linked-ability-row__description">{{{ability.description}}}</div>
+                    {{/if}}
                   </div>
-                  <label class="stacked">
-                    <span>{{localize "STARFRONTIERS.Item.Description"}}</span>
-                    <textarea name="system.racialAbilities.{{index}}.description">{{ability.description}}</textarea>
-                  </label>
-                  <div class="section-controls">
-                    <button type="button" data-action="removeRaceAbility" data-index="{{index}}">
-                      <i class="fa-solid fa-trash"></i>
-                      <span>{{localize "STARFRONTIERS.Item.RemoveRaceAbility"}}</span>
-                    </button>
-                  </div>
+                  <button type="button" data-action="removeLinkedRaceAbility" data-ref="{{ability.id}}">
+                    <i class="fa-solid fa-trash"></i>
+                    <span>{{localize "STARFRONTIERS.Item.RemoveRaceAbility"}}</span>
+                  </button>
                 </div>
               {{/each}}
             </div>
@@ -245,8 +212,7 @@
     {{#if is.trainedAbility}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.TrainedAbilityData"}}</legend>
-        <div class="compact-grid five-columns">
-          <label><span>{{localize "STARFRONTIERS.Item.RaceKey"}}</span><input type="text" name="system.raceKey" value="{{system.raceKey}}" /></label>
+        <div class="compact-grid four-columns">
           <label><span>{{localize "STARFRONTIERS.Item.BaseChance"}}</span><input type="number" name="system.baseChance" value="{{system.baseChance}}" min="0" max="100" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.CurrentChance"}}</span><input type="number" name="system.currentChance" value="{{system.currentChance}}" min="0" max="100" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Cap"}}</span><input type="number" name="system.cap" value="{{system.cap}}" min="0" max="100" /></label>

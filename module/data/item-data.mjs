@@ -47,13 +47,15 @@ export class StarFrontiersRaceData extends StarFrontiersItemData {
         int: numberField({ initial: 0 }),
         log: numberField({ initial: 0 }),
         per: numberField({ initial: 0 }),
-        ldr: numberField({ initial: 0 })
+        ldr: numberField({ initial: 0 }),
+        im: numberField({ initial: 0 })
       }),
       movement: schemaField({
         walking: numberField({ initial: 2, min: 0 }),
         running: numberField({ initial: 6, min: 0 }),
         hourly: numberField({ initial: 0, min: 0 })
       }),
+      racialAbilityRefs: arrayField(textField()),
       racialAbilities: arrayField(schemaField({
         key: textField(),
         label: textField(),
