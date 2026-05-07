@@ -56,6 +56,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.linkedRacialAbilities = item.type === "race" ? await this.#resolveLinkedRacialAbilities(item) : [];
     context.bonusPickRows = item.type === "race" ? Array.from(item.system.bonusPicks ?? []) : [];
     context.skillIsMain = item.type === "skill" && item.system.category === "main";
+    context.isMilitarySkill = item.type === "skill" && item.system.psa === "military";
     context.linkedSubskills = context.skillIsMain ? await this.#resolveLinkedSubskills(item) : [];
     context.linkedRequiredSkill = item.type === "weapon" ? await this.#resolveRequiredSkill(item) : null;
     context.itemEffects = item.type === "trainedAbility"
@@ -123,6 +124,17 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     if (weaponTypeEl && ammoUsesEl) {
       weaponTypeEl.addEventListener("change", () => {
         ammoUsesEl.value = StarFrontiersItemSheet.#defaultAmmoUses(weaponTypeEl.value);
+      });
+    }
+    const psaEl = this.element.querySelector('select[name="system.psa"]');
+    if (psaEl && this.item.type === "skill") {
+      psaEl.addEventListener("change", async () => {
+        if (psaEl.value !== "military") {
+          await this.item.update({
+            "system.mechanics.applyMeleeBonus": false,
+            "system.mechanics.applyRangeBonus": false
+          });
+        }
       });
     }
   }

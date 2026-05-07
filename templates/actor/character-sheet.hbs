@@ -405,13 +405,19 @@
         <fieldset class="paper-box skills-box">
           <legend>{{localize "STARFRONTIERS.Character.Skills"}}</legend>
           <div class="item-list">
-            {{#each skillItems as |item|}}
-              <div class="item-row" data-item-id="{{item.id}}">
-                <button type="button" class="item-name-button" data-action="openItem" data-item-drag="true" draggable="true" title="{{localize "STARFRONTIERS.Item.Open"}}">{{item.name}}</button>
+            {{#each skillRows as |row|}}
+              <div class="item-row skill-row{{#if row.isSubskill}} skill-row--subskill{{/if}}" data-item-id="{{row.id}}">
+                <button type="button" class="item-name-button" data-action="rollSkill" data-item-drag="true" draggable="true" title="{{localize "STARFRONTIERS.Character.RollSkill"}}">{{row.name}}</button>
+                {{#if row.isSubskill}}
+                  <span></span>
+                {{else}}
+                  <input type="number" class="skill-level-input" min="0" max="6" step="1" value="{{row.level}}" data-item-field="system.level" aria-label="{{localize "STARFRONTIERS.Item.Level"}}" />
+                {{/if}}
                 <div class="item-actions">
                   <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button>
-                  <button type="button" data-action="duplicateItem" title="{{localize "STARFRONTIERS.Item.Duplicate"}}"><i class="fa-solid fa-copy"></i></button>
-                  <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                  {{#unless row.isSubskill}}
+                    <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                  {{/unless}}
                 </div>
               </div>
             {{/each}}

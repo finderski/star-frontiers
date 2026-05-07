@@ -97,10 +97,15 @@ export class StarFrontiersSkillData extends StarFrontiersItemData {
       psa: textField({ choices: ["", "military", "technological", "biosocial"] }),
       isPsaForOwner: boolField(),
       category: textField({ initial: "main", choices: ["main", "subskill"] }),
+      attributeKey: textField({ initial: "dex", choices: ["dex", "str"] }),
       level: numberField({ initial: 0, min: 0, max: 6 }),
       rollFormula: textField(),
       weaponSkillKey: textField({ choices: ["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
       subskillRefs: arrayField(textField()),
+      mechanics: schemaField({
+        applyMeleeBonus: boolField(),
+        applyRangeBonus: boolField()
+      }),
       xpCost: schemaField({
         perLevel: arrayField(numberField({ initial: 0, min: 0 })),
         nonPsaPerLevel: arrayField(numberField({ initial: 0, min: 0 }))

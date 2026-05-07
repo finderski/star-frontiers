@@ -227,11 +227,15 @@
   - `nameLabel` is always `ITEM_TYPE_LABELS[item.type]` (e.g. “WEAPON”, “SKILL”, “RACIAL ABILITY”) — the label above the name input identifies the type
   - item image: `imageUsesMask = img.startsWith(“icons/svg/”)`. Only Foundry built-in icons use the CSS mask-image (color adapts to `--sf-ink`). All other images (artwork SVGs, PNGs, custom paths) use `<img class=”item-image__art”>` so colors render correctly. Do not revert to the `.endsWith(“.svg”)` check — it broke artwork SVGs.
 - Skill item sheets:
-  - 3-column row: PSA | Category | Roll Formula
+  - 4-column row: PSA | Category | Attribute | Roll Formula
   - `category` choices: `main` · `subskill`
+  - `attributeKey` choices: `dex` · `str` (default `”dex”`) — base ability for skill checks; shown in the item sheet Attribute column
   - `category === “main”` shows a sub-skill drop zone backed by `system.subskillRefs`
-  - do **not** show Level, Ability, Bonus, Weapon Skill dropdown, or Heavy Skill checkbox — all removed
+  - When `psa === “military”`, two checkboxes appear below the grid: **Apply Melee Bonus** (`mechanics.applyMeleeBonus`) and **Apply Range Bonus** (`mechanics.applyRangeBonus`). Changing PSA away from “military” auto-resets both to `false` via an `_onRender` change listener.
+  - do **not** show Level on the item sheet — Level is edited via the character sheet skill row inline input only
+  - do **not** show Ability, Bonus, Weapon Skill dropdown, or Heavy Skill checkbox — all removed
   - `weaponSkillKey` is hidden (kept in schema for backward compat)
+  - Roll formula placeholder is `ceil(@dex*.5) + @level`; `@level` in roll data = `skill.system.level * 10`
 - Trained Ability (Racial Ability) item sheets:
   - 4-column row: Roll Type | Base Chance | Cap | XP/Point
   - Active Effects block below: lists embedded AEs on the item with Open and Delete buttons; Add creates a new AE and opens Foundry's `ActiveEffectConfig` dialog
@@ -271,7 +275,7 @@
   - Active tab is held on the sheet instance as `this._activeTab`; `#applyActiveTab()` swaps `--active` classes on buttons and panels without forcing a re-render.
   - Tab state survives `submitOnChange` re-renders because `_onRender` re-applies the active class from the same instance value. Lost on sheet close.
   - Profile tab: identity header (always visible above tabs), Physical Data, Medical Record, Weapons, Defenses+Energy column, Personal File.
-  - Skills+Equipment tab: Skills fieldset (Expanded only) + Racial Abilities fieldset (Expanded only, only when `trainedAbility` items are owned) + Equipment fieldset (always). The old combined "Skills and Equipment" reverse-side fieldset has been split into separate fieldsets.
+  - Skills+Equipment tab: Skills fieldset (Expanded only) + Racial Abilities fieldset (Expanded only, only when `trainedAbility` items are owned) + Equipment fieldset (always). The old combined "Skills and Equipment" reverse-side fieldset has been split into separate fieldsets. Skill rows have: name button (triggers `rollSkill` check), level inline input (main skills only; `data-item-field="system.level"`), open + delete buttons (delete hidden on sub-skills). Sub-skills indent via `.skill-row--subskill`. Dropping a main skill sets level to 1 and auto-creates its sub-skills (also at level 1) from `subskillRefs`. Changing a main skill's level cascades to all owned sub-skills. Deleting a main skill batch-deletes its sub-skills.
   - Notes tab: ProseMirror notes + (Expanded only) the Expanded Rules notes textarea.
 - Top section is functional:
   - stat generation button
@@ -320,8 +324,10 @@ This reflects the current local notes and implemented work, not a live Asana syn
   - Verify the AE `transfer: true` / `disabled` toggle cycle works end-to-end in Foundry (set `disabled: false` on success → AE propagates to actor → bonus applies; fire button sets `disabled: true` → bonus removed)
 - Attack roll rework:
   - Replace `weaponSkillKey` string lookup with `weapon.system.requiredSkillRef` + `weapon.system.attributeKey`
-  - Use `attributeKey` (dex/str) as the base ability for the Expanded-rules formula: `½ attr + (skill level × 10)`
+  - Use `attributeKey` (dex/str) as the base ability for the Expanded-rules formula: `½ attr + (skill.system.level * 10)`
   - Pre-populate modifier dialog with an unskilled penalty when the character does not own the required skill
+  - When the required skill has `mechanics.applyMeleeBonus` or `mechanics.applyRangeBonus` set, read `actor.system.combatProfile.meleeBonus` / `.rangeBonus` (written by active AEs) and fold into the attack target
+  - **Note:** skill roll checks (`rollSkill` action) are implemented; the rework is for weapon attack rolls specifically
 - Weapons:
   - variable SEU damage formula — inject `seuSetting` into roll data so formulas like `@seuSetting`d10 scale with dial
   - confirm attack formulas against the actual rules PDFs

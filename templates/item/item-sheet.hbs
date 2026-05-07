@@ -204,11 +204,19 @@
     {{#if is.skill}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.SkillData"}}</legend>
-        <div class="compact-grid three-columns">
+        <div class="compact-grid four-columns">
           <label><span>{{localize "STARFRONTIERS.Item.PSA"}}</span><select name="system.psa">{{selectOptions choices.psa selected=system.psa}}</select></label>
           <label><span>{{localize "STARFRONTIERS.Item.Category"}}</span><select name="system.category">{{selectOptions choices.skillCategory selected=system.category}}</select></label>
-          <label><span>{{localize "STARFRONTIERS.Item.RollFormula"}}</span><input type="text" name="system.rollFormula" value="{{system.rollFormula}}" placeholder="e.g. floor(@dex * 0.5) + (@level * 10)" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.AttributeKey"}}</span><select name="system.attributeKey">{{selectOptions choices.attributeKey selected=system.attributeKey}}</select></label>
+          <label><span>{{localize "STARFRONTIERS.Item.RollFormula"}}</span><input type="text" name="system.rollFormula" value="{{system.rollFormula}}" placeholder="ceil(@dex*.5) + @level" /></label>
         </div>
+
+        {{#if isMilitarySkill}}
+          <div class="skill-combat-bonus-row">
+            <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ApplyMeleeBonus"}}</span><input type="checkbox" name="system.mechanics.applyMeleeBonus" {{checked system.mechanics.applyMeleeBonus}} /></label>
+            <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ApplyRangeBonus"}}</span><input type="checkbox" name="system.mechanics.applyRangeBonus" {{checked system.mechanics.applyRangeBonus}} /></label>
+          </div>
+        {{/if}}
 
         {{#if skillIsMain}}
           <div class="race-editor-block">

@@ -1440,7 +1440,29 @@ button.roll-label-main:focus-visible {
   width: 100%;
 }
 
-/* --- 9b. Racial abilities --- */
+/* --- 9b. Skills list rows --- */
+
+.skill-row {
+  grid-template-columns: minmax(0, 1fr) 40px auto;
+}
+
+.skill-row--subskill .item-name-button {
+  padding-left: 20px;
+}
+
+.skill-level-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--sf-row-line);
+  color: var(--sf-ink);
+  font-family: var(--input);
+  min-height: 0;
+  padding: 0;
+  text-align: center;
+  width: 100%;
+}
+
+/* --- 9c. Racial abilities --- */
 
 .racial-ability-row {
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -1620,6 +1642,12 @@ button.roll-label-main:focus-visible {
 
 .star-frontiers-item-sheet fieldset .stacked {
   margin: 10px 0 0 0;
+}
+
+.skill-combat-bonus-row {
+  display: flex;
+  gap: 24px;
+  margin-top: 8px;
 }
 
 

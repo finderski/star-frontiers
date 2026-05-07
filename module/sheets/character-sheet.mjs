@@ -64,6 +64,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       toggleWeaponGear: StarFrontiersCharacterSheet.#onToggleWeaponGear,
       rollRacialAbility: StarFrontiersCharacterSheet.#onRollRacialAbility,
       toggleRacialAbilityEffect: StarFrontiersCharacterSheet.#onToggleRacialAbilityEffect,
+      rollSkill: StarFrontiersCharacterSheet.#onRollSkill,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
   };
@@ -98,7 +99,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const screenId = actor.system.defenses?.screen ?? "";
     context.wornSuit = suitId ? actor.items.get(suitId) ?? null : null;
     context.wornScreen = screenId ? actor.items.get(screenId) ?? null : null;
-    context.skillItems = actor.items.filter((item) => item.type === "skill");
+    context.skillRows = context.expandedRules ? this.#prepareSkillRows(actor) : [];
     context.racialAbilityRows = context.expandedRules ? this.#prepareRacialAbilityRows(actor) : [];
     context.equipmentRows = StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
     context.encumbrance = StarFrontiersCharacterSheet.#prepareEncumbranceContext(actor);
@@ -121,6 +122,17 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }
     );
     return context;
+  }
+
+  #prepareSkillRows(actor) {
+    return actor.items
+      .filter((item) => item.type === "skill")
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        level: item.system.level ?? 0,
+        isSubskill: item.system.category === "subskill"
+      }));
   }
 
   #prepareRacialAbilityRows(actor) {
@@ -395,6 +407,35 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       return race;
     }
 
+    if (document.documentName === "Item" && document.type === "skill" && document.system.category === "main") {
+      this._rememberScrollPosition();
+      const mainData = document.toObject();
+      foundry.utils.setProperty(mainData, "system.level", 1);
+      const [created] = await this.document.createEmbeddedDocuments("Item", [mainData]);
+      const refs = Array.from(document.system.subskillRefs ?? []);
+      if (refs.length) {
+        const toCreate = [];
+        for (const ref of refs) {
+          let subDoc = game.items?.get(ref) ?? null;
+          if (!subDoc && globalThis.fromUuid) {
+            try { subDoc = await globalThis.fromUuid(ref); } catch { subDoc = null; }
+          }
+          if (!subDoc || subDoc.type !== "skill") continue;
+          const alreadyOwned = this.document.items.some((i) => i.type === "skill" && i.name === subDoc.name);
+          if (!alreadyOwned) {
+            const subData = subDoc.toObject();
+            foundry.utils.setProperty(subData, "system.level", 1);
+            toCreate.push(subData);
+          }
+        }
+        if (toCreate.length) {
+          await this.document.createEmbeddedDocuments("Item", toCreate);
+          ui.notifications.info(game.i18n.format("STARFRONTIERS.Character.SubskillsAdded", { name: document.name, count: toCreate.length }));
+        }
+      }
+      return created;
+    }
+
     if (document.documentName === "Item") {
       this._rememberScrollPosition();
     }
@@ -562,7 +603,14 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       this._rememberScrollPosition();
     }
 
-    await item.delete();
+    const toDelete = [item.id];
+    if (item.type === "skill" && item.system.category === "main") {
+      const refs = Array.from(item.system.subskillRefs ?? []);
+      for (const i of this.document.items) {
+        if (i.type === "skill" && refs.includes(i.id)) toDelete.push(i.id);
+      }
+    }
+    await this.document.deleteEmbeddedDocuments("Item", toDelete);
   }
 
   static async #onClearDefenseSlot(event, target) {
@@ -604,6 +652,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
     await StarFrontiersCharacterSheet.#rollRacialAbility(this.document, item);
+  }
+
+  static async #onRollSkill(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+    await StarFrontiersCharacterSheet.#rollSkillCheck(this.document, item);
   }
 
   static async #onToggleRacialAbilityEffect(event, target) {
@@ -1072,6 +1127,64 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     });
   }
 
+  static async #rollSkillCheck(actor, skill, rollMode = "public") {
+    const attributeKey = skill.system.attributeKey || "dex";
+    const rollData = {
+      dex: actor.system.abilities.dex?.value ?? 0,
+      str: actor.system.abilities.str?.value ?? 0,
+      sta: actor.system.abilities.sta?.value ?? 0,
+      rs: actor.system.abilities.rs?.value ?? 0,
+      int: actor.system.abilities.int?.value ?? 0,
+      log: actor.system.abilities.log?.value ?? 0,
+      per: actor.system.abilities.per?.value ?? 0,
+      ldr: actor.system.abilities.ldr?.value ?? 0,
+      level: (skill.system.level ?? 0) * 10
+    };
+
+    const formulaStr = skill.system.rollFormula || `ceil(@${attributeKey} * 0.5) + @level`;
+    const baseTargetRoll = new Roll(formulaStr, rollData);
+    await baseTargetRoll.evaluate({ allowInteractive: false });
+    const baseTarget = Math.floor(baseTargetRoll.total);
+
+    const modifier = await foundry.applications.api.DialogV2.prompt({
+      window: { title: game.i18n.format("STARFRONTIERS.Character.SkillModifierTitle", { name: skill.name }) },
+      content: `<p>${game.i18n.format("STARFRONTIERS.Character.SkillModifierPrompt", { name: skill.name, target: baseTarget })}</p>
+        <input name="modifier" type="number" step="1" value="0" autofocus>`,
+      ok: {
+        label: game.i18n.localize("STARFRONTIERS.Character.RollAbilityModifierSubmit"),
+        callback: (event, button) => button.form.elements.modifier.valueAsNumber || 0
+      },
+      modal: true,
+      rejectClose: false
+    });
+    if (modifier === null) return;
+
+    const adjustedTarget = baseTarget + modifier;
+    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
+    const success = roll.total <= adjustedTarget;
+    const rollHtml = await roll.render({
+      flavor: game.i18n.format("STARFRONTIERS.Character.SkillCheckFlavor", { name: skill.name })
+    });
+
+    await StarFrontiersCharacterSheet.#createCheckChatMessage(actor, {
+      title: game.i18n.format("STARFRONTIERS.Character.SkillCheckTitle", {
+        name: StarFrontiersCharacterSheet.#getRollTitleName(actor),
+        skill: skill.name
+      }),
+      subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
+      rows: [
+        { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(baseTarget) },
+        { label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: modifier >= 0 ? `+${modifier}` : String(modifier) },
+        { label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(adjustedTarget) },
+        { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(roll.total).padStart(2, "0") }
+      ],
+      rollMode,
+      outcome: success ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure"),
+      outcomeClass: success ? "success" : "failure",
+      rollHtml
+    });
+  }
+
   async #onItemFieldChange(event) {
     event.stopPropagation();
     const target = event.currentTarget;
@@ -1098,6 +1211,14 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     const value = target.type === "number" ? Number(target.value || 0) : target.value;
     await item.update({ [target.dataset.itemField]: value });
+
+    if (target.dataset.itemField === "system.level" && item.type === "skill" && item.system.category === "main") {
+      const refs = Array.from(item.system.subskillRefs ?? []);
+      if (refs.length) {
+        const subskills = this.document.items.filter((i) => i.type === "skill" && refs.includes(i.id));
+        if (subskills.length) await Promise.all(subskills.map((s) => s.update({ "system.level": value })));
+      }
+    }
   }
 
   #normalizeHandedness(value) {
