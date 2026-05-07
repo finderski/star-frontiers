@@ -51,6 +51,56 @@
 - Use `apply_patch` for edits when working manually.
 - Rules-specific UI should usually be driven by `system.rulesEdition` or world `rulesEdition`, not forked templates.
 - Styling is centralized in one stylesheet and theme-aware through CSS variables.
+- Multiple agents may touch this repo (`Codex`, Rich, Claude). Keep project docs current as part of finishing the work, not as a separate optional cleanup step.
+
+## Doc sync with CLAUDE.md
+
+### Principle
+- `CLAUDE.md` is the **project-state file**: what exists, what changed, game-rule interpretations, schema history, done list, outstanding issues.
+- `AGENTS.md` is the **working-rules file**: how Codex should operate here, guardrails, invariants, data-model decisions, next-task maintenance.
+- When something material changes, both files usually need a touch, but in different sections.
+
+### Codex ownership rule
+- The agent that finished the work owns the doc update before ending the session.
+- If Codex changed code, Codex updates `AGENTS.md` and any necessary `CLAUDE.md` sections in the same session.
+- Do not leave schema, invariant, or roadmap changes undocumented for “later”.
+
+### When to update `CLAUDE.md`
+- Update after a meaningful unit of work, before ending the session.
+- Add one bullet to the implementation-status / done list:
+  - past tense
+  - specific
+  - one bullet = one fact
+- Update schema version notes if `CURRENT_SCHEMA_VERSION` changed, with a one-line migration summary.
+- Remove resolved items from outstanding issues and add newly surfaced ones.
+- Update the game-rules summary only when a rules interpretation changed.
+- Update conventions only when a new cross-cutting pattern or rule was established.
+- Skip `CLAUDE.md` for tiny bug fixes that do not change documented behavior.
+
+### When to update `AGENTS.md`
+- Mirror any schema-version bump from `CLAUDE.md`.
+- Update **Current data model decisions** when a field meaning, ownership model, or storage convention changes.
+- Update **Things not to change without asking** when a new invariant is established.
+- Update **Current next tasks** to remove completed items and add newly surfaced follow-ups.
+- Update working instructions here when the collaboration process changes.
+
+### Formatting conventions for both files
+- Prefix new versioned bullets with the relevant version when applicable, for example:
+  - `0.2.3 — Race item sheet now ...`
+- One bullet, one fact.
+- Use specific names:
+  - `addRaceAbility`
+  - `system.defenses.suit`
+  - `CURRENT_SCHEMA_VERSION`
+- Do not restate obvious code structure; document:
+  - why a decision was made
+  - what invariant must hold
+  - what cross-cutting effect future sessions must remember
+
+### Recommended sync habit
+- At the end of every session that touched code, do a quick pass on both docs.
+- Lightweight and consistent is better than “perfect later”.
+- Read `CLAUDE.md` and `AGENTS.md` before major work; update them after major work.
 
 ## Schema versioning
 
