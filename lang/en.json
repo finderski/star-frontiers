@@ -58,7 +58,11 @@
       "RacialAbilityGliding": "Gliding: minimum start height {minStartHeight} m, cannot glide below {forbiddenBelow} G or above {forbiddenAbove} G.",
       "RacialAbilityLightSensitivity": "Light Sensitivity: {penalty} penalty.{mitigations}",
       "RacialAbilityMitigations": " Mitigations: {mitigations}.",
-      "RacialAbilities": "Racial Abilities:",
+      "RacialAbilities": "Racial Abilities",
+      "RacialAbilityRollTitle": "{name}: {ability}",
+      "RacialAbilityRollFlavor": "{name} ability roll",
+      "RollRacialAbility": "Roll ability check",
+      "EndRacialEffect": "End effect (click to deactivate)",
       "ReplaceStats": "Replace Stats",
       "ReplaceStatsPrompt": "Current ability scores will be replaced with a new set of rolls.",
       "ReverseSide": "Skills and Equipment",
@@ -175,6 +179,10 @@
         "military": "Military",
         "technological": "Technological"
       },
+      "RollType": {
+        "active": "Active (Roll)",
+        "passive": "Passive (Always On)"
+      },
       "RulesEdition": {
         "basic": "Basic",
         "expanded": "Expanded"
@@ -200,10 +208,13 @@
         "inertia": "Inertia",
         "sonic": "Sonic"
       },
+      "AttributeKey": {
+        "dex": "DEX",
+        "str": "STR"
+      },
       "SkillCategory": {
-        "general": "General",
-        "psa": "PSA",
-        "racial": "Racial"
+        "main": "Main Skill",
+        "subskill": "Sub-Skill"
       },
       "SourceType": {
         "None": "None",
@@ -242,6 +253,8 @@
     "Item": {
       "Ability": "Ability",
       "Active": "Active",
+      "AddEffect": "Add Effect",
+      "AttributeKey": "Attribute",
       "Actions": "Actions",
       "AmmoData": "Ammunition",
       "AmmoLinked": "Linked ammo: {name}",
@@ -267,6 +280,7 @@
       "ConsumeOnUse": "Consume on Use",
       "ChangeIcon": "Click to change icon",
       "ClearAmmo": "Clear linked ammo",
+      "ClearSkill": "Clear linked skill",
       "Consumed": "Consumed",
       "Cost": "Cost",
       "CopyName": "{name} Copy",
@@ -277,11 +291,18 @@
       "DamageType": "Damage Type",
       "Description": "Description",
       "Delete": "Delete item",
+      "DeleteEffect": "Delete effect",
       "DropAmmo": "Drop an ammo item here",
       "DropAmmoOnly": "Drop an ammunition item onto a weapon to link it.",
       "DropRacialAbility": "Drop a racial ability here",
       "DropRacialAbilityOnly": "Drop a racial ability item onto a race to link it.",
+      "DropSkill": "Drop a skill here",
+      "DropSubSkill": "Drop sub-skill items here",
+      "DropSubskillOnly": "Only sub-skill items can be linked here.",
       "Duplicate": "Duplicate item",
+      "EffectDisabled": "Disabled",
+      "Effects": "Active Effects",
+      "EffectTransfers": "Transfers to actor",
       "Elasticity": "Elasticity",
       "ForbiddenAbove": "Forbidden Above (G)",
       "ForbiddenBelow": "Forbidden Below (G)",
@@ -290,7 +311,7 @@
       "FunctionPointsUsed": "FP Used",
       "GearData": "Gear",
       "Gliding": "Gliding",
-      "HeavySkill": "Heavy Skill",
+      "HeavyWeapon": "Heavy Weapon",
       "Key": "Key",
       "Kit": "Kit",
       "Label": "Label",
@@ -328,6 +349,9 @@
       "RacialAbility": "Racial Ability",
       "RacialAbilities": "Racial Abilities",
       "RacialAbilityLinked": "Linked racial ability: {name}",
+      "SkillLinked": "Linked skill: {name}",
+      "SubskillLinked": "Linked sub-skill: {name}",
+      "SubSkills": "Sub-Skills",
       "Race": "Race",
       "RaceAbilities": "Race Abilities",
       "RaceData": "Race Data",
@@ -341,9 +365,12 @@
       "Remaining": "Remaining",
       "RemoveBonusPick": "Remove Bonus Pick",
       "RemoveRaceAbility": "Remove Ability",
+      "RemoveSubSkill": "Remove Sub-Skill",
+      "RequiredSkill": "Required Skill",
       "RentalCost": "Rental/Day",
       "RateOfFire": "Rate of Fire",
       "RollFormula": "Roll Formula",
+      "RollType": "Roll Type",
       "RulesEdition": "Rules Edition",
       "Ruleset": "Ruleset",
       "SEUPerHit": "SEU/Hit",
@@ -372,8 +399,11 @@
         "Vehicle": "Vehicle",
         "Weapon": "Weapon"
       },
+      "NewEffect": "New Effect",
       "NoBonusPicks": "No bonus picks configured.",
+      "NoEffects": "No active effects configured.",
       "NoRaceAbilities": "No racial abilities configured.",
+      "NoSubSkills": "No sub-skills linked.",
       "Uses": "Uses",
       "VariableMin": "SEU Min",
       "VariableMax": "SEU Max",

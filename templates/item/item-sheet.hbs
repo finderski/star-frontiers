@@ -1,22 +1,17 @@
 <section class="star-frontiers-item-sheet {{themeClass}}" data-rules-edition="{{rulesEdition}}" autocomplete="off">
   <header class="item-header">
     <div class="item-image" data-action="editImage" title="{{localize "STARFRONTIERS.Item.ChangeIcon"}}">
-      <div class="item-image__icon" style="--item-img: url({{item.img}})"></div>
+      {{#if imageUsesMask}}
+        <div class="item-image__icon" style="--item-img: url({{item.img}})"></div>
+      {{else}}
+        <img class="item-image__art" src="{{item.img}}" alt="" />
+      {{/if}}
     </div>
     <div class="item-title">
       <label class="field-line">
         <span>{{localize nameLabel}}</span>
         <input type="text" name="name" value="{{item.name}}" />
       </label>
-      <div class="item-meta">
-        <span>{{localize typeLabel}}</span>
-        {{#if showKey}}
-          <label>
-            <span>{{localize "STARFRONTIERS.Item.Key"}}</span>
-            <input type="text" name="system.key" value="{{system.key}}" />
-          </label>
-        {{/if}}
-      </div>
     </div>
   </header>
 
@@ -132,8 +127,8 @@
             <select name="system.weaponType">{{selectOptions choices.weaponType selected=system.weaponType}}</select>
           </label>
           <label>
-            <span>{{localize "STARFRONTIERS.Item.WeaponSkill"}}</span>
-            <select name="system.weaponSkillKey">{{selectOptions choices.weaponSkill selected=system.weaponSkillKey}}</select>
+            <span>{{localize "STARFRONTIERS.Item.AttributeKey"}}</span>
+            <select name="system.attributeKey">{{selectOptions choices.attributeKey selected=system.attributeKey}}</select>
           </label>
           <label>
             <span>{{localize "STARFRONTIERS.Item.DamageFormula"}}</span>
@@ -159,6 +154,20 @@
         </div>
 
         <div class="ammo-drop-zone">
+          <span>{{localize "STARFRONTIERS.Item.RequiredSkill"}}</span>
+          <div>
+            {{#if linkedRequiredSkill}}
+              <strong>{{linkedRequiredSkill.name}}</strong>
+              <button type="button" data-action="clearRequiredSkill" title="{{localize "STARFRONTIERS.Item.ClearSkill"}}">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            {{else}}
+              <span>{{localize "STARFRONTIERS.Item.DropSkill"}}</span>
+            {{/if}}
+          </div>
+        </div>
+
+        <div class="ammo-drop-zone">
           <span>{{localize "STARFRONTIERS.Item.LinkedAmmo"}}</span>
           <div>
             {{#if linkedAmmo}}
@@ -180,6 +189,7 @@
           {{#if weaponUsesSeu}}
             <label><span>{{localize "STARFRONTIERS.Item.SEUPerHit"}}</span><input type="number" name="system.ammo.seuPerShot" value="{{system.ammo.seuPerShot}}" min="0" /></label>
           {{/if}}
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HeavyWeapon"}}</span><input type="checkbox" name="system.mechanics.isHeavy" {{checked system.mechanics.isHeavy}} /></label>
           {{#if expandedRules}}
             <label><span>{{localize "STARFRONTIERS.Item.RateOfFire"}}</span><input type="number" name="system.mechanics.rateOfFire" value="{{system.mechanics.rateOfFire}}" min="1" /></label>
             {{#if weaponUsesSeu}}
@@ -194,18 +204,39 @@
     {{#if is.skill}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.SkillData"}}</legend>
-        <div class="compact-grid five-columns">
+        <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Item.PSA"}}</span><select name="system.psa">{{selectOptions choices.psa selected=system.psa}}</select></label>
           <label><span>{{localize "STARFRONTIERS.Item.Category"}}</span><select name="system.category">{{selectOptions choices.skillCategory selected=system.category}}</select></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Level"}}</span><input type="number" name="system.level" value="{{system.level}}" min="0" max="6" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Ability"}}</span><select name="system.ability">{{selectOptions choices.ability selected=system.ability}}</select></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Bonus"}}</span><input type="number" name="system.bonus" value="{{system.bonus}}" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.RollFormula"}}</span><input type="text" name="system.rollFormula" value="{{system.rollFormula}}" placeholder="e.g. floor(@dex * 0.5) + (@level * 10)" /></label>
         </div>
-        <div class="compact-grid three-columns">
-          <label><span>{{localize "STARFRONTIERS.Item.RollFormula"}}</span><input type="text" name="system.rollFormula" value="{{system.rollFormula}}" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.WeaponSkill"}}</span><select name="system.weaponSkillKey">{{selectOptions choices.weaponSkill selected=system.weaponSkillKey}}</select></label>
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HeavySkill"}}</span><input type="checkbox" name="system.isHeavyWeaponSkill" {{checked system.isHeavyWeaponSkill}} /></label>
-        </div>
+
+        {{#if skillIsMain}}
+          <div class="race-editor-block">
+            <div class="race-editor-block__header">
+              <span>{{localize "STARFRONTIERS.Item.SubSkills"}}</span>
+            </div>
+            <div class="linked-ability-drop-zone">
+              <span>{{localize "STARFRONTIERS.Item.DropSubSkill"}}</span>
+            </div>
+            {{#if linkedSubskills.length}}
+              <div class="linked-ability-list">
+                {{#each linkedSubskills as |sub|}}
+                  <div class="linked-ability-row">
+                    <div class="linked-ability-row__body">
+                      <strong>{{sub.name}}</strong>
+                    </div>
+                    <button type="button" data-action="removeSubskill" data-ref="{{sub.id}}">
+                      <i class="fa-solid fa-trash"></i>
+                      <span>{{localize "STARFRONTIERS.Item.RemoveSubSkill"}}</span>
+                    </button>
+                  </div>
+                {{/each}}
+              </div>
+            {{else}}
+              <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoSubSkills"}}</p>
+            {{/if}}
+          </div>
+        {{/if}}
       </fieldset>
     {{/if}}
 
@@ -213,10 +244,41 @@
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.TrainedAbilityData"}}</legend>
         <div class="compact-grid four-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.RollType"}}</span><select name="system.rollType">{{selectOptions choices.rollType selected=system.rollType}}</select></label>
           <label><span>{{localize "STARFRONTIERS.Item.BaseChance"}}</span><input type="number" name="system.baseChance" value="{{system.baseChance}}" min="0" max="100" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.CurrentChance"}}</span><input type="number" name="system.currentChance" value="{{system.currentChance}}" min="0" max="100" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Cap"}}</span><input type="number" name="system.cap" value="{{system.cap}}" min="0" max="100" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.XPPerPoint"}}</span><input type="number" name="system.xpPerPoint" value="{{system.xpPerPoint}}" min="0" /></label>
+        </div>
+
+        <div class="race-editor-block">
+          <div class="race-editor-block__header">
+            <span>{{localize "STARFRONTIERS.Item.Effects"}}</span>
+            <button type="button" data-action="addEffect">
+              <i class="fa-solid fa-plus"></i>
+              <span>{{localize "STARFRONTIERS.Item.AddEffect"}}</span>
+            </button>
+          </div>
+          {{#if itemEffects.length}}
+            <div class="effect-list">
+              {{#each itemEffects as |effect|}}
+                <div class="effect-row">
+                  <button type="button" class="effect-row__open" data-action="openEffect" data-effect-id="{{effect.id}}">
+                    <img class="effect-row__icon" src="{{effect.img}}" alt="" />
+                    <span class="effect-row__name">{{effect.name}}</span>
+                  </button>
+                  <div class="effect-row__badges">
+                    {{#if effect.transfer}}<span class="effect-row__badge" title="{{localize "STARFRONTIERS.Item.EffectTransfers"}}"><i class="fa-solid fa-arrow-up-from-bracket"></i></span>{{/if}}
+                    {{#if effect.disabled}}<span class="effect-row__badge effect-row__badge--off" title="{{localize "STARFRONTIERS.Item.EffectDisabled"}}"><i class="fa-solid fa-ban"></i></span>{{/if}}
+                  </div>
+                  <button type="button" class="effect-row__delete" data-action="deleteEffect" data-effect-id="{{effect.id}}" title="{{localize "STARFRONTIERS.Item.DeleteEffect"}}">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              {{/each}}
+            </div>
+          {{else}}
+            <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoEffects"}}</p>
+          {{/if}}
         </div>
       </fieldset>
     {{/if}}

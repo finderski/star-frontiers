@@ -20,10 +20,15 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     },
     actions: {
       addBonusPick: StarFrontiersItemSheet.#onAddBonusPick,
+      addEffect: StarFrontiersItemSheet.#onAddEffect,
       clearAmmo: StarFrontiersItemSheet.#onClearAmmo,
+      clearRequiredSkill: StarFrontiersItemSheet.#onClearRequiredSkill,
+      deleteEffect: StarFrontiersItemSheet.#onDeleteEffect,
       editImage: StarFrontiersItemSheet.#onEditImage,
+      openEffect: StarFrontiersItemSheet.#onOpenEffect,
       removeBonusPick: StarFrontiersItemSheet.#onRemoveBonusPick,
-      removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility
+      removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility,
+      removeSubskill: StarFrontiersItemSheet.#onRemoveSubskill
     }
   };
 
@@ -40,22 +45,29 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.item = item;
     context.system = item.system;
     context.editable = options.editable ?? this.options.editable ?? true;
-    context.typeLabel = ITEM_TYPE_LABELS[item.type] ?? item.type;
     context.is = Object.fromEntries(Object.keys(ITEM_TYPE_LABELS).map((type) => [type, item.type === type]));
     context.rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
     context.expandedRules = context.rulesEdition === "expanded";
-    context.nameLabel = item.type === "race"
-      ? "STARFRONTIERS.Item.Race"
-      : item.type === "trainedAbility"
-        ? "STARFRONTIERS.Item.RacialAbility"
-        : "STARFRONTIERS.Item.Name";
-    context.showKey = ["skill"].includes(item.type);
+    context.nameLabel = ITEM_TYPE_LABELS[item.type] ?? "STARFRONTIERS.Item.Name";
     context.showCost = !["race", "skill", "trainedAbility"].includes(item.type);
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
     context.weaponUsesSeu = item.type === "weapon" && item.system.ammo?.uses === "seu";
     context.linkedRacialAbilities = item.type === "race" ? await this.#resolveLinkedRacialAbilities(item) : [];
     context.bonusPickRows = item.type === "race" ? Array.from(item.system.bonusPicks ?? []) : [];
+    context.skillIsMain = item.type === "skill" && item.system.category === "main";
+    context.linkedSubskills = context.skillIsMain ? await this.#resolveLinkedSubskills(item) : [];
+    context.linkedRequiredSkill = item.type === "weapon" ? await this.#resolveRequiredSkill(item) : null;
+    context.itemEffects = item.type === "trainedAbility"
+      ? Array.from(item.effects ?? []).map(e => ({
+          id: e.id,
+          name: e.name,
+          img: e.img || "icons/svg/aura.svg",
+          transfer: e.transfer,
+          disabled: e.disabled
+        }))
+      : [];
+    context.imageUsesMask = (item.img ?? "").startsWith("icons/svg/");
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
     context.choices = this.#prepareChoices();
@@ -94,9 +106,11 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       screenPowerSource: this.#choices(["", "clip", "beltpack", "powerpack"], "STARFRONTIERS.Choice.ScreenPowerSource"),
       screenReduction: this.#choices(["", "half", "full", "absorbsN"], "STARFRONTIERS.Choice.ScreenReduction"),
       screenType: this.#choices(["", "albedo", "inertia", "gauss", "sonic", "chameleon", "holo"], "STARFRONTIERS.Choice.ScreenType"),
-      skillCategory: this.#choices(["racial", "psa", "general"], "STARFRONTIERS.Choice.SkillCategory"),
       sourceType: this.#choices(["", "powerclip", "beltpack", "powerpack", "parabatteryT1", "parabatteryT2", "parabatteryT3", "parabatteryT4", "ammoClip"], "STARFRONTIERS.Choice.SourceType"),
       vehicleDamageType: this.#choices(["", "ground", "flying"], "STARFRONTIERS.Choice.VehicleDamageType"),
+      attributeKey: this.#choices(["dex", "str"], "STARFRONTIERS.Choice.AttributeKey"),
+      rollType: this.#choices(["active", "passive"], "STARFRONTIERS.Choice.RollType"),
+      skillCategory: this.#choices(["main", "subskill"], "STARFRONTIERS.Choice.SkillCategory"),
       weaponSkill: this.#choices(["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"], "STARFRONTIERS.Choice.WeaponSkill"),
       weaponType: this.#choices(["melee", "beam", "projectile", "gyrojet", "grenade"], "STARFRONTIERS.Choice.WeaponType")
     };
@@ -128,6 +142,33 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   }
 
   async _onDropDocument(event, document) {
+    if (this.item.type === "skill" && this.item.system.category === "main"
+        && document.documentName === "Item" && document.type === "skill"
+        && document.system.category === "subskill") {
+      const sameActor = document.parent && document.parent === this.item.parent;
+      const ref = sameActor ? document.id : document.uuid;
+      const current = Array.from(this.item.system.subskillRefs ?? []);
+      if (!current.includes(ref)) {
+        current.push(ref);
+        await this.item.update({ "system.subskillRefs": current });
+      }
+      ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.SubskillLinked", { name: document.name }));
+      return document;
+    }
+
+    if (this.item.type === "skill" && document.documentName === "Item") {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropSubskillOnly"));
+      return null;
+    }
+
+    if (this.item.type === "weapon" && document.documentName === "Item" && document.type === "skill") {
+      const sameActor = document.parent && document.parent === this.item.parent;
+      const ref = sameActor ? document.id : document.uuid;
+      await this.item.update({ "system.requiredSkillRef": ref });
+      ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.SkillLinked", { name: document.name }));
+      return document;
+    }
+
     if (this.item.type === "race" && document.documentName === "Item" && document.type === "trainedAbility") {
       const sameActor = document.parent && document.parent === this.item.parent;
       const ref = sameActor ? document.id : document.uuid;
@@ -249,5 +290,60 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     if (index < 0 || index >= current.length) return;
     current.splice(index, 1);
     await this.item.update({ "system.bonusPicks": current });
+  }
+
+  async #resolveLinkedSubskills(item) {
+    const refs = Array.from(item.system.subskillRefs ?? []);
+    const subskills = [];
+    for (const ref of refs) {
+      let doc = item.actor?.items?.get(ref) ?? game.items?.get(ref) ?? null;
+      if (!doc && globalThis.fromUuid) {
+        try { doc = await globalThis.fromUuid(ref); } catch { doc = null; }
+      }
+      if (!doc || doc.type !== "skill") continue;
+      subskills.push({ id: ref, name: doc.name });
+    }
+    return subskills;
+  }
+
+  async #resolveRequiredSkill(item) {
+    const ref = item.system.requiredSkillRef;
+    if (!ref) return null;
+    const owned = item.actor?.items?.get(ref);
+    if (owned) return owned;
+    if (!globalThis.fromUuid) return null;
+    try { return await globalThis.fromUuid(ref); } catch { return null; }
+  }
+
+  static async #onRemoveSubskill(event, target) {
+    target ??= event.currentTarget;
+    const ref = target.dataset.ref ?? "";
+    if (!ref) return;
+    const current = Array.from(this.item.system.subskillRefs ?? []);
+    await this.item.update({ "system.subskillRefs": current.filter(r => r !== ref) });
+  }
+
+  static async #onClearRequiredSkill(event, target) {
+    await this.item.update({ "system.requiredSkillRef": "" });
+  }
+
+  static async #onAddEffect(event, target) {
+    const [effect] = await this.item.createEmbeddedDocuments("ActiveEffect", [{
+      name: game.i18n.localize("STARFRONTIERS.Item.NewEffect"),
+      transfer: false
+    }]);
+    effect?.sheet?.render(true);
+  }
+
+  static async #onOpenEffect(event, target) {
+    target ??= event.currentTarget;
+    const effect = this.item.effects.get(target.dataset.effectId ?? "");
+    effect?.sheet?.render(true);
+  }
+
+  static async #onDeleteEffect(event, target) {
+    target ??= event.currentTarget;
+    const effectId = target.dataset.effectId ?? "";
+    if (effectId) await this.item.deleteEmbeddedDocuments("ActiveEffect", [effectId]);
   }
 }

@@ -96,19 +96,11 @@ export class StarFrontiersSkillData extends StarFrontiersItemData {
       ...super.defineSchema(),
       psa: textField({ choices: ["", "military", "technological", "biosocial"] }),
       isPsaForOwner: boolField(),
-      category: textField({ initial: "psa", choices: ["racial", "psa", "general"] }),
+      category: textField({ initial: "main", choices: ["main", "subskill"] }),
       level: numberField({ initial: 0, min: 0, max: 6 }),
-      ability: textField({ choices: ["", "str", "sta", "dex", "rs", "int", "log", "per", "ldr"] }),
-      bonus: numberField({ initial: 0 }),
       rollFormula: textField(),
       weaponSkillKey: textField({ choices: ["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
-      isHeavyWeaponSkill: boolField(),
-      subskills: arrayField(schemaField({
-        key: textField(),
-        label: textField(),
-        successFormula: textField(),
-        notes: htmlField()
-      })),
+      subskillRefs: arrayField(textField()),
       xpCost: schemaField({
         perLevel: arrayField(numberField({ initial: 0, min: 0 })),
         nonPsaPerLevel: arrayField(numberField({ initial: 0, min: 0 }))
@@ -128,7 +120,6 @@ export class StarFrontiersTrainedAbilityData extends StarFrontiersItemData {
       ...super.defineSchema(),
       raceKey: textField(),
       baseChance: numberField({ initial: 0, min: 0, max: 100 }),
-      currentChance: numberField({ initial: 0, min: 0, max: 100 }),
       cap: numberField({ initial: 100, min: 0, max: 100 }),
       xpPerPoint: numberField({ initial: 0, min: 0 }),
       rollType: textField({ initial: "active", choices: ["active", "passive"] }),
@@ -151,6 +142,8 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
         initial: "beam",
         choices: ["melee", "beam", "projectile", "gyrojet", "grenade"]
       }),
+      attributeKey: textField({ initial: "dex", choices: ["dex", "str"] }),
+      requiredSkillRef: textField(),
       weaponSkillKey: textField({ choices: ["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
       damageFormula: textField(),
       damageType: textField({ choices: ["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"] }),

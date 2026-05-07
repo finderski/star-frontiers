@@ -1288,9 +1288,10 @@ button.roll-label-main:focus-visible {
 /* =====================================================================
  * 9. Character sheet — Skills & Equipment tab
  *
- * Two stacked fieldsets:
- *   - Skills box (Expanded only) — uses the shared item-list pattern
- *     (section 4d) for the skill list.
+ * Three fieldsets (Expanded rules):
+ *   - Skills box (Expanded only) — uses the shared item-list pattern (4d).
+ *   - Racial Abilities box (Expanded only, only when owned trainedAbility items
+ *     exist) — Name | Chance% | Roll/End buttons.
  *   - Equipment box — five-column grid Name | Qty | Mass | Carry | Actions.
  *     Encumbrance summary lives in this fieldset's header.
  *
@@ -1439,6 +1440,29 @@ button.roll-label-main:focus-visible {
   width: 100%;
 }
 
+/* --- 9b. Racial abilities --- */
+
+.racial-ability-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.racial-ability-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.racial-ability-row__chance {
+  font-family: var(--input);
+  font-size: 0.9em;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.racial-ability-end-btn {
+  color: var(--sf-focus);
+}
+
 
 /* =====================================================================
  * 10. Character sheet — Notes tab
@@ -1492,6 +1516,12 @@ button.roll-label-main:focus-visible {
   mask-position: center;
   mask-repeat: no-repeat;
   mask-size: contain;
+  width: 100%;
+}
+
+.item-image__art {
+  height: 100%;
+  object-fit: contain;
   width: 100%;
 }
 
@@ -1765,6 +1795,60 @@ button.roll-label-main:focus-visible {
   align-self: end;
   display: flex;
   justify-content: flex-end;
+}
+
+.effect-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.effect-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.effect-row__open {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  justify-content: flex-start;
+  min-width: 0;
+  text-align: left;
+}
+
+.effect-row__icon {
+  flex-shrink: 0;
+  height: 24px;
+  object-fit: contain;
+  width: 24px;
+}
+
+.effect-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.effect-row__badges {
+  display: flex;
+  gap: 4px;
+}
+
+.effect-row__badge {
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+
+.effect-row__badge--off {
+  color: var(--sf-danger, #c0392b);
+  opacity: 1;
+}
+
+.effect-row__delete {
+  flex-shrink: 0;
 }
 
 

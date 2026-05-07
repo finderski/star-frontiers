@@ -62,6 +62,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       clearDefenseSlot: StarFrontiersCharacterSheet.#onClearDefenseSlot,
       reloadWeapon: StarFrontiersCharacterSheet.#onReloadWeapon,
       toggleWeaponGear: StarFrontiersCharacterSheet.#onToggleWeaponGear,
+      rollRacialAbility: StarFrontiersCharacterSheet.#onRollRacialAbility,
+      toggleRacialAbilityEffect: StarFrontiersCharacterSheet.#onToggleRacialAbilityEffect,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
   };
@@ -97,6 +99,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.wornSuit = suitId ? actor.items.get(suitId) ?? null : null;
     context.wornScreen = screenId ? actor.items.get(screenId) ?? null : null;
     context.skillItems = actor.items.filter((item) => item.type === "skill");
+    context.racialAbilityRows = context.expandedRules ? this.#prepareRacialAbilityRows(actor) : [];
     context.equipmentRows = StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
     context.encumbrance = StarFrontiersCharacterSheet.#prepareEncumbranceContext(actor);
     context.enrichedPersonalNotes = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
@@ -118,6 +121,25 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }
     );
     return context;
+  }
+
+  #prepareRacialAbilityRows(actor) {
+    return actor.items
+      .filter((item) => item.type === "trainedAbility")
+      .map((item) => {
+        const progress = actor.system.racialSkillProgress?.[item.id];
+        const currentChance = progress?.currentChance ?? item.system.baseChance;
+        const effectId = item.system.triggersEffectId;
+        const effect = effectId ? item.effects.get(effectId) : null;
+        return {
+          id: item.id,
+          name: item.name,
+          isActiveRoll: item.system.rollType === "active",
+          currentChance,
+          triggersEffectId: effectId,
+          effectActive: effect ? !effect.disabled : false
+        };
+      });
   }
 
   async #prepareWeaponRows(actor) {
@@ -577,6 +599,25 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     await StarFrontiersCharacterSheet.#rollWeaponDamage(this.document, weapon, target.dataset.rollMode ?? "public");
   }
 
+  static async #onRollRacialAbility(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+    await StarFrontiersCharacterSheet.#rollRacialAbility(this.document, item);
+  }
+
+  static async #onToggleRacialAbilityEffect(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+    const effectId = item.system.triggersEffectId;
+    if (!effectId) return;
+    const effect = item.effects.get(effectId);
+    if (!effect) return;
+    await effect.update({ disabled: !effect.disabled });
+  }
+
+
   static async #onCycleCarryState(event, target) {
     target ??= event.currentTarget;
 
@@ -992,6 +1033,41 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         { label: game.i18n.localize("STARFRONTIERS.Character.InitiativeModifierLabel"), value: modifier >= 0 ? `+${modifier}` : String(modifier) },
         { label: game.i18n.localize("STARFRONTIERS.Character.Total"), value: String(roll.total) }
       ],
+      rollHtml
+    });
+  }
+
+  static async #rollRacialAbility(actor, item, rollMode = "public") {
+    const progress = actor.system.racialSkillProgress?.[item.id];
+    const chance = progress?.currentChance ?? item.system.baseChance;
+    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
+    const success = roll.total <= chance;
+    const rollHtml = await roll.render({
+      flavor: game.i18n.format("STARFRONTIERS.Character.RacialAbilityRollFlavor", { name: item.name })
+    });
+
+    if (success && item.system.triggersEffectId) {
+      const effect = item.effects.get(item.system.triggersEffectId);
+      if (effect && effect.disabled) {
+        await effect.update({ disabled: false });
+      }
+    }
+
+    await StarFrontiersCharacterSheet.#createCheckChatMessage(actor, {
+      title: game.i18n.format("STARFRONTIERS.Character.RacialAbilityRollTitle", {
+        name: StarFrontiersCharacterSheet.#getRollTitleName(actor),
+        ability: item.name
+      }),
+      subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
+      rows: [
+        { label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(chance) },
+        { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(roll.total).padStart(2, "0") }
+      ],
+      rollMode,
+      outcome: success
+        ? game.i18n.localize("STARFRONTIERS.Character.Success")
+        : game.i18n.localize("STARFRONTIERS.Character.Failure"),
+      outcomeClass: success ? "success" : "failure",
       rollHtml
     });
   }

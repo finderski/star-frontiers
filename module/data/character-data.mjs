@@ -4,6 +4,7 @@ import {
   boolField,
   htmlField,
   numberField,
+  objectField,
   schemaField,
   setField,
   textField
@@ -203,6 +204,8 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
           ability: textField({ initial: "", choices: ["", "str", "sta", "dex", "rs", "int", "log", "per", "ldr"] })
         }))
       }),
+
+      racialSkillProgress: objectField(),
 
       warnings: arrayField(warningField())
     };

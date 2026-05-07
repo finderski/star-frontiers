@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.2.3";
+export const CURRENT_SCHEMA_VERSION = "0.2.5";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -171,6 +171,97 @@ const MIGRATIONS = [
           if (foundry.utils.hasProperty(tokenDoc.actor._source, "system.energyRecord")) {
             await tokenDoc.actor.update({ "system.-=energyRecord": null });
           }
+        }
+      }
+    }
+  },
+  {
+    version: "0.2.4",
+    description: "Move trainedAbility currentChance from item schema to actor system.racialSkillProgress map",
+    async migrate() {
+      function collectProgress(items, invalidIds = new Set()) {
+        const progress = {};
+        for (const item of items) {
+          if (item.type !== "trainedAbility") continue;
+          const chance = item._source?.system?.currentChance ?? 0;
+          if (chance) progress[item.id] = { currentChance: chance };
+        }
+        for (const id of invalidIds) {
+          const item = items.get?.(id, { invalid: true });
+          if (!item || item.type !== "trainedAbility") continue;
+          const chance = item._source?.system?.currentChance ?? 0;
+          if (chance) progress[id] = { currentChance: chance };
+        }
+        return progress;
+      }
+
+      for (const actor of game.actors) {
+        if (actor.type !== "character") continue;
+        const progress = collectProgress(actor.items, actor.items.invalidDocumentIds);
+        if (Object.keys(progress).length) {
+          await actor.update({ "system.racialSkillProgress": progress });
+        }
+      }
+
+      for (const scene of game.scenes) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor || tokenDoc.actor.type !== "character") continue;
+          const progress = collectProgress(tokenDoc.actor.items, tokenDoc.actor.items.invalidDocumentIds);
+          if (Object.keys(progress).length) {
+            await tokenDoc.actor.update({ "system.racialSkillProgress": progress });
+          }
+        }
+      }
+    }
+  },
+  {
+    version: "0.2.5",
+    description: "Convert skill category choices from racial/psa/general to main/subskill",
+    async migrate() {
+      const OLD_TO_NEW = { racial: "main", psa: "main", general: "main" };
+
+      function buildUpdate(systemSource) {
+        const old = systemSource?.category;
+        if (!OLD_TO_NEW[old]) return null;
+        return { "system.category": "main" };
+      }
+
+      async function repairInvalid(collection) {
+        for (const id of collection.invalidDocumentIds ?? new Set()) {
+          const item = collection.get(id, { invalid: true });
+          if (item?.type !== "skill") continue;
+          const update = buildUpdate(item._source?.system);
+          if (update) await item.update(update);
+        }
+      }
+
+      for (const item of game.items) {
+        if (item.type !== "skill") continue;
+        const update = buildUpdate(item._source?.system);
+        if (update) await item.update(update);
+      }
+      await repairInvalid(game.items);
+
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          if (item.type !== "skill") continue;
+          const update = buildUpdate(item._source?.system);
+          if (update) await item.update(update);
+        }
+        await repairInvalid(actor.items);
+      }
+
+      for (const scene of game.scenes) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor) continue;
+          const rawItems = tokenDoc.delta?._source?.items ?? [];
+          const updates = [];
+          for (const itemSrc of rawItems) {
+            if (itemSrc?.type !== "skill") continue;
+            const update = buildUpdate(itemSrc.system);
+            if (update) updates.push({ _id: itemSrc._id, ...update });
+          }
+          if (updates.length) await tokenDoc.actor.updateEmbeddedDocuments("Item", updates);
         }
       }
     }

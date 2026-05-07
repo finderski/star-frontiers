@@ -425,6 +425,32 @@
         </fieldset>
       {{/if}}
 
+      {{#if racialAbilityRows.length}}
+        <fieldset class="paper-box racial-abilities-box">
+          <legend>{{localize "STARFRONTIERS.Character.RacialAbilities"}}</legend>
+          <div class="item-list">
+            {{#each racialAbilityRows as |row|}}
+              <div class="item-row racial-ability-row" data-item-id="{{row.id}}">
+                <span class="racial-ability-row__name">{{row.name}}</span>
+                <span class="racial-ability-row__chance">{{row.currentChance}}%</span>
+                <div class="item-actions racial-ability-row__actions">
+                  {{#if row.isActiveRoll}}
+                    <button type="button" data-action="rollRacialAbility" title="{{localize "STARFRONTIERS.Character.RollRacialAbility"}}">
+                      <i class="fa-solid fa-dice-d10"></i>
+                    </button>
+                  {{/if}}
+                  {{#if row.effectActive}}
+                    <button type="button" class="racial-ability-end-btn" data-action="toggleRacialAbilityEffect" title="{{localize "STARFRONTIERS.Character.EndRacialEffect"}}">
+                      <i class="fa-solid fa-fire-flame-curved"></i>
+                    </button>
+                  {{/if}}
+                </div>
+              </div>
+            {{/each}}
+          </div>
+        </fieldset>
+      {{/if}}
+
       <fieldset class="paper-box equipment-box">
         <legend>{{localize "STARFRONTIERS.Character.Equipment"}}</legend>
         <div class="equipment-grid equipment-grid--header">

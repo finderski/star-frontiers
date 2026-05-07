@@ -41,3 +41,7 @@ export function arrayField(element) {
 export function setField(element = textField()) {
   return new fields.SetField(element);
 }
+
+export function objectField(options = {}) {
+  return new fields.ObjectField(options);
+}
