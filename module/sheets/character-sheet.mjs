@@ -125,14 +125,18 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   #prepareSkillRows(actor) {
-    return actor.items
-      .filter((item) => item.type === "skill")
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        level: item.system.level ?? 0,
-        isSubskill: item.system.category === "subskill"
-      }));
+    const allSkills = actor.items.filter((item) => item.type === "skill");
+    const referencedIds = new Set(
+      allSkills
+        .filter((s) => s.system.category === "main")
+        .flatMap((s) => Array.from(s.system.subskillRefs ?? []))
+    );
+    return allSkills.map((item) => ({
+      id: item.id,
+      name: item.name,
+      level: item.system.level ?? 0,
+      isSubskill: item.system.category === "subskill" && referencedIds.has(item.id)
+    }));
   }
 
   #prepareRacialAbilityRows(actor) {
@@ -415,22 +419,29 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const refs = Array.from(document.system.subskillRefs ?? []);
       if (refs.length) {
         const toCreate = [];
+        const embeddedSubIds = [];
         for (const ref of refs) {
           let subDoc = game.items?.get(ref) ?? null;
           if (!subDoc && globalThis.fromUuid) {
             try { subDoc = await globalThis.fromUuid(ref); } catch { subDoc = null; }
           }
           if (!subDoc || subDoc.type !== "skill") continue;
-          const alreadyOwned = this.document.items.some((i) => i.type === "skill" && i.name === subDoc.name);
-          if (!alreadyOwned) {
+          const alreadyOwned = this.document.items.find((i) => i.type === "skill" && i.name === subDoc.name);
+          if (alreadyOwned) {
+            embeddedSubIds.push(alreadyOwned.id);
+          } else {
             const subData = subDoc.toObject();
             foundry.utils.setProperty(subData, "system.level", 1);
             toCreate.push(subData);
           }
         }
         if (toCreate.length) {
-          await this.document.createEmbeddedDocuments("Item", toCreate);
+          const createdSubs = await this.document.createEmbeddedDocuments("Item", toCreate);
+          embeddedSubIds.push(...createdSubs.map((s) => s.id));
           ui.notifications.info(game.i18n.format("STARFRONTIERS.Character.SubskillsAdded", { name: document.name, count: toCreate.length }));
+        }
+        if (embeddedSubIds.length) {
+          await created.update({ "system.subskillRefs": embeddedSubIds });
         }
       }
       return created;

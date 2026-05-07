@@ -1446,7 +1446,7 @@ button.roll-label-main:focus-visible {
   grid-template-columns: minmax(0, 1fr) 40px auto;
 }
 
-.skill-row--subskill .item-name-button {
+.skill-row--subskill {
   padding-left: 20px;
 }
 
