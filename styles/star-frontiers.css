@@ -321,6 +321,13 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   font-size: .85em;
 }
 
+.star-frontiers-sheet .borderlessInput {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
 
 /* =====================================================================
  * 4. Shared layout primitives
@@ -1411,6 +1418,13 @@ button.roll-label-main:focus-visible {
   gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(45%, 1fr));
   align-items: start;
+}
+
+.labelRow {
+  display: flex;
+  margin: 0 0 15px 0;
+  padding: 0 0 20px 0;
+  border-bottom: 2px solid var(--sf-line);
 }
 
 .equipment-section {

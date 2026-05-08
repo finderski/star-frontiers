@@ -128,7 +128,7 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
         perDay: numberField({ initial: 0, min: 0 }),
         perHour: numberField({ initial: 0, min: 0 })
       }),
-      psa: textField({ choices: ["", "military", "technological", "biosocial"] }),
+      psa: textField({ initial: "military",choices: ["military", "technological", "biosocial"] }),
 
       abilities: schemaField(Object.fromEntries(ABILITY_KEYS.map((key) => [key, abilityField()]))),
       stamina: vitalField(),

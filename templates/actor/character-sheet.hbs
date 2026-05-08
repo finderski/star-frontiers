@@ -456,6 +456,12 @@
       {{#if expandedRules}}
         <fieldset class="paper-box skills-box">
           <legend>{{localize "STARFRONTIERS.Character.Skills"}}</legend>
+          <div class="labelRow">
+            <label class="field-line">{{localize "STARFRONTIERS.Character.CareerPrimarySkillArea-abbr"}}</label>
+            <select class="borderlessInput" name="system.psa">
+              {{selectOptions psaChoices selected=system.psa localize=true}}
+            </select>
+          </div>
           <div class="item-list">
             {{#each skillRows as |row|}}
               <div class="item-row skill-row{{#if row.isSubskill}} skill-row--subskill{{/if}}" data-item-id="{{row.id}}">

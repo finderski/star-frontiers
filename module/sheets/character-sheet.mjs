@@ -24,6 +24,11 @@ const HANDEDNESS_CHOICES = {
   right: "STARFRONTIERS.Choice.Handedness.right",
   ambi: "STARFRONTIERS.Choice.Handedness.ambi"
 };
+const PSA_CHOICES = {
+  military: "STARFRONTIERS.Choice.PSA.military",
+  technological: "STARFRONTIERS.Choice.PSA.technological",
+  biosocial: "STARFRONTIERS.Choice.PSA.biosocial"
+};
 const CARRY_STATE_CHOICES = {
   ready: "STARFRONTIERS.Choice.CarryState.ready",
   carried: "STARFRONTIERS.Choice.CarryState.carried",
@@ -88,6 +93,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
     context.handednessChoices = HANDEDNESS_CHOICES;
+    context.psaChoices = PSA_CHOICES;
     context.carryStateChoices = CARRY_STATE_CHOICES;
     context.handednessKind = this.#normalizeHandedness(actor.system.handedness.kind);
     context.statsInitialized = StarFrontiersCharacterSheet.#isStatsInitialized(actor);
