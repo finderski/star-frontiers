@@ -428,7 +428,17 @@
         {{/if}}
       </div>
       <div class="personal-file__experience">
-        <span>{{localize "STARFRONTIERS.Character.Experience"}}</span>
+        <label class="bigLabel">{{localize "STARFRONTIERS.Character.Experience"}}</label>
+        <div class="fieldAndLabel">
+          <input type="number" name="system.experience.earned" value="{{system.experience.earned}}" min="0" />
+          <small>{{localize "STARFRONTIERS.Character.ExperienceAvailable"}}</small>
+        </div>
+        <span class="slash">/</span>
+        <div class="fieldAndLabel">
+          <input type="number" value="{{system.experience.spent}}" min="0" readonly />
+          <small>{{localize "STARFRONTIERS.Character.ExperienceSpent"}}</small>
+        </div>
+        <!--
         <div class="personal-file__experience-grid">
           <label class="personal-file__experience-field">
             <input type="number" name="system.experience.earned" value="{{system.experience.earned}}" min="0" />
@@ -439,6 +449,7 @@
             <small>{{localize "STARFRONTIERS.Character.ExperienceSpent"}}</small>
           </label>
         </div>
+        -->
       </div>
       <label>
         <span>{{localize "STARFRONTIERS.Character.Credits"}}</span>

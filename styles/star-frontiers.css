@@ -363,6 +363,19 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   grid-column: 1 / -1;
 }
 
+.bigLabel {
+  font-family: var(--fieldset);
+  font-size: 1.35em;
+  line-height: 1;
+  text-transform: uppercase;
+  align-content: start;
+}
+
+.fieldAndLabel {
+  display: flex;
+  flex-flow: column nowrap;
+}
+
 /* --- 4b. Field lines / stacked / labels ---
  * `.field-line` and `.paper-box label`: a label-text + input pair laid
  * out side-by-side. `.stacked` flips it to vertical (label above input).
@@ -1293,8 +1306,25 @@ button.roll-label-main:focus-visible {
 }
 
 .personal-file__experience {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-flow: row nowrap;
+  width: 100%;
+  column-gap: 5px;
+  justify-content: flex-start;
+  font-family: var(--fieldset);
+}
+
+.personal-file__experience .fieldAndLabel > input {
+  text-align: center;
+}
+
+.personal-file__experience small {
+  font-size: .65em;
+  text-align: center;
+}
+
+.personal-file__experience .slash {
+  font-size: 1.6em;
 }
 
 .personal-file__experience-grid {
