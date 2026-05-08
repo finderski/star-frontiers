@@ -380,14 +380,66 @@
 
     <fieldset class="paper-box personal-file">
       <legend>{{localize "STARFRONTIERS.Character.PersonalFile"}}</legend>
-      <label class="stacked">
+      <div class="stacked">
         <span>{{localize "STARFRONTIERS.Character.RacialAbilities"}}</span>
-        <textarea name="system.personalFile.racialAbilities">{{system.personalFile.racialAbilities}}</textarea>
-      </label>
-      <label>
+        {{#if racialAbilityRows.length}}
+          <div class="racial-ability-chip-list">
+            {{#each racialAbilityRows as |row|}}
+              <article class="racial-ability-chip" data-item-id="{{row.id}}">
+                <div class="racial-ability-chip__header">
+                  <button type="button" class="racial-ability-chip__name" data-action="openItem" title="{{localize "STARFRONTIERS.Character.OpenRacialAbility"}}">{{row.name}}</button>
+                  {{#if row.isActiveRoll}}
+                    <span class="racial-ability-chip__chance">{{row.currentChance}}% / {{row.cap}}%</span>
+                  {{else}}
+                    <span class="racial-ability-chip__mode">{{localize "STARFRONTIERS.Choice.RollType.passive"}}</span>
+                  {{/if}}
+                </div>
+                {{#if row.description}}
+                  <p class="racial-ability-chip__description">{{row.description}}</p>
+                {{/if}}
+                <div class="racial-ability-chip__footer">
+                  {{#if row.hasEffect}}
+                    <span class="racial-ability-chip__status{{#if row.effectActive}} racial-ability-chip__status--active{{/if}}">
+                      {{row.effectStatusLabel}}
+                    </span>
+                  {{/if}}
+                  <div class="item-actions racial-ability-chip__actions">
+                    {{#if row.isActiveRoll}}
+                      <button type="button" data-action="rollRacialAbility" title="{{localize "STARFRONTIERS.Character.RollRacialAbility"}}">
+                        <i class="fa-solid fa-dice-d10"></i>
+                      </button>
+                      <button type="button" data-action="decreaseRacialAbility" title="{{localize "STARFRONTIERS.Character.DecreaseRacialAbility"}}"{{#unless row.canDecrease}} disabled{{/unless}}>
+                        <i class="fa-solid fa-minus"></i>
+                      </button>
+                      <button type="button" data-action="increaseRacialAbility" title="{{localize "STARFRONTIERS.Character.IncreaseRacialAbility"}}"{{#unless row.canIncrease}} disabled{{/unless}}>
+                        <i class="fa-solid fa-plus"></i>
+                      </button>
+                    {{/if}}
+                    {{#if row.hasEffect}}
+                      <button type="button" class="racial-ability-effect-btn{{#if row.effectActive}} racial-ability-effect-btn--active{{/if}}" data-action="toggleRacialAbilityEffect" title="{{localize "STARFRONTIERS.Character.ToggleRacialEffect"}}">
+                        <i class="fa-solid fa-fire-flame-curved"></i>
+                      </button>
+                    {{/if}}
+                  </div>
+                </div>
+              </article>
+            {{/each}}
+          </div>
+        {{/if}}
+      </div>
+      <div class="personal-file__experience">
         <span>{{localize "STARFRONTIERS.Character.Experience"}}</span>
-        <input type="number" name="system.experience.earned" value="{{system.experience.earned}}" min="0" />
-      </label>
+        <div class="personal-file__experience-grid">
+          <label class="personal-file__experience-field">
+            <input type="number" name="system.experience.earned" value="{{system.experience.earned}}" min="0" />
+            <small>{{localize "STARFRONTIERS.Character.ExperienceAvailable"}}</small>
+          </label>
+          <label class="personal-file__experience-field">
+            <input type="number" value="{{system.experience.spent}}" min="0" readonly />
+            <small>{{localize "STARFRONTIERS.Character.ExperienceSpent"}}</small>
+          </label>
+        </div>
+      </div>
       <label>
         <span>{{localize "STARFRONTIERS.Character.Credits"}}</span>
         <input type="number" name="system.credits" value="{{system.credits}}" min="0" />
@@ -427,32 +479,6 @@
               <i class="fa-solid fa-plus"></i>
               <span>{{localize "STARFRONTIERS.Character.AddSkill"}}</span>
             </button>
-          </div>
-        </fieldset>
-      {{/if}}
-
-      {{#if racialAbilityRows.length}}
-        <fieldset class="paper-box racial-abilities-box">
-          <legend>{{localize "STARFRONTIERS.Character.RacialAbilities"}}</legend>
-          <div class="item-list">
-            {{#each racialAbilityRows as |row|}}
-              <div class="item-row racial-ability-row" data-item-id="{{row.id}}">
-                <span class="racial-ability-row__name">{{row.name}}</span>
-                <span class="racial-ability-row__chance">{{row.currentChance}}%</span>
-                <div class="item-actions racial-ability-row__actions">
-                  {{#if row.isActiveRoll}}
-                    <button type="button" data-action="rollRacialAbility" title="{{localize "STARFRONTIERS.Character.RollRacialAbility"}}">
-                      <i class="fa-solid fa-dice-d10"></i>
-                    </button>
-                  {{/if}}
-                  {{#if row.effectActive}}
-                    <button type="button" class="racial-ability-end-btn" data-action="toggleRacialAbilityEffect" title="{{localize "STARFRONTIERS.Character.EndRacialEffect"}}">
-                      <i class="fa-solid fa-fire-flame-curved"></i>
-                    </button>
-                  {{/if}}
-                </div>
-              </div>
-            {{/each}}
           </div>
         </fieldset>
       {{/if}}

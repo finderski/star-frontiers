@@ -104,17 +104,14 @@
 
 ## Schema versioning
 
-- Current schema version: **0.2.5** (stored in world setting `schemaVersion`).
+- Current schema version: **0.2.3** (stored in world setting `schemaVersion`).
 - Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
 - During development (pre-1.0), prefer patch bumps (`0.2.0 → 0.2.1`) for incremental schema fixes rather than jumping minor versions. Reserve minor bumps for end-of-phase milestones.
 - **0.2.0** — removes per-weapon range band `mod` fields and per-document `rulesEdition` fields; remaps old `weaponType` / `ammo.uses` values to the current choices.
 - **0.2.1** — repairs items the 0.2.0 walk could not see. Documents that fail schema validation get filtered out of `game.items` / `actor.items` and stashed in `collection.invalidDocumentIds`. 0.2.1 walks those IDs (using `collection.get(id, { invalid: true })`), and walks raw `tokenDoc.delta._source.items` for unlinked tokens (which similarly hides invalid docs). Reads from `_source` because `system.*` may have been replaced with defaults.
 - **0.2.2** — converts `system.defenses.suit` / `.screen` from free text to owned-item-ID refs (resolves stored value against the actor's items; clears if it doesn't point to a valid armor/screen). Also normalizes `carryState === "ready"` on armor/screen items to `"carried"`.
-- **0.2.4** — removes `currentChance` from `StarFrontiersTrainedAbilityData`. Adds `system.racialSkillProgress` (`ObjectField`) to `StarFrontiersCharacterData` — a map from `trainedAbility` item ID → `{ currentChance: number }`. Migration reads `_source.system.currentChance` from existing actor-owned items and writes the map to the actor before the field is gone.
-- **0.2.5** — converts `StarFrontiersSkillData.category` from the old choices `["racial", "psa", "general"]` to `["main", "subskill"]`. All three old values map to `"main"`. Walks world items, actor items, unlinked token raw source (`tokenDoc.delta._source.items`), and `invalidDocumentIds`.
 - **Always walk three places** for any document-data migration: world Items (`game.items`), world Actors (`game.actors` + `actor.items`), and unlinked scene tokens (`scene.tokens` filtered by `actorLink === false` → `tokenDoc.delta._source.items`, then update via `tokenDoc.actor.updateEmbeddedDocuments`). Also walk `invalidDocumentIds` if the migration is about choice-validated fields.
 - **New optional fields with schema defaults do not require a migration** — TypeDataModel fills in defaults for stored documents that predate the field. The encumbrance/equipment additions (carryState/quantity/mass on gear, consumable, ammo, powerSource, armor, screen, weapon) all rely on this — no migration was bumped.
-- **migrations.mjs syntax hazard** — a stray extra `}` was previously left after the 0.2.4 entry, causing a JS SyntaxError that prevented the entire system from loading (sheets fell back to Foundry defaults). When editing migration entries, always count closing braces carefully: `migrate()` closes at 4 spaces, migration object at 2 spaces (with the array comma on the same line as the brace: `  },`).
 
 ---
 
@@ -128,9 +125,14 @@
 - `STA` is intentionally split from current health-like tracking:
   - `system.abilities.sta.base`
   - `system.abilities.sta.value`
-  - `system.stamina.value` = current in-play stamina
-  - `system.stamina.max` = derived from current STA plus temp
+- `system.stamina.value` = current in-play stamina
+- `system.stamina.max` = derived from current STA plus temp
 - Do not collapse `STA` and current stamina into one field without asking.
+- Character experience is currently modeled as:
+  - `system.experience.earned`: available / unspent XP pool
+  - `system.experience.spent`: XP already committed to advancements
+  - `system.experience.total`: derived `earned + spent`
+  This is already live in the Personal File UI, so do not reinterpret `earned` as “lifetime earned only” without discussing the migration and UX impact.
 
 ### Race application
 - Dropping a `race` item on a character updates `system.race`.
@@ -141,9 +143,10 @@
 - `IM` is derived as `ceil(RS / 10) + race.system.modifiers.im`. It is not a separate stored actor stat.
 - `race.system.racialAbilityRefs` is the active link model for race-authored special abilities. It stores refs/UUIDs to `trainedAbility` items, which are presented in the UI as **Racial Ability** items.
 - `system.charGen.raceBonusSelections` stores Expanded-rules race bonus-pick choices as one entry per granted slot (`sourceIndex`, `slot`, `amount`, `appliesTo`, `ability`). This is the source of truth for Human-style single-ability boosts.
-- In **Expanded** rules, dropping a race imports linked racial-ability items onto the actor (owned `trainedAbility` items stamped with `system.raceKey`) and fills `system.personalFile.racialAbilities` from those linked items plus bonus-pick text.
+- Dropping a race imports linked racial-ability items onto the actor (owned `trainedAbility` items stamped with `system.raceKey`) for both Basic and Expanded rules.
+- In **Expanded** rules, race application also fills the legacy `system.personalFile.racialAbilities` summary field from linked abilities plus bonus-pick text, but the sheet UI no longer reads from that field.
 - In **Expanded** rules, dropping a race also prompts for any configured bonus-pick slots, stores the selections on the actor, and applies them on top of paired race modifiers during stat generation, race changes, and manual base-score back-calculation.
-- In **Basic** rules, race drops still apply name/movement/stat mods, but do **not** populate `system.personalFile.racialAbilities`, and existing race-keyed racial-ability items from the previous race are cleaned up on drop.
+- In **Basic** rules, race drops still apply name/movement/stat mods and import linked racial-ability items, but skip the bonus-pick prompt and do not use the legacy summary field.
 
 ### Weapon/ammo
 - Weapon rows on the character sheet display **loaded ammo**, not spent ammo.
@@ -172,7 +175,9 @@
 - Character-level progression state for racial abilities lives on the **actor**, not the item. The `trainedAbility` item is a template; the actor tracks how good each character is at each ability.
 - `system.racialSkillProgress` on character actors is a plain `ObjectField` (no inner schema) keyed by the owned `trainedAbility` item's ID: `{ [itemId]: { currentChance: number } }`.
 - When reading current chance for a racial ability roll, look up `actor.system.racialSkillProgress[item.id]?.currentChance ?? item.system.baseChance`.
-- Do not add `currentChance` back to `StarFrontiersTrainedAbilityData` — it was deliberately removed in 0.2.4.
+- The Profile-tab racial-ability chip controls are now an **XP-spend testbed**: `+` costs 1 available XP and adds 1 spent XP, `-` refunds 1 spent XP back to available, and chance cannot drop below `item.system.baseChance`.
+- `item.system.xpPerPoint` is still template data on the Racial Ability item sheet, but the current character-sheet advancement controls do **not** consume it yet. Live behavior is fixed-cost `1 XP` per `±1 chance`.
+- Do not add `currentChance` back to `StarFrontiersTrainedAbilityData` — it is intentionally actor-owned progression state.
 
 ### Defense slots (Suit / Screen)
 - `system.defenses.suit` and `system.defenses.screen` on a character actor hold the **owned-item ID** of the currently-worn armor/screen. They are NOT free text. Free-text values were converted in 0.2.2.
@@ -219,13 +224,10 @@
   - label the header field as **Racial Ability**
   - do **not** show `system.key`
   - do **not** show `system.raceKey` (it is managed by race-drop/import logic, not by hand)
-  - do **not** show `system.currentChance` — that field no longer exists on the item schema (moved to actor in 0.2.4)
-  - currently expose `description`, `baseChance`, `cap`, and `xpPerPoint` (three-column grid)
+  - do **not** show `system.currentChance` — current chance is actor progress, not item-template data
+  - currently expose `description`, `rollType`, `baseChance`, `cap`, `xpPerPoint`, `triggersEffectId`, `cooldown.duration`, and an embedded Active Effects list/editor
 - Item sheet header (all types):
-  - no `system.key` field — removed from all item sheets
-  - no `<Item Type>` label span — removed from all item sheets
-  - `nameLabel` is always `ITEM_TYPE_LABELS[item.type]` (e.g. “WEAPON”, “SKILL”, “RACIAL ABILITY”) — the label above the name input identifies the type
-  - item image: `imageUsesMask = img.startsWith(“icons/svg/”)`. Only Foundry built-in icons use the CSS mask-image (color adapts to `--sf-ink`). All other images (artwork SVGs, PNGs, custom paths) use `<img class=”item-image__art”>` so colors render correctly. Do not revert to the `.endsWith(“.svg”)` check — it broke artwork SVGs.
+  - the name label is type-specific only where useful (`Race`, `Racial Ability`); other item types use the generic `Name`
 - Skill item sheets:
   - 4-column row: PSA | Category | Attribute | Roll Formula
   - `category` choices: `main` · `subskill`
@@ -275,12 +277,12 @@
   - Active tab is held on the sheet instance as `this._activeTab`; `#applyActiveTab()` swaps `--active` classes on buttons and panels without forcing a re-render.
   - Tab state survives `submitOnChange` re-renders because `_onRender` re-applies the active class from the same instance value. Lost on sheet close.
   - Profile tab: identity header (always visible above tabs), Physical Data, Medical Record, Weapons, Defenses+Energy column, Personal File.
-  - Skills+Equipment tab: Skills fieldset (Expanded only) + Racial Abilities fieldset (Expanded only, only when `trainedAbility` items are owned) + Equipment fieldset (always). The old combined "Skills and Equipment" reverse-side fieldset has been split into separate fieldsets. Skill rows have: name button (triggers `rollSkill` check), level inline input (main skills only; `data-item-field="system.level"`), open + delete buttons (delete hidden on sub-skills). Sub-skills indent via `.skill-row--subskill`. Dropping a main skill sets level to 1 and auto-creates its sub-skills (also at level 1) from `subskillRefs`. Changing a main skill's level cascades to all owned sub-skills. Deleting a main skill batch-deletes its sub-skills.
+  - Skills+Equipment tab: Skills fieldset (Expanded only) + Equipment fieldset (always). The old combined "Skills and Equipment" reverse-side fieldset has been split into separate fieldsets. Skill rows have: name button (triggers `rollSkill` check), level inline input (main skills only; `data-item-field="system.level"`), open + delete buttons (delete hidden on linked sub-skills only). Sub-skills indent via `.skill-row--subskill` (`padding-left: 20px` on the row). Dropping a main skill sets level to 1, auto-creates its sub-skills (also at level 1), then writes embedded IDs back to the parent's `subskillRefs`. Changing a main skill's level cascades to all owned sub-skills. Deleting a main skill batch-deletes its sub-skills. Orphaned sub-skills (parent deleted, no main skill references their ID) are treated as non-sub-skills and show the delete button.
   - Notes tab: ProseMirror notes + (Expanded only) the Expanded Rules notes textarea.
 - Top section is functional:
   - stat generation button
   - race drag/drop updates race and derived movement
-  - Expanded race drag/drop also imports linked racial abilities and updates the `Racial Abilities` character section
+  - race drag/drop also imports linked racial abilities onto the actor
 - Stat generation:
   - rolls d100 per paired stat
   - translates using the Alpha Dawn table
@@ -293,6 +295,11 @@
   - ability checks prompt for a modifier; modifier changes the **target**, not the die roll
   - `STA` checks use a world setting to choose between current stamina and STA score
 - Medical section (Profile tab) is partially implemented; `Current STA` is editable and injuries field exists.
+- Personal File:
+  - racial abilities render here as actor-owned chip/cards, not a textarea
+  - chip name opens the owned Racial Ability item
+  - active-roll abilities can roll from the chip, adjust current chance with `+/-`, and show/toggle linked effect state
+  - Experience renders as one heading with two fields underneath: editable Available XP and read-only Spent XP
 
 ## Roadmap status (high level)
 This reflects the current local notes and implemented work, not a live Asana sync.
@@ -322,6 +329,8 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Battle Rage follow-through:
   - Wire `combatProfile.meleeBonus` into the attack roll so AEs that write to that field actually modify the to-hit calculation
   - Verify the AE `transfer: true` / `disabled` toggle cycle works end-to-end in Foundry (set `disabled: false` on success → AE propagates to actor → bonus applies; fire button sets `disabled: true` → bonus removed)
+- Racial Abilities:
+  - decide whether chip advancement should start honoring `item.system.xpPerPoint` instead of the current fixed-cost `1 XP` testbed
 - Attack roll rework:
   - Replace `weaponSkillKey` string lookup with `weapon.system.requiredSkillRef` + `weapon.system.attributeKey`
   - Use `attributeKey` (dex/str) as the base ability for the Expanded-rules formula: `½ attr + (skill.system.level * 10)`
@@ -356,7 +365,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not gate the attacker/target combat encumbrance modifiers behind the two `encumbranceAffectsPhysical/NonPhysical` world settings. Those settings only extend the −10 to ability/skill checks. Combat mods are core Expanded rules and always applied.
 - Do not expose `weapon.system.quantity` on the weapon item sheet — it lives on the gear panel slide-up on the character sheet by design (character-tied data, not item-template data).
 - Do not store free text in `system.defenses.suit` / `system.defenses.screen` — those fields hold owned-item IDs only. The legacy free-text behavior was deprecated in 0.2.2 and the migration cleared stale values.
-- Do not add `currentChance` back to `StarFrontiersTrainedAbilityData`. It was deliberately moved to `system.racialSkillProgress` on the actor in 0.2.4 because skill progress is character state, not item-template data.
+- Do not add `currentChance` back to `StarFrontiersTrainedAbilityData`. It was deliberately moved to `system.racialSkillProgress` on the actor because skill progress is character state, not item-template data.
+- Do not repurpose `system.experience.earned` away from “available XP” without asking. The Personal File advancement controls now treat `earned` as the spendable pool, `spent` as the refund/undo pool, and `total` as the derived sum.
+- Do not store world-item IDs in `skill.system.subskillRefs` on actor-owned skills. After dropping a main skill and auto-creating its sub-skills, the refs must be rewritten to the new embedded item IDs. The cascade delete and level-sync both rely on `refs.includes(i.id)` where `i.id` is the embedded ID.
 - Do not add a fourth `"active"` / `"worn"` carry state for armor/screen — "worn" is tracked on the character via `defenses.suit/screen` refs, not on the item. Armor/screen carry-state is intentionally `carried ↔ stored` only.
 - Do not merge `armor` and `screen` into one item type. They have genuinely different mechanics (per-damage-type reductions vs. defends-set + SEU absorption with power source). The shared item sheet already factors common fields (cost, mass, description, image).
 

@@ -48,7 +48,11 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.is = Object.fromEntries(Object.keys(ITEM_TYPE_LABELS).map((type) => [type, item.type === type]));
     context.rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
     context.expandedRules = context.rulesEdition === "expanded";
-    context.nameLabel = ITEM_TYPE_LABELS[item.type] ?? "STARFRONTIERS.Item.Name";
+    context.nameLabel = item.type === "race"
+      ? "STARFRONTIERS.Item.Race"
+      : item.type === "trainedAbility"
+        ? "STARFRONTIERS.Item.RacialAbility"
+        : "STARFRONTIERS.Item.Name";
     context.showCost = !["race", "skill", "trainedAbility"].includes(item.type);
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
@@ -68,6 +72,12 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
           disabled: e.disabled
         }))
       : [];
+    context.effectChoices = item.type === "trainedAbility"
+      ? {
+          "": game.i18n.localize("STARFRONTIERS.Choice.None"),
+          ...Object.fromEntries(context.itemEffects.map((effect) => [effect.id, effect.name]))
+        }
+      : {};
     context.imageUsesMask = (item.img ?? "").startsWith("icons/svg/");
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
@@ -342,7 +352,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   static async #onAddEffect(event, target) {
     const [effect] = await this.item.createEmbeddedDocuments("ActiveEffect", [{
       name: game.i18n.localize("STARFRONTIERS.Item.NewEffect"),
-      transfer: false
+      transfer: this.item.type === "trainedAbility"
     }]);
     effect?.sheet?.render(true);
   }

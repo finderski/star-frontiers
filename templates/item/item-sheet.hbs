@@ -257,6 +257,13 @@
           <label><span>{{localize "STARFRONTIERS.Item.Cap"}}</span><input type="number" name="system.cap" value="{{system.cap}}" min="0" max="100" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.XPPerPoint"}}</span><input type="number" name="system.xpPerPoint" value="{{system.xpPerPoint}}" min="0" /></label>
         </div>
+        <div class="compact-grid two-columns">
+          <label>
+            <span>{{localize "STARFRONTIERS.Item.TriggerEffect"}}</span>
+            <select name="system.triggersEffectId">{{selectOptions effectChoices selected=system.triggersEffectId}}</select>
+          </label>
+          <label><span>{{localize "STARFRONTIERS.Item.CooldownMinutes"}}</span><input type="number" name="system.cooldown.duration" value="{{system.cooldown.duration}}" min="0" /></label>
+        </div>
 
         <div class="race-editor-block">
           <div class="race-editor-block__header">

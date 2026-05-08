@@ -64,6 +64,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       toggleWeaponGear: StarFrontiersCharacterSheet.#onToggleWeaponGear,
       rollRacialAbility: StarFrontiersCharacterSheet.#onRollRacialAbility,
       toggleRacialAbilityEffect: StarFrontiersCharacterSheet.#onToggleRacialAbilityEffect,
+      increaseRacialAbility: StarFrontiersCharacterSheet.#onIncreaseRacialAbility,
+      decreaseRacialAbility: StarFrontiersCharacterSheet.#onDecreaseRacialAbility,
       rollSkill: StarFrontiersCharacterSheet.#onRollSkill,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
@@ -100,7 +102,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.wornSuit = suitId ? actor.items.get(suitId) ?? null : null;
     context.wornScreen = screenId ? actor.items.get(screenId) ?? null : null;
     context.skillRows = context.expandedRules ? this.#prepareSkillRows(actor) : [];
-    context.racialAbilityRows = context.expandedRules ? this.#prepareRacialAbilityRows(actor) : [];
+    context.racialAbilityRows = this.#prepareRacialAbilityRows(actor);
     context.equipmentRows = StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
     context.encumbrance = StarFrontiersCharacterSheet.#prepareEncumbranceContext(actor);
     context.enrichedPersonalNotes = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
@@ -142,18 +144,28 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   #prepareRacialAbilityRows(actor) {
     return actor.items
       .filter((item) => item.type === "trainedAbility")
+      .sort((a, b) => a.name.localeCompare(b.name))
       .map((item) => {
-        const progress = actor.system.racialSkillProgress?.[item.id];
-        const currentChance = progress?.currentChance ?? item.system.baseChance;
-        const effectId = item.system.triggersEffectId;
-        const effect = effectId ? item.effects.get(effectId) : null;
+        const currentChance = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
+        const baseChance = Number(item.system.baseChance ?? 0);
+        const effect = StarFrontiersCharacterSheet.#getRacialAbilityEffect(item);
+        const cap = Number(item.system.cap ?? 100);
+        const availableXp = Number(actor.system.experience?.earned ?? 0);
+        const spentXp = Number(actor.system.experience?.spent ?? 0);
         return {
           id: item.id,
           name: item.name,
+          description: StarFrontiersCharacterSheet.#plainTextFromHtml(item.system.description ?? ""),
           isActiveRoll: item.system.rollType === "active",
           currentChance,
-          triggersEffectId: effectId,
-          effectActive: effect ? !effect.disabled : false
+          cap,
+          canIncrease: availableXp > 0 && currentChance < cap,
+          canDecrease: spentXp > 0 && currentChance > baseChance,
+          hasEffect: Boolean(effect),
+          effectActive: effect ? !effect.disabled : false,
+          effectStatusLabel: effect && !effect.disabled
+            ? game.i18n.localize("STARFRONTIERS.Character.EffectActive")
+            : game.i18n.localize("STARFRONTIERS.Character.EffectReady")
         };
       });
   }
@@ -665,6 +677,22 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     await StarFrontiersCharacterSheet.#rollRacialAbility(this.document, item);
   }
 
+  static async #onIncreaseRacialAbility(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+    this._rememberScrollPosition();
+    await StarFrontiersCharacterSheet.#adjustRacialAbilityChance(this.document, item, 1);
+  }
+
+  static async #onDecreaseRacialAbility(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+    this._rememberScrollPosition();
+    await StarFrontiersCharacterSheet.#adjustRacialAbilityChance(this.document, item, -1);
+  }
+
   static async #onRollSkill(event, target) {
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
@@ -676,10 +704,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
-    const effectId = item.system.triggersEffectId;
-    if (!effectId) return;
-    const effect = item.effects.get(effectId);
+    const effect = StarFrontiersCharacterSheet.#getRacialAbilityEffect(item);
     if (!effect) return;
+    this._rememberScrollPosition();
     await effect.update({ disabled: !effect.disabled });
   }
 
@@ -1104,16 +1131,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static async #rollRacialAbility(actor, item, rollMode = "public") {
-    const progress = actor.system.racialSkillProgress?.[item.id];
-    const chance = progress?.currentChance ?? item.system.baseChance;
+    const chance = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
     const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
     const success = roll.total <= chance;
     const rollHtml = await roll.render({
       flavor: game.i18n.format("STARFRONTIERS.Character.RacialAbilityRollFlavor", { name: item.name })
     });
 
-    if (success && item.system.triggersEffectId) {
-      const effect = item.effects.get(item.system.triggersEffectId);
+    if (success && game.settings.get(SYSTEM_ID, "automateActiveEffects")) {
+      const effect = StarFrontiersCharacterSheet.#getRacialAbilityEffect(item);
       if (effect && effect.disabled) {
         await effect.update({ disabled: false });
       }
@@ -1135,6 +1161,36 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         : game.i18n.localize("STARFRONTIERS.Character.Failure"),
       outcomeClass: success ? "success" : "failure",
       rollHtml
+    });
+  }
+
+  static async #adjustRacialAbilityChance(actor, item, delta) {
+    const current = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
+    const base = Number(item.system.baseChance ?? 0);
+    const cap = Number(item.system.cap ?? 100);
+    const availableXp = Number(actor.system.experience?.earned ?? 0);
+    const spentXp = Number(actor.system.experience?.spent ?? 0);
+    const next = Math.min(Math.max(current + delta, base), cap);
+    if (next === current) return;
+
+    if (delta > 0 && availableXp <= 0) return;
+    if (delta < 0 && (spentXp <= 0 || current <= base)) return;
+
+    const progress = foundry.utils.deepClone(actor.system.racialSkillProgress ?? {});
+    if (next <= base) {
+      delete progress[item.id];
+    } else {
+      progress[item.id] = {
+        ...(progress[item.id] ?? {}),
+        currentChance: next
+      };
+    }
+
+    const xpDirection = delta > 0 ? 1 : -1;
+    await actor.update({
+      "system.racialSkillProgress": progress,
+      "system.experience.earned": Math.max(availableXp - xpDirection, 0),
+      "system.experience.spent": Math.max(spentXp + xpDirection, 0)
     });
   }
 
@@ -1479,6 +1535,22 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static #clampAbility(value) {
     return Math.min(Math.max(value, 1), 100);
+  }
+
+  static #getRacialAbilityCurrentChance(actor, item) {
+    const stored = actor.system.racialSkillProgress?.[item.id]?.currentChance;
+    const base = Number(item.system.baseChance ?? 0);
+    const cap = Number(item.system.cap ?? 100);
+    return Math.min(Math.max(Number(stored ?? base), 0), cap);
+  }
+
+  static #getRacialAbilityEffect(item) {
+    const effectId = item.system.triggersEffectId;
+    if (effectId) {
+      const linked = item.effects.get(effectId);
+      if (linked) return linked;
+    }
+    return item.effects.size === 1 ? item.effects.contents[0] : null;
   }
 
   static #getAbilityCheckTarget(actor, ability) {
@@ -1864,19 +1936,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static async #syncRaceLinkedAbilities(actor, race, previousRace = null) {
     const previousKey = previousRace ? StarFrontiersCharacterSheet.#raceLinkKey(previousRace) : "";
     const currentKey = StarFrontiersCharacterSheet.#raceLinkKey(race);
-    const expandedRules = game.settings.get(SYSTEM_ID, "rulesEdition") === "expanded";
-
-    if (!expandedRules) {
-      if (previousKey) {
-        const staleIds = actor.items
-          .filter((item) => item.type === "trainedAbility" && item.system.raceKey === previousKey)
-          .map((item) => item.id);
-        if (staleIds.length) {
-          await actor.deleteEmbeddedDocuments("Item", staleIds);
-        }
-      }
-      return;
-    }
 
     if (previousKey && previousKey !== currentKey) {
       const staleIds = actor.items

@@ -227,6 +227,10 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   color: var(--sf-muted);
 }
 
+.star-frontiers-item-sheet input[type="checkbox"] {
+  border-bottom: none;
+}
+
 .star-frontiers-sheet textarea.fieldInput {
   font-size: 0.75em;
 }
@@ -1199,6 +1203,7 @@ button.roll-label-main:focus-visible {
 .left-column {
   display: grid;
   gap: 18px;
+  align-items:start;
 }
 
 .defenses-box {
@@ -1280,18 +1285,118 @@ button.roll-label-main:focus-visible {
   gap: 18px;
 }
 
-.personal-file textarea {
-  min-height: 155px;
+.personal-file__experience {
+  display: grid;
+  gap: 10px;
+}
+
+.personal-file__experience-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.personal-file__experience-field {
+  display: grid;
+  gap: 6px;
+}
+
+.personal-file__experience-field small {
+  color: var(--sf-muted);
+  font-family: var(--fieldset);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.racial-ability-chip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.racial-ability-chip {
+  border: 1px solid var(--sf-row-line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.star-frontiers-sheet .racial-ability-chip__name {
+  background: transparent;
+  border: none;
+  color: var(--sf-ink);
+  font-family: var(--fieldset);
+  font-size: 0.95rem;
+  height: auto;
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.racial-ability-chip__header,
+.racial-ability-chip__footer {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.racial-ability-chip__chance,
+.racial-ability-chip__mode {
+  font-family: var(--input);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.racial-ability-chip__mode {
+  color: var(--sf-muted);
+}
+
+.racial-ability-chip__description {
+  color: var(--sf-muted);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.racial-ability-chip__status {
+  border: 1px solid var(--sf-row-line);
+  color: var(--sf-muted);
+  display: inline-flex;
+  font-family: var(--fieldset);
+  font-size: 0.68rem;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.racial-ability-chip__status--active {
+  border-color: var(--sf-focus);
+  color: var(--sf-focus);
+}
+
+.racial-ability-chip__actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.racial-ability-chip__actions button[disabled] {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.racial-ability-effect-btn--active {
+  color: var(--sf-focus);
 }
 
 
 /* =====================================================================
  * 9. Character sheet — Skills & Equipment tab
  *
- * Three fieldsets (Expanded rules):
+ * Two fieldsets (Expanded rules):
  *   - Skills box (Expanded only) — uses the shared item-list pattern (4d).
- *   - Racial Abilities box (Expanded only, only when owned trainedAbility items
- *     exist) — Name | Chance% | Roll/End buttons.
  *   - Equipment box — five-column grid Name | Qty | Mass | Carry | Actions.
  *     Encumbrance summary lives in this fieldset's header.
  *
@@ -1461,30 +1566,6 @@ button.roll-label-main:focus-visible {
   text-align: center;
   width: 100%;
 }
-
-/* --- 9c. Racial abilities --- */
-
-.racial-ability-row {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-}
-
-.racial-ability-row__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.racial-ability-row__chance {
-  font-family: var(--input);
-  font-size: 0.9em;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.racial-ability-end-btn {
-  color: var(--sf-focus);
-}
-
 
 /* =====================================================================
  * 10. Character sheet — Notes tab
