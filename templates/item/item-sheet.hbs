@@ -34,7 +34,7 @@
           name="system.description"
           data-document-u-u-i-d="{{item.uuid}}"
           value="{{system.description}}"
-          collaborate="true"
+          collaborate="false"
           toggled="true"
         >
           {{{enrichedDescription}}}
@@ -70,14 +70,18 @@
               {{#each linkedRacialAbilities as |ability|}}
                 <div class="linked-ability-row">
                   <div class="linked-ability-row__body">
-                    <strong>{{ability.name}}</strong>
+                    <button
+                      type="button"
+                      class="linked-ability-row__toggle"
+                      data-action="toggleLinkedRaceAbilityExpanded"
+                      aria-expanded="false"
+                    >{{ability.name}}</button>
                     {{#if ability.description}}
                       <div class="linked-ability-row__description">{{{ability.description}}}</div>
                     {{/if}}
                   </div>
-                  <button type="button" data-action="removeLinkedRaceAbility" data-ref="{{ability.id}}">
+                  <button type="button" data-action="removeLinkedRaceAbility" data-ref="{{ability.id}}" title="{{localize "STARFRONTIERS.Item.RemoveRaceAbility"}}">
                     <i class="fa-solid fa-trash"></i>
-                    <span>{{localize "STARFRONTIERS.Item.RemoveRaceAbility"}}</span>
                   </button>
                 </div>
               {{/each}}
@@ -103,9 +107,8 @@
                   <label><span>{{localize "STARFRONTIERS.Item.Slots"}}</span><input type="number" name="system.bonusPicks.{{index}}.slots" value="{{pick.slots}}" min="0" /></label>
                   <label><span>{{localize "STARFRONTIERS.Item.AppliesTo"}}</span><select name="system.bonusPicks.{{index}}.appliesTo">{{selectOptions @root.choices.bonusPickAppliesTo selected=pick.appliesTo}}</select></label>
                   <div class="race-bonus-row__actions">
-                    <button type="button" data-action="removeBonusPick" data-index="{{index}}">
+                    <button type="button" data-action="removeBonusPick" data-index="{{index}}" title="{{localize "STARFRONTIERS.Item.RemoveBonusPick"}}">
                       <i class="fa-solid fa-trash"></i>
-                      <span>{{localize "STARFRONTIERS.Item.RemoveBonusPick"}}</span>
                     </button>
                   </div>
                 </div>
@@ -256,13 +259,6 @@
           <label><span>{{localize "STARFRONTIERS.Item.BaseChance"}}</span><input type="number" name="system.baseChance" value="{{system.baseChance}}" min="0" max="100" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Cap"}}</span><input type="number" name="system.cap" value="{{system.cap}}" min="0" max="100" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.XPPerPoint"}}</span><input type="number" name="system.xpPerPoint" value="{{system.xpPerPoint}}" min="0" /></label>
-        </div>
-        <div class="compact-grid two-columns">
-          <label>
-            <span>{{localize "STARFRONTIERS.Item.TriggerEffect"}}</span>
-            <select name="system.triggersEffectId">{{selectOptions effectChoices selected=system.triggersEffectId}}</select>
-          </label>
-          <label><span>{{localize "STARFRONTIERS.Item.CooldownMinutes"}}</span><input type="number" name="system.cooldown.duration" value="{{system.cooldown.duration}}" min="0" /></label>
         </div>
 
         <div class="race-editor-block">

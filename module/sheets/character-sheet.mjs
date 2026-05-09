@@ -67,6 +67,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       clearDefenseSlot: StarFrontiersCharacterSheet.#onClearDefenseSlot,
       reloadWeapon: StarFrontiersCharacterSheet.#onReloadWeapon,
       toggleWeaponGear: StarFrontiersCharacterSheet.#onToggleWeaponGear,
+      toggleRacialAbilityExpanded: StarFrontiersCharacterSheet.#onToggleRacialAbilityExpanded,
+      shareRacialAbility: StarFrontiersCharacterSheet.#onShareRacialAbility,
       rollRacialAbility: StarFrontiersCharacterSheet.#onRollRacialAbility,
       toggleRacialAbilityEffect: StarFrontiersCharacterSheet.#onToggleRacialAbilityEffect,
       increaseRacialAbility: StarFrontiersCharacterSheet.#onIncreaseRacialAbility,
@@ -92,10 +94,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.expandedRules = context.rulesEdition === "expanded";
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
-    context.handednessChoices = HANDEDNESS_CHOICES;
+    context.handednessChoices = this.#getHandednessChoices(actor);
     context.psaChoices = PSA_CHOICES;
     context.carryStateChoices = CARRY_STATE_CHOICES;
-    context.handednessKind = this.#normalizeHandedness(actor.system.handedness.kind);
+    context.handednessKind = this.#normalizeHandedness(actor.system.handedness.kind, actor);
     context.statsInitialized = StarFrontiersCharacterSheet.#isStatsInitialized(actor);
     context.generateStatsLabel = context.statsInitialized
       ? "STARFRONTIERS.Character.ReplaceStats"
@@ -680,7 +682,23 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
-    await StarFrontiersCharacterSheet.#rollRacialAbility(this.document, item);
+    await StarFrontiersCharacterSheet.#rollRacialAbility(this.document, item, target.dataset.rollMode ?? "public");
+  }
+
+  static async #onShareRacialAbility(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+    await StarFrontiersCharacterSheet.#shareRacialAbility(this.document, item, target.dataset.rollMode ?? "public");
+  }
+
+  static #onToggleRacialAbilityExpanded(event, target) {
+    target ??= event.currentTarget;
+    const chip = target.closest(".racial-ability-chip");
+    if (!chip) return;
+    const expanded = !chip.classList.contains("racial-ability-chip--expanded");
+    chip.classList.toggle("racial-ability-chip--expanded", expanded);
+    target.setAttribute("aria-expanded", String(expanded));
   }
 
   static async #onIncreaseRacialAbility(event, target) {
@@ -703,7 +721,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
-    await StarFrontiersCharacterSheet.#rollSkillCheck(this.document, item);
+    await StarFrontiersCharacterSheet.#rollSkillCheck(this.document, item, target.dataset.rollMode ?? "public");
   }
 
   static async #onToggleRacialAbilityEffect(event, target) {
@@ -875,10 +893,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (!action || !itemUuid || !globalThis.fromUuid) return;
 
     const item = await globalThis.fromUuid(itemUuid);
-    if (!item?.actor || item.type !== "weapon") return;
-
     if (action === "rollWeaponDamage") {
+      if (!item?.actor || item.type !== "weapon") return;
       await StarFrontiersCharacterSheet.#rollWeaponDamage(item.actor, item, rollMode ?? "public", bandKey ?? "");
+      return;
+    }
+
+    if (action === "rollRacialAbility") {
+      if (!item?.actor || item.type !== "trainedAbility") return;
+      await StarFrontiersCharacterSheet.#rollRacialAbility(item.actor, item, rollMode ?? "public");
     }
   }
 
@@ -1170,6 +1193,38 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     });
   }
 
+  static async #shareRacialAbility(actor, item, rollMode = "public") {
+    const description = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      item.system.description ?? "",
+      {
+        secrets: actor.isOwner,
+        relativeTo: item,
+        rollData: actor.getRollData?.() ?? {},
+        async: true
+      }
+    );
+
+    const content = await renderTemplate("systems/star-frontiers/templates/chat/racial-ability-card.hbs", {
+      title: item.name,
+      subtitle: StarFrontiersCharacterSheet.#getRollTitleName(actor),
+      description,
+      isActiveRoll: item.system.rollType === "active",
+      currentChance: StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item),
+      cap: Number(item.system.cap ?? 100),
+      rollButtonLabel: game.i18n.localize("STARFRONTIERS.Character.RollRacialAbility"),
+      itemUuid: item.uuid,
+      rollMode
+    });
+
+    const chatData = {
+      content,
+      speaker: ChatMessage.getSpeaker({ actor })
+    };
+
+    StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
+    await ChatMessage.create(chatData);
+  }
+
   static async #adjustRacialAbilityChance(actor, item, delta) {
     const current = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
     const base = Number(item.system.baseChance ?? 0);
@@ -1294,9 +1349,19 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
   }
 
-  #normalizeHandedness(value) {
-    const normalized = String(value ?? "").toLowerCase();
-    return normalized in HANDEDNESS_CHOICES ? normalized : "right";
+  #normalizeHandedness(value, actor = this.actor ?? this.document) {
+    return StarFrontiersCharacterSheet.#coerceHandednessKind(actor, value);
+  }
+
+  #getHandednessChoices(actor = this.actor ?? this.document) {
+    if (StarFrontiersCharacterSheet.#hasAmbidextrousTrait(actor)) {
+      return { ambi: HANDEDNESS_CHOICES.ambi };
+    }
+
+    return {
+      left: HANDEDNESS_CHOICES.left,
+      right: HANDEDNESS_CHOICES.right
+    };
   }
 
   async #ownRaceItem(document) {
@@ -1309,7 +1374,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const incomingKey = String(document.system?.key ?? "").trim().toLowerCase();
       return existingKey && incomingKey && existingKey === incomingKey;
     });
-    if (existing) return existing;
+    if (existing) {
+      const source = document.toObject();
+      await existing.update({
+        name: source.name,
+        img: source.img,
+        system: source.system
+      });
+      return existing;
+    }
 
     const source = document.toObject();
     delete source._id;
@@ -1366,6 +1439,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         foundry.utils.setProperty(data, path, value);
       }
     }
+
+    foundry.utils.setProperty(
+      data,
+      "system.handedness.kind",
+      this.#normalizeHandedness(
+        foundry.utils.getProperty(data, "system.handedness.kind") ?? actor.system.handedness.kind,
+        actor
+      )
+    );
   }
 
   static #isStatsInitialized(actor) {
@@ -1392,6 +1474,18 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static #raceInitiativeModifier(race) {
     return Number(race?.system?.modifiers?.im ?? 0);
+  }
+
+  static #hasAmbidextrousTrait(actor) {
+    return actor?.items?.some?.((item) =>
+      item.type === "trainedAbility"
+      && String(item.name ?? "").trim().toLowerCase() === "ambidextrous"
+    ) ?? false;
+  }
+
+  static #coerceHandednessKind(actor, currentKind = actor?.system?.handedness?.kind) {
+    if (StarFrontiersCharacterSheet.#hasAmbidextrousTrait(actor)) return "ambi";
+    return String(currentKind ?? "").toLowerCase() === "left" ? "left" : "right";
   }
 
   static #formatInitiativeSource(rsValue, race) {
@@ -1481,7 +1575,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const label = prompt.appliesTo === "abilityPair"
         ? game.i18n.format("STARFRONTIERS.Character.RaceBonusChoicePair", { index: index + 1 })
         : game.i18n.format("STARFRONTIERS.Character.RaceBonusChoiceSingle", { index: index + 1 });
-      const amountLabel = game.i18n.format("STARFRONTIERS.Character.Value-abbr", { value: amount });
+      const amountLabel = game.i18n.format("STARFRONTIERS.Character.Value-abbr", { value: prompt.amount });
 
       return `
         <label class="dialog-field">
@@ -1780,6 +1874,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     updates["system.personalFile.racialAbilities"] = game.settings.get(SYSTEM_ID, "rulesEdition") === "expanded"
       ? (racialAbilitySummary ?? StarFrontiersCharacterSheet.#buildLegacyRaceAbilitySummary(race, raceBonusSelections))
       : "";
+    updates["system.handedness.kind"] = StarFrontiersCharacterSheet.#coerceHandednessKind(actor);
 
     if (!applyStats) return updates;
 

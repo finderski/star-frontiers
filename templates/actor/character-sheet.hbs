@@ -188,7 +188,7 @@
             name="system.personalFile.injuries"
             data-document-u-u-i-d="{{actor.uuid}}"
             value="{{system.personalFile.injuries}}"
-            collaborate="true"
+            collaborate="false"
             toggled="true"
           >
             {{{enrichedPersonalInjuries}}}
@@ -387,11 +387,15 @@
             {{#each racialAbilityRows as |row|}}
               <article class="racial-ability-chip" data-item-id="{{row.id}}">
                 <div class="racial-ability-chip__header">
-                  <button type="button" class="racial-ability-chip__name" data-action="openItem" title="{{localize "STARFRONTIERS.Character.OpenRacialAbility"}}">{{row.name}}</button>
+                  <button
+                    type="button"
+                    class="racial-ability-chip__name"
+                    data-action="toggleRacialAbilityExpanded"
+                    aria-expanded="false"
+                    title="{{localize "STARFRONTIERS.Character.ToggleRacialAbilityDescription"}}"
+                  >{{row.name}}</button>
                   {{#if row.isActiveRoll}}
                     <span class="racial-ability-chip__chance">{{row.currentChance}}% / {{row.cap}}%</span>
-                  {{else}}
-                    <span class="racial-ability-chip__mode">{{localize "STARFRONTIERS.Choice.RollType.passive"}}</span>
                   {{/if}}
                 </div>
                 {{#if row.description}}
@@ -404,10 +408,25 @@
                     </span>
                   {{/if}}
                   <div class="item-actions racial-ability-chip__actions">
-                    {{#if row.isActiveRoll}}
-                      <button type="button" data-action="rollRacialAbility" title="{{localize "STARFRONTIERS.Character.RollRacialAbility"}}">
-                        <i class="fa-solid fa-dice-d10"></i>
+                    <div class="roll-label-group">
+                      <button type="button" data-action="shareRacialAbility" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityPublic"}}">
+                        <i class="fa-regular fa-comment-dots"></i>
                       </button>
+                      <div class="roll-label-actions">
+                        <button type="button" class="roll-label-action roll-label-action--blind" data-action="shareRacialAbility" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityBlind"}}"></button>
+                        <button type="button" class="roll-label-action roll-label-action--gm" data-action="shareRacialAbility" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityWhisper"}}"></button>
+                      </div>
+                    </div>
+                    {{#if row.isActiveRoll}}
+                      <div class="roll-label-group">
+                        <button type="button" data-action="rollRacialAbility" title="{{localize "STARFRONTIERS.Character.RollRacialAbilityPublic"}}">
+                          <i class="fa-solid fa-dice-d10"></i>
+                        </button>
+                        <div class="roll-label-actions">
+                          <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollRacialAbility" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Character.RollRacialAbilityBlind"}}"></button>
+                          <button type="button" class="roll-label-action roll-label-action--gm" data-action="rollRacialAbility" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Character.RollRacialAbilityWhisper"}}"></button>
+                        </div>
+                      </div>
                       <button type="button" data-action="decreaseRacialAbility" title="{{localize "STARFRONTIERS.Character.DecreaseRacialAbility"}}"{{#unless row.canDecrease}} disabled{{/unless}}>
                         <i class="fa-solid fa-minus"></i>
                       </button>
@@ -420,6 +439,9 @@
                         <i class="fa-solid fa-fire-flame-curved"></i>
                       </button>
                     {{/if}}
+                    <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Character.OpenRacialAbility"}}">
+                      <i class="fa-solid fa-pen-to-square"></i>
+                    </button>
                   </div>
                 </div>
               </article>
@@ -476,7 +498,13 @@
           <div class="item-list">
             {{#each skillRows as |row|}}
               <div class="item-row skill-row{{#if row.isSubskill}} skill-row--subskill{{/if}}" data-item-id="{{row.id}}">
-                <button type="button" class="item-name-button" data-action="rollSkill" data-item-drag="true" draggable="true" title="{{localize "STARFRONTIERS.Character.RollSkill"}}">{{row.name}}</button>
+                <div class="roll-label-group">
+                  <button type="button" class="item-name-button" data-action="rollSkill" data-item-drag="true" draggable="true" title="{{localize "STARFRONTIERS.Character.RollSkillPublic"}}">{{row.name}}</button>
+                  <div class="roll-label-actions">
+                    <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollSkill" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Character.RollSkillBlind"}}"></button>
+                    <button type="button" class="roll-label-action roll-label-action--gm" data-action="rollSkill" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Character.RollSkillWhisper"}}"></button>
+                  </div>
+                </div>
                 {{#if row.isSubskill}}
                   <span></span>
                 {{else}}
@@ -553,7 +581,7 @@
             name="system.personalFile.notes"
             data-document-u-u-i-d="{{actor.uuid}}"
             value="{{system.personalFile.notes}}"
-            collaborate="true"
+            collaborate="false"
             toggled="true"
           >
             {{{enrichedPersonalNotes}}}

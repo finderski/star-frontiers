@@ -28,7 +28,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       openEffect: StarFrontiersItemSheet.#onOpenEffect,
       removeBonusPick: StarFrontiersItemSheet.#onRemoveBonusPick,
       removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility,
-      removeSubskill: StarFrontiersItemSheet.#onRemoveSubskill
+      removeSubskill: StarFrontiersItemSheet.#onRemoveSubskill,
+      toggleLinkedRaceAbilityExpanded: StarFrontiersItemSheet.#onToggleLinkedRaceAbilityExpanded
     }
   };
 
@@ -72,12 +73,6 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
           disabled: e.disabled
         }))
       : [];
-    context.effectChoices = item.type === "trainedAbility"
-      ? {
-          "": game.i18n.localize("STARFRONTIERS.Choice.None"),
-          ...Object.fromEntries(context.itemEffects.map((effect) => [effect.id, effect.name]))
-        }
-      : {};
     context.imageUsesMask = (item.img ?? "").startsWith("icons/svg/");
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
@@ -312,6 +307,14 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     if (index < 0 || index >= current.length) return;
     current.splice(index, 1);
     await this.item.update({ "system.bonusPicks": current });
+  }
+
+  static #onToggleLinkedRaceAbilityExpanded(event, target) {
+    target ??= event.currentTarget;
+    const row = target.closest(".linked-ability-row");
+    if (!row) return;
+    row.classList.toggle("linked-ability-row--expanded");
+    target.setAttribute("aria-expanded", String(row.classList.contains("linked-ability-row--expanded")));
   }
 
   async #resolveLinkedSubskills(item) {

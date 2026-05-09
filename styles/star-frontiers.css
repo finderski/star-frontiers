@@ -1364,6 +1364,7 @@ button.roll-label-main:focus-visible {
   background: transparent;
   border: none;
   color: var(--sf-ink);
+  cursor: pointer;
   font-family: var(--fieldset);
   font-size: 0.95rem;
   height: auto;
@@ -1371,6 +1372,11 @@ button.roll-label-main:focus-visible {
   min-height: 0;
   padding: 0;
   text-align: left;
+}
+
+.star-frontiers-sheet .racial-ability-chip__name:hover,
+.star-frontiers-sheet .racial-ability-chip__name:focus-visible {
+  color: var(--sf-focus);
 }
 
 .racial-ability-chip__header,
@@ -1394,8 +1400,13 @@ button.roll-label-main:focus-visible {
 
 .racial-ability-chip__description {
   color: var(--sf-muted);
+  display: none;
   font-size: 0.95rem;
   margin: 0;
+}
+
+.racial-ability-chip--expanded .racial-ability-chip__description {
+  display: block;
 }
 
 .racial-ability-chip__status {
@@ -1414,9 +1425,14 @@ button.roll-label-main:focus-visible {
 }
 
 .racial-ability-chip__actions {
+  align-items: center;
   display: flex;
-  gap: 4px;
+  gap: 4px 10px;
   margin-left: auto;
+}
+
+.racial-ability-chip__actions .roll-label-group {
+  display: inline-flex;
 }
 
 .racial-ability-chip__actions button[disabled] {
@@ -1593,6 +1609,10 @@ button.roll-label-main:focus-visible {
 
 .skill-row {
   grid-template-columns: minmax(0, 1fr) 40px auto;
+}
+
+.skill-row .roll-label-group {
+  min-width: 0;
 }
 
 .skill-row--subskill {
@@ -1916,15 +1936,32 @@ button.roll-label-main:focus-visible {
   min-width: 0;
 }
 
-.linked-ability-row__body > strong {
+.linked-ability-row__toggle {
+  background: transparent;
+  border: none;
   color: var(--sf-ink);
+  cursor: pointer;
   font-family: var(--fieldset);
   font-size: 0.9rem;
+  justify-content: flex-start;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.linked-ability-row__toggle:hover,
+.linked-ability-row__toggle:focus-visible {
+  color: var(--sf-focus);
 }
 
 .linked-ability-row__description {
   color: var(--sf-muted);
+  display: none;
   font-size: 0.95rem;
+}
+
+.linked-ability-row--expanded .linked-ability-row__description {
+  display: block;
 }
 
 .linked-ability-row__description > :first-child {
@@ -1937,6 +1974,11 @@ button.roll-label-main:focus-visible {
 
 .linked-ability-row > button {
   align-self: center;
+}
+
+.linked-ability-row > button i:only-child,
+.race-bonus-row__actions button i:only-child {
+  margin: 0;
 }
 
 .race-bonus-row {

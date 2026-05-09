@@ -136,6 +136,9 @@
   - `system.experience.spent`: XP already committed to advancements
   - `system.experience.total`: derived `earned + spent`
   This is already live in the Personal File UI, so do not reinterpret `earned` as “lifetime earned only” without discussing the migration and UX impact.
+- Handedness is effectively gated by owned racial abilities:
+  - without an owned `trainedAbility` named `Ambidextrous`, only `left` / `right` are valid display choices
+  - with that ability present, the sheet forces handedness to `ambi` and only shows that option
 
 ### Race application
 - Dropping a `race` item on a character updates `system.race`.
@@ -149,6 +152,7 @@
 - Dropping a race imports linked racial-ability items onto the actor (owned `trainedAbility` items stamped with `system.raceKey`) for both Basic and Expanded rules.
 - In **Expanded** rules, race application also fills the legacy `system.personalFile.racialAbilities` summary field from linked abilities plus bonus-pick text, but the sheet UI no longer reads from that field.
 - In **Expanded** rules, dropping a race also prompts for any configured bonus-pick slots, stores the selections on the actor, and applies them on top of paired race modifiers during stat generation, race changes, and manual base-score back-calculation.
+- If a dropped race matches an already-owned race by name/key, the owned copy is refreshed from the dropped source before bonus-pick prompting or stat application. This keeps embedded races from silently using stale `bonusPicks` or racial-ability refs.
 - In **Basic** rules, race drops still apply name/movement/stat mods and import linked racial-ability items, but skip the bonus-pick prompt and do not use the legacy summary field.
 
 ### Weapon/ammo
@@ -228,7 +232,8 @@
   - do **not** show `system.key`
   - do **not** show `system.raceKey` (it is managed by race-drop/import logic, not by hand)
   - do **not** show `system.currentChance` — current chance is actor progress, not item-template data
-  - currently expose `description`, `rollType`, `baseChance`, `cap`, `xpPerPoint`, `triggersEffectId`, `cooldown.duration`, and an embedded Active Effects list/editor
+  - currently expose `description`, `rollType`, `baseChance`, `cap`, `xpPerPoint`, and an embedded Active Effects list/editor
+  - do **not** currently expose `triggersEffectId` or `cooldown.duration` in the sheet UI; actor-side AE toggling falls back to the sole embedded effect when only one exists
 - Item sheet header (all types):
   - the name label is type-specific only where useful (`Race`, `Racial Ability`); other item types use the generic `Name`
 - Skill item sheets:
@@ -300,9 +305,18 @@
 - Medical section (Profile tab) is partially implemented; `Current STA` is editable and injuries field exists.
 - Personal File:
   - racial abilities render here as actor-owned chip/cards, not a textarea
-  - chip name opens the owned Racial Ability item
+  - chip name toggles description expansion; edit/open moved to a dedicated pencil button at the far right
+  - send-to-chat button is always visible and uses the same public / whisper-to-GM / GM-only hover affordance as abilities and weapons
   - active-roll abilities can roll from the chip, adjust current chance with `+/-`, and show/toggle linked effect state
+  - roll button is only shown for active-roll abilities; passive abilities leave the top-right corner empty
+  - effect status + flame toggle are only shown when the item has a linked Active Effect
   - Experience renders as one heading with two fields underneath: editable Available XP and read-only Spent XP
+  - shared racial-ability chat cards can include a follow-up Roll button that inherits the original roll mode
+- Race item sheet:
+  - linked racial abilities render as collapsed rows by default; click the ability name to expand its description
+  - linked-ability and bonus-pick delete buttons are icon-only, with explanatory text moved to hover tooltips
+- Skills section:
+  - skill-name roll buttons now also expose public / whisper-to-GM / GM-only hover actions, matching abilities and weapons
 
 ## Roadmap status (high level)
 This reflects the current local notes and implemented work, not a live Asana sync.

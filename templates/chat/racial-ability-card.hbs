@@ -1,0 +1,31 @@
+<section class="star-frontiers check-roll-card racial-ability-card">
+  <header class="check-roll-card__header">
+    <h3>{{title}}</h3>
+    {{#if subtitle}}
+      <p>{{subtitle}}</p>
+    {{/if}}
+  </header>
+
+  {{{description}}}
+
+  {{#if isActiveRoll}}
+    <div class="check-roll-card__rows">
+      <div class="check-roll-card__row">
+        <span class="check-roll-card__label">{{localize "STARFRONTIERS.Character.Target"}}</span>
+        <strong class="check-roll-card__value">{{currentChance}}% / {{cap}}%</strong>
+      </div>
+    </div>
+
+    <div class="chat-card-actions">
+      <button
+        type="button"
+        class="sf-chat-action"
+        data-action="rollRacialAbility"
+        data-item-uuid="{{itemUuid}}"
+        data-roll-mode="{{rollMode}}"
+      >
+        {{rollButtonLabel}}
+      </button>
+    </div>
+  {{/if}}
+</section>
