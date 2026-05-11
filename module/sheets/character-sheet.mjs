@@ -74,6 +74,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       increaseRacialAbility: StarFrontiersCharacterSheet.#onIncreaseRacialAbility,
       decreaseRacialAbility: StarFrontiersCharacterSheet.#onDecreaseRacialAbility,
       rollSkill: StarFrontiersCharacterSheet.#onRollSkill,
+      toggleAddItemMenu: StarFrontiersCharacterSheet.#onToggleAddItemMenu,
+      toggleEquipmentRow: StarFrontiersCharacterSheet.#onToggleEquipmentRow,
+      useConsumable: StarFrontiersCharacterSheet.#onUseConsumable,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
   };
@@ -111,7 +114,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.wornScreen = screenId ? actor.items.get(screenId) ?? null : null;
     context.skillRows = context.expandedRules ? this.#prepareSkillRows(actor) : [];
     context.racialAbilityRows = this.#prepareRacialAbilityRows(actor);
-    context.equipmentRows = StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
+    const { inventoryRows, assetRows, hasAssets } = StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
+    context.inventoryRows = inventoryRows;
+    context.assetRows = assetRows;
+    context.hasAssets = hasAssets;
     context.encumbrance = StarFrontiersCharacterSheet.#prepareEncumbranceContext(actor);
     context.enrichedPersonalNotes = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
       actor.system.personalFile?.notes ?? "",
@@ -185,15 +191,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const liveCapacity = StarFrontiersCharacterSheet.#getLiveCapacity(item, linkedAmmo);
       const uses = item.system.ammo?.uses ?? "none";
       const hasAmmo = uses !== "none";
-      const ammoLoaded = StarFrontiersCharacterSheet.#getLoadedAmmo(item, liveCapacity);
+      const ammoLoaded = StarFrontiersCharacterSheet.#getLoadedAmmo(item, liveCapacity, linkedAmmo);
       const isSEU = uses === "seu";
       const canReload = StarFrontiersCharacterSheet.#canReloadWeapon(actor, item, linkedAmmo);
-      const clipChoices = hasAmmo
-        ? actor.items
-            .filter((it) => it.type === "ammo" && it.system.ammoType === uses)
-            .map((it) => ({ id: it.id, name: it.name }))
-        : [];
       const linkedClipId = linkedAmmo?.parent === actor ? linkedAmmo.id : "";
+      const clipChoices = hasAmmo
+        ? StarFrontiersCharacterSheet.#prepareAmmoLinkChoices(actor, uses, linkedClipId)
+        : [];
       return {
         key: item.id,
         item,
@@ -250,25 +254,83 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static #prepareEquipmentRows(actor) {
-    const types = ["gear", "consumable", "ammo", "powerSource"];
-    return actor.items
-      .filter((item) => types.includes(item.type))
-      .map((item) => {
-        const sys = item.system ?? {};
-        const quantity = Number(sys.quantity ?? 1);
-        const mass = Number(sys.mass ?? 0);
-        const carryState = sys.carryState || "carried";
-        return {
-          id: item.id,
-          name: item.name,
-          img: item.img,
-          quantity,
-          mass,
-          totalMass: Number((mass * quantity).toFixed(2)),
-          carryState,
-          carryStateLabel: game.i18n.localize(`STARFRONTIERS.Choice.CarryState.${carryState}`)
-        };
-      });
+    const portabilityThreshold = game.settings.get(SYSTEM_ID, "computerPortabilityLevel") ?? 4;
+    const inventoryItems = [];
+    const assetItems = [];
+    const inventoryTypes = new Set(["gear", "consumable", "ammo", "powerSource", "computer", "program"]);
+    const assetTypes = new Set(["vehicle"]);
+    const expandableTypes = new Set(["consumable", "powerSource", "computer", "ammo"]);
+
+    for (const item of actor.items) {
+      const sys = item.system ?? {};
+      if (item.type === "computer" && Number(sys.level ?? 1) > portabilityThreshold) {
+        assetItems.push(item);
+        continue;
+      }
+      if (assetTypes.has(item.type)) {
+        assetItems.push(item);
+        continue;
+      }
+      if (!inventoryTypes.has(item.type)) continue;
+      inventoryItems.push(item);
+    }
+
+    const buildRow = (item) => {
+      const sys = item.system ?? {};
+      const quantity = Number(sys.quantity ?? 1);
+      const mass = Number(sys.mass ?? 0);
+      const isPortableComputer = !(item.type === "computer" && Number(sys.level ?? 1) > portabilityThreshold);
+      const carryState = item.type === "computer" && !isPortableComputer
+        ? "stored"
+        : (sys.carryState || "carried");
+
+      let statusBadge = "";
+      if (item.type === "consumable") statusBadge = `${sys.uses?.value ?? 0}/${sys.uses?.max ?? 0}`;
+      else if (item.type === "powerSource") statusBadge = `${sys.remaining ?? 0}/${sys.capacity ?? 0} SEU`;
+      else if (item.type === "computer") statusBadge = `${sys.functionPoints?.used ?? 0}/${sys.functionPoints?.max ?? 0} FP`;
+      else if (item.type === "ammo") statusBadge = `${sys.shots ?? 0} ${game.i18n.localize("STARFRONTIERS.Item.Shots").toLowerCase()}`;
+
+      let carryStateCycleable = true;
+      let carryStateLocked = false;
+      if (item.type === "program" || item.type === "vehicle") carryStateCycleable = false;
+      if (item.type === "computer" && !isPortableComputer) {
+        carryStateCycleable = false;
+        carryStateLocked = true;
+      }
+
+      return {
+        id: item.id,
+        type: item.type,
+        name: item.name,
+        img: item.img,
+        quantity: ["program", "vehicle", "computer"].includes(item.type) ? null : quantity,
+        mass: ["program", "vehicle"].includes(item.type) ? null : mass,
+        totalMass: ["program", "vehicle"].includes(item.type) ? 0 : Number((mass * quantity).toFixed(2)),
+        carryState,
+        carryStateLabel: game.i18n.localize(`STARFRONTIERS.Choice.CarryState.${carryState}`),
+        carryStateCycleable,
+        carryStateLocked,
+        expandable: expandableTypes.has(item.type),
+        statusBadge,
+        uses: item.type === "consumable" ? { value: sys.uses?.value ?? 0, max: sys.uses?.max ?? 0 } : null,
+        remaining: item.type === "powerSource" ? { value: sys.remaining ?? 0, max: sys.capacity ?? 0 } : null,
+        functionPoints: item.type === "computer" ? { used: sys.functionPoints?.used ?? 0, max: sys.functionPoints?.max ?? 0 } : null,
+        shots: item.type === "ammo" ? Number(sys.shots ?? 0) : null,
+        consumeOnUse: item.type === "consumable" ? Boolean(sys.consumeOnUse) : false,
+        hasUseButton: item.type === "consumable",
+        requiredSkillRef: item.type === "consumable" ? (sys.requiredSkillRef ?? "") : "",
+        linkedRequiredSkillName: item.type === "consumable"
+          ? StarFrontiersCharacterSheet.#resolveLinkedSkillName(actor, sys.requiredSkillRef ?? "")
+          : "",
+        portabilityLocked: item.type === "computer" && !isPortableComputer
+      };
+    };
+
+    return {
+      inventoryRows: inventoryItems.map(buildRow),
+      assetRows: assetItems.map(buildRow),
+      hasAssets: assetItems.length > 0
+    };
   }
 
   static #prepareEncumbranceContext(actor) {
@@ -281,14 +343,45 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static #getLiveCapacity(weapon, linkedAmmo) {
+    if (linkedAmmo?.type === "powerSource") return Number(linkedAmmo.system?.capacity ?? weapon.system.ammo?.capacity ?? 0);
     if (linkedAmmo?.system?.shots > 0) return linkedAmmo.system.shots;
     return weapon.system.ammo?.capacity ?? 0;
   }
 
-  static #getLoadedAmmo(weapon, liveCapacity) {
+  static #getLoadedAmmo(weapon, liveCapacity, linkedSource = null) {
+    if (linkedSource?.type === "powerSource") {
+      return Math.max(Number(linkedSource.system?.remaining ?? 0), 0);
+    }
     const capacity = liveCapacity ?? weapon.system.ammo?.capacity ?? 0;
     if (!capacity) return 0;
     return Math.max(capacity - (weapon.system.ammo?.consumed ?? 0), 0);
+  }
+
+  static #prepareAmmoLinkChoices(actor, uses, linkedRef = "") {
+    const groups = [];
+    const clips = actor.items
+      .filter((it) => it.type === "ammo" && it.system.ammoType === uses)
+      .map((it) => ({ id: it.id, name: it.name, selected: it.id === linkedRef }));
+    if (clips.length) {
+      groups.push({
+        group: game.i18n.localize("STARFRONTIERS.Weapon.ClipGroup"),
+        options: clips
+      });
+    }
+
+    if (uses === "seu") {
+      const powerSources = actor.items
+        .filter((it) => it.type === "powerSource")
+        .map((it) => ({ id: it.id, name: it.name, selected: it.id === linkedRef }));
+      if (powerSources.length) {
+        groups.push({
+          group: game.i18n.localize("STARFRONTIERS.Weapon.PowerSourceGroup"),
+          options: powerSources
+        });
+      }
+    }
+
+    return groups;
   }
 
   static async #resolveWeaponAmmoItem(actor, weapon) {
@@ -301,6 +394,33 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       return await globalThis.fromUuid(ref);
     } catch {
       return null;
+    }
+  }
+
+  static async #syncWeaponPowerSourceLink(actor, weapon, nextRef = "") {
+    const currentRef = weapon.system.ammo?.clipItem ?? "";
+    if (currentRef) {
+      const currentSource = actor.items.get(currentRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(currentRef).catch(() => null) : null);
+      if (currentSource?.type === "powerSource") {
+        const refs = Array.from(currentSource.system.linkedWeaponRefs ?? []);
+        if (refs.includes(weapon.id) && nextRef !== currentRef) {
+          await currentSource.update({
+            "system.linkedWeaponRefs": refs.filter((entry) => entry !== weapon.id)
+          });
+        }
+      }
+    }
+
+    if (!nextRef) return;
+
+    const nextSource = actor.items.get(nextRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(nextRef).catch(() => null) : null);
+    if (nextSource?.type !== "powerSource") return;
+
+    const refs = Array.from(nextSource.system.linkedWeaponRefs ?? []);
+    if (!refs.includes(weapon.id)) {
+      await nextSource.update({
+        "system.linkedWeaponRefs": [...refs, weapon.id]
+      });
     }
   }
 
@@ -330,6 +450,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       if (!event.target.closest(".weapon-gear-wrap")) {
         for (const panel of this.element.querySelectorAll(".weapon-gear-panel--open")) {
           panel.classList.remove("weapon-gear-panel--open");
+        }
+      }
+      if (!event.target.closest(".add-item-wrap")) {
+        for (const menu of this.element.querySelectorAll(".add-item-menu:not([hidden])")) {
+          menu.hidden = true;
         }
       }
     });
@@ -634,6 +759,36 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       this._rememberScrollPosition();
     }
 
+    if (item.type === "powerSource") {
+      const linkedWeaponRefs = Array.from(item.system.linkedWeaponRefs ?? []);
+      const linkedScreenRefs = Array.from(item.system.linkedScreenRefs ?? []);
+      for (const ref of linkedWeaponRefs) {
+        const linkedWeapon = actor.items.get(ref) ?? null;
+        if (!linkedWeapon) continue;
+        const clipRef = linkedWeapon.system?.ammo?.clipItem ?? "";
+        if (clipRef === item.id || clipRef === item.uuid) {
+          await linkedWeapon.update({ "system.ammo.clipItem": "" });
+          this._rememberScrollPosition();
+        }
+      }
+      if (linkedScreenRefs.length) {
+        // Screens only maintain the power-source-side ref right now.
+        await item.update({ "system.linkedScreenRefs": [] });
+      }
+    }
+
+    if (item.type === "weapon" || item.type === "screen") {
+      for (const powerSource of actor.items.filter((owned) => owned.type === "powerSource")) {
+        const field = item.type === "weapon" ? "linkedWeaponRefs" : "linkedScreenRefs";
+        const refs = Array.from(powerSource.system?.[field] ?? []);
+        if (!refs.includes(item.id)) continue;
+        await powerSource.update({
+          [`system.${field}`]: refs.filter((entry) => entry !== item.id)
+        });
+        this._rememberScrollPosition();
+      }
+    }
+
     const toDelete = [item.id];
     if (item.type === "skill" && item.system.category === "main") {
       const refs = Array.from(item.system.subskillRefs ?? []);
@@ -701,6 +856,17 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     target.setAttribute("aria-expanded", String(expanded));
   }
 
+  static #onToggleEquipmentRow(event, target) {
+    target ??= event.currentTarget;
+    const row = target.closest(".equipment-row");
+    const expanded = row?.querySelector(".equipment-row__expanded");
+    const chevron = row?.querySelector(".equipment-row__chevron");
+    if (!row || !expanded || !chevron) return;
+    const isOpen = !expanded.hidden;
+    expanded.hidden = isOpen;
+    chevron.classList.toggle("equipment-row__chevron--open", !isOpen);
+  }
+
   static async #onIncreaseRacialAbility(event, target) {
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
@@ -722,6 +888,92 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
     await StarFrontiersCharacterSheet.#rollSkillCheck(this.document, item, target.dataset.rollMode ?? "public");
+  }
+
+  static #onToggleAddItemMenu(event, target) {
+    target ??= event.currentTarget;
+    const wrap = target.closest(".add-item-wrap");
+    const menu = wrap?.querySelector(".add-item-menu");
+    if (!wrap || !menu) return;
+    const root = this.element;
+    for (const other of root.querySelectorAll(".add-item-menu:not([hidden])")) {
+      if (other !== menu) other.hidden = true;
+    }
+    menu.hidden = !menu.hidden;
+  }
+
+  static async #onUseConsumable(event, target) {
+    target ??= event.currentTarget;
+    const actor = this.document;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(actor, target);
+    if (!item) return;
+    this._rememberScrollPosition();
+
+    const sys = item.system ?? {};
+    const rollMode = target.dataset.rollMode ?? "public";
+
+    if (sys.requiredSkillRef) {
+      const hasSkill = actor.items.some((owned) =>
+        owned.type === "skill" && (owned.id === sys.requiredSkillRef || owned.uuid === sys.requiredSkillRef)
+      );
+      if (!hasSkill) {
+        const chatData = {
+          content: game.i18n.format("STARFRONTIERS.Item.MissingRequiredSkillWarning", {
+            item: item.name,
+            actor: actor.name
+          }),
+          speaker: ChatMessage.getSpeaker({ actor })
+        };
+        StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
+        await ChatMessage.create(chatData);
+      }
+    }
+
+    const targets = game.user?.targets ?? new Set();
+    const targetActor = targets.size === 1 ? [...targets][0]?.actor ?? null : null;
+
+    for (const effectId of Array.from(sys.effectIds ?? [])) {
+      const effect = item.effects.get(effectId);
+      if (!effect || !targetActor) continue;
+      await targetActor.createEmbeddedDocuments("ActiveEffect", [effect.toObject()]);
+    }
+
+    const messageKey = targetActor
+      ? "STARFRONTIERS.Item.UsedConsumable"
+      : "STARFRONTIERS.Item.UsedConsumableSelf";
+    const messageData = targetActor
+      ? { actor: actor.name, item: item.name, target: targetActor.name }
+      : { actor: actor.name, item: item.name };
+    const chatData = {
+      content: game.i18n.format(messageKey, messageData),
+      speaker: ChatMessage.getSpeaker({ actor })
+    };
+    StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
+    await ChatMessage.create(chatData);
+
+    if (!sys.consumeOnUse) return;
+
+    let newUsesValue = Number(sys.uses?.value ?? 1) - 1;
+    let newQuantity = Number(sys.quantity ?? 1);
+    const newUsesMax = Number(sys.uses?.max ?? 1);
+
+    if (newUsesValue <= 0 && newQuantity > 1) {
+      newQuantity -= 1;
+      newUsesValue = newUsesMax;
+      await item.update({
+        "system.uses.value": newUsesValue,
+        "system.quantity": newQuantity
+      });
+      return;
+    }
+
+    if (newUsesValue <= 0) {
+      await item.update({ "system.uses.value": 0 });
+      ui.notifications.warn(game.i18n.format("STARFRONTIERS.Item.ConsumableEmpty", { item: item.name }));
+      return;
+    }
+
+    await item.update({ "system.uses.value": newUsesValue });
   }
 
   static async #onToggleRacialAbilityEffect(event, target) {
@@ -772,19 +1024,30 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const sourceAmmo = await StarFrontiersCharacterSheet.#resolveReloadSource(actor, weapon);
     if (!sourceAmmo) return;
 
-    const sourceQty = Number(sourceAmmo.system?.quantity ?? 0);
-    const newCapacity = sourceAmmo.system.shots ?? weapon.system.ammo?.capacity ?? 0;
-    const updates = { "system.ammo.consumed": 0, "system.ammo.capacity": newCapacity };
+    const isPowerSource = sourceAmmo.type === "powerSource";
+    const newCapacity = isPowerSource
+      ? Number(sourceAmmo.system.capacity ?? weapon.system.ammo?.capacity ?? 0)
+      : Number(sourceAmmo.system.shots ?? weapon.system.ammo?.capacity ?? 0);
+    const nextClipRef = sourceAmmo.parent === actor ? sourceAmmo.id : sourceAmmo.uuid;
 
-    const isSEU = weapon.system.ammo?.uses === "seu";
-    const linkedRef = weapon.system.ammo?.clipItem;
-    if (isSEU && linkedRef !== sourceAmmo.id && linkedRef !== sourceAmmo.uuid) {
-      updates["system.ammo.clipItem"] = sourceAmmo.parent === actor ? sourceAmmo.id : sourceAmmo.uuid;
-    }
-
-    await weapon.update(updates);
+    await StarFrontiersCharacterSheet.#syncWeaponPowerSourceLink(actor, weapon, nextClipRef);
+    await weapon.update({
+      "system.ammo.clipItem": nextClipRef,
+      "system.ammo.consumed": 0,
+      "system.ammo.capacity": newCapacity
+    });
     this._rememberScrollPosition();
-    await sourceAmmo.update({ "system.quantity": sourceQty - 1 });
+
+    if (isPowerSource) {
+      const currentRefs = Array.from(sourceAmmo.system.linkedWeaponRefs ?? []);
+      if (!currentRefs.includes(weapon.id)) {
+        await sourceAmmo.update({ "system.linkedWeaponRefs": [...currentRefs, weapon.id] });
+        this._rememberScrollPosition();
+      }
+    } else {
+      const sourceQty = Number(sourceAmmo.system?.quantity ?? 0);
+      await sourceAmmo.update({ "system.quantity": Math.max(sourceQty - 1, 0) });
+    }
 
     ui.notifications.info(game.i18n.format("STARFRONTIERS.Weapon.Reloaded", {
       weapon: weapon.name,
@@ -796,32 +1059,52 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const uses = weapon.system.ammo?.uses ?? "none";
     if (uses === "none") return false;
 
-    const qualifies = (item) =>
-      Number(item?.system?.quantity ?? 0) > 0 && item?.system?.carryState !== "stored";
+    const qualifiesAmmo = (item) =>
+      item?.type === "ammo"
+      && Number(item?.system?.quantity ?? 0) > 0
+      && item?.system?.carryState !== "stored";
+    const qualifiesPowerSource = (item) =>
+      item?.type === "powerSource"
+      && Number(item?.system?.remaining ?? 0) > 0
+      && item?.system?.carryState !== "stored";
 
     if (uses === "seu") {
-      if (linkedAmmo && linkedAmmo.system?.ammoType === "seu" && qualifies(linkedAmmo)) return true;
+      if (linkedAmmo && (
+        (linkedAmmo.type === "ammo" && linkedAmmo.system?.ammoType === "seu" && qualifiesAmmo(linkedAmmo))
+        || qualifiesPowerSource(linkedAmmo)
+      )) return true;
       return actor.items.some((it) =>
-        it.type === "ammo" && it.system.ammoType === "seu" && qualifies(it));
+        (it.type === "ammo" && it.system.ammoType === "seu" && qualifiesAmmo(it))
+        || qualifiesPowerSource(it));
     }
 
-    return !!linkedAmmo && qualifies(linkedAmmo);
+    return !!linkedAmmo && qualifiesAmmo(linkedAmmo);
   }
 
   static async #resolveReloadSource(actor, weapon) {
     const uses = weapon.system.ammo?.uses ?? "none";
     if (uses === "none") return null;
 
-    const qualifies = (item) =>
-      Number(item?.system?.quantity ?? 0) > 0 && item?.system?.carryState !== "stored";
+    const qualifiesAmmo = (item) =>
+      item?.type === "ammo"
+      && Number(item?.system?.quantity ?? 0) > 0
+      && item?.system?.carryState !== "stored";
+    const qualifiesPowerSource = (item) =>
+      item?.type === "powerSource"
+      && Number(item?.system?.remaining ?? 0) > 0
+      && item?.system?.carryState !== "stored";
 
     const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
 
     if (uses === "seu") {
-      if (linkedAmmo && linkedAmmo.system?.ammoType === "seu" && qualifies(linkedAmmo)) return linkedAmmo;
+      if (linkedAmmo && (
+        (linkedAmmo.type === "ammo" && linkedAmmo.system?.ammoType === "seu" && qualifiesAmmo(linkedAmmo))
+        || qualifiesPowerSource(linkedAmmo)
+      )) return linkedAmmo;
 
       const candidates = actor.items.filter((it) =>
-        it.type === "ammo" && it.system.ammoType === "seu" && qualifies(it));
+        (it.type === "ammo" && it.system.ammoType === "seu" && qualifiesAmmo(it))
+        || qualifiesPowerSource(it));
 
       if (!candidates.length) {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoSeuAvailable"));
@@ -848,9 +1131,14 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static async #promptReloadChoice(weapon, candidates) {
     const options = candidates.map((c) => {
+      if (c.type === "powerSource") {
+        const remaining = Number(c.system?.remaining ?? 0);
+        const capacity = Number(c.system?.capacity ?? 0);
+        return `<option value="${c.id}">${c.name} (${remaining}/${capacity} SEU)</option>`;
+      }
       const qty = Number(c.system?.quantity ?? 0);
       const shots = Number(c.system?.shots ?? 0);
-      return `<option value="${c.id}">${c.name} (${qty}) — ${shots}</option>`;
+      return `<option value="${c.id}">${c.name} (${qty} clips × ${shots} shots)</option>`;
     }).join("");
 
     const choice = await foundry.applications.api.DialogV2.prompt({
@@ -965,7 +1253,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const liveCapacity = StarFrontiersCharacterSheet.#getLiveCapacity(weapon, linkedAmmo);
 
     if (ammoCheck.amount > 0) {
-      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity);
+      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity, linkedAmmo);
       if (loaded < ammoCheck.amount) {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
         return;
@@ -988,7 +1276,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const encumbrance = StarFrontiersCharacterSheet.#getCombatEncumbranceMods(actor, profile.rulesEdition);
 
     if (ammoCheck.amount > 0) {
-      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity);
+      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity, linkedAmmo);
       if (loaded < totalAmmo) {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
         return;
@@ -996,9 +1284,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
 
     if (game.settings.get(SYSTEM_ID, "automateAmmo") && ammoCheck.amount > 0) {
-      await weapon.update({
-        "system.ammo.consumed": Math.min((weapon.system.ammo?.consumed ?? 0) + totalAmmo, liveCapacity)
-      });
+      const nextConsumed = Math.min((weapon.system.ammo?.consumed ?? 0) + totalAmmo, Math.max(liveCapacity, totalAmmo));
+      await weapon.update({ "system.ammo.consumed": nextConsumed });
+      if (linkedAmmo?.type === "powerSource") {
+        const nextRemaining = Math.max(Number(linkedAmmo.system?.remaining ?? 0) - totalAmmo, 0);
+        await linkedAmmo.update({ "system.remaining": nextRemaining });
+      }
     }
 
     const rows = [
@@ -1049,8 +1340,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
 
     if (ammoCheck.amount > 0) {
-      const consumed = (weapon.system.ammo?.consumed ?? 0) + (game.settings.get(SYSTEM_ID, "automateAmmo") ? totalAmmo : 0);
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.AmmoRemaining"), value: `${Math.max(liveCapacity - consumed, 0)}/${liveCapacity}` });
+      const displayRemaining = linkedAmmo?.type === "powerSource"
+        ? Math.max(Number(linkedAmmo.system?.remaining ?? 0) - (game.settings.get(SYSTEM_ID, "automateAmmo") ? totalAmmo : 0), 0)
+        : Math.max(liveCapacity - ((weapon.system.ammo?.consumed ?? 0) + (game.settings.get(SYSTEM_ID, "automateAmmo") ? totalAmmo : 0)), 0);
+      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.AmmoRemaining"), value: `${displayRemaining}/${liveCapacity}` });
     }
 
     const anyHit = hitCount > 0;
@@ -1324,6 +1617,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(this.document, item);
       const capacity = StarFrontiersCharacterSheet.#getLiveCapacity(item, linkedAmmo);
       const loaded = Math.min(Math.max(Number(target.value || 0), 0), capacity);
+      if (linkedAmmo?.type === "powerSource") {
+        await linkedAmmo.update({ "system.remaining": loaded });
+        await item.update({ "system.ammo.consumed": Math.max(capacity - loaded, 0) });
+        return;
+      }
       await item.update({ "system.ammo.consumed": Math.max(capacity - loaded, 0) });
       return;
     }
@@ -1334,6 +1632,17 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const raw = Number(target.value || 1);
       const clamped = max > 0 ? Math.min(Math.max(raw, min), max) : Math.max(raw, min);
       await item.update({ "system.ammo.variableSetting.current": clamped });
+      return;
+    }
+
+    if (target.dataset.itemField === "system.ammo.clipItem" && item.type === "weapon") {
+      const nextRef = String(target.value ?? "");
+      await StarFrontiersCharacterSheet.#syncWeaponPowerSourceLink(this.document, item, nextRef);
+      const nextSource = nextRef ? (this.document.items.get(nextRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(nextRef).catch(() => null) : null)) : null;
+      const updateData = { "system.ammo.clipItem": nextRef };
+      if (nextSource?.type === "ammo") updateData["system.ammo.capacity"] = Number(nextSource.system.shots ?? 0);
+      if (nextSource?.type === "powerSource") updateData["system.ammo.capacity"] = Number(nextSource.system.capacity ?? item.system.ammo?.capacity ?? 0);
+      await item.update(updateData);
       return;
     }
 
@@ -1474,6 +1783,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static #raceInitiativeModifier(race) {
     return Number(race?.system?.modifiers?.im ?? 0);
+  }
+
+  static #resolveLinkedSkillName(actor, ref) {
+    if (!ref) return "";
+    const direct = actor.items.get(ref) ?? null;
+    if (direct?.type === "skill") return direct.name;
+    const world = game.items?.get(ref) ?? null;
+    if (world?.type === "skill") return world.name;
+    return "";
   }
 
   static #hasAmbidextrousTrait(actor) {

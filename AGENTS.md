@@ -104,7 +104,7 @@
 
 ## Schema versioning
 
-- Current schema version: **0.2.3** (stored in world setting `schemaVersion`).
+- Current schema version: **0.2.5** (stored in world setting `schemaVersion`).
 - Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
 - During development (pre-1.0), prefer patch bumps (`0.2.0 → 0.2.1`) for incremental schema fixes rather than jumping minor versions. Reserve minor bumps for end-of-phase milestones.
 - Character sheet now exposes `system.psa` as the Expanded Rules Career PSA selector, with choices limited to Military, Technological, and Biosocial.
@@ -157,16 +157,20 @@
 
 ### Weapon/ammo
 - Weapon rows on the character sheet display **loaded ammo**, not spent ammo.
-- Loaded ammo is computed from `capacity - consumed`.
+- Loaded ammo is computed from `capacity - consumed` for clip-fed weapons, or read directly from `powerSource.system.remaining` when the linked source is a power source.
 - `system.ammo.consumed` is the source of truth for depletion; it lives on the weapon item.
-- Linked ammo items exist via `system.ammo.clipItem`. Live capacity is derived from the linked ammo item's `system.shots` at render time (`#getLiveCapacity`), not stored directly. Stored `system.ammo.capacity` is synced on reload.
+- Linked ammo items exist via `system.ammo.clipItem`. Live capacity is derived from the linked source at render time (`#getLiveCapacity`), not stored directly. Stored `system.ammo.capacity` is synced on reload / relink.
 - Ammo item `system.quantity` is back (was removed in 0.2.0, re-added with the equipment/encumbrance work). Reload now requires `quantity > 0` AND `carryState ≠ "stored"`, and decrements `quantity` by 1 on success. Reload button is hidden in the gear panel until both conditions are met. Do not switch ammo depletion tracking (per-shot, on the weapon's `system.ammo.consumed`) to the ammo item itself without discussing it — quantity is the *spare-clip count*, `consumed` is the *shots-fired count*, they are different.
 - `ammo.system.ammoType` defaults to `"rounds"`; newly created ammo items pre-fill the dropdown so they're immediately usable for clip linking.
+- **SEU architecture split**: powerclips remain `ammo` items (`ammoType: "seu"`); beltpacks/backpacks/parabatteries are `powerSource` items. Do not blur these roles.
 - **Reload paths split by weapon type** (`#resolveReloadSource` in `character-sheet.mjs`):
   - **Rounds weapons** (`weapon.system.ammo.uses === "rounds"`): strict. Linked clip must qualify; no fallback to other owned `rounds` ammo. Star Frontiers rules: pistol vs rifle clips are NOT interchangeable, so we don't auto-find a match.
-  - **SEU weapons** (`weapon.system.ammo.uses === "seu"`): flexible. Linked clip preferred; else search owned `ammo` with `ammoType === "seu"` that's carried/equipped. Single match → use silently. Multiple → prompt via `#promptReloadChoice` (DialogV2). The chosen source becomes the new `clipItem`. SEU power sources (`powerSource` items) are NOT direct reload sources — only `ammo` items with `ammoType: "seu"`. PowerSources can be used to recharge clips (future work, not implemented).
+  - **SEU weapons** (`weapon.system.ammo.uses === "seu"`): flexible. Linked SEU clip or linked `powerSource` preferred if it qualifies. Else search owned `ammo` with `ammoType === "seu"` plus qualifying `powerSource` items. Single match → use silently. Multiple → prompt via `#promptReloadChoice` (DialogV2). The chosen source becomes the new `clipItem`.
   - `#canReloadWeapon` mirrors this split — it's what gates the visible Reload button in the gear panel.
-- **Linked Ammo selector in the gear panel**: a `<select data-item-field="system.ammo.clipItem">` listing all owned `ammo` whose `ammoType` matches the weapon's `ammo.uses`. The blank option (`—`) un-links. This is the primary in-character-sheet linking UX; the item-sheet drop zone still works for compendium/sidebar drops. Item dragging from the character sheet is NOT enabled (`dragSelector: null` in `DEFAULT_OPTIONS.dragDrop`), so the gear-panel selector is the canonical way to link an owned clip.
+- When a SEU weapon is linked to a `powerSource`, attack automation decrements `powerSource.system.remaining` and also increments `weapon.system.ammo.consumed` for the weapon-local "shots since connected" view.
+- `powerSource.system.linkedWeaponRefs` and `.linkedScreenRefs` are the reverse-link source of truth for power cords. Keep both sides synchronized atomically when linking, unlinking, reloading, or deleting.
+- `consumable.system.requiredSkillRef` is the skill-link field for safe/effective consumable use. Do not add parallel booleans like `requiresMedic`.
+- **Linked Ammo selector in the gear panel**: a `<select data-item-field="system.ammo.clipItem">` listing all owned `ammo` whose `ammoType` matches the weapon's `ammo.uses`; for SEU weapons it also lists `powerSource` items in a separate optgroup. The blank option (`—`) un-links. This is the primary in-character-sheet linking UX; the item-sheet drop zone still works for compendium/sidebar drops. Item dragging from the character sheet is NOT enabled (`dragSelector: null` in `DEFAULT_OPTIONS.dragDrop`), so the gear-panel selector is the canonical way to link an owned source.
 - **Out-of-ammo early check** in `#rollWeaponAttack` runs BEFORE the attack dialog opens. If `loaded < ammoCheck.amount` (per-shot ammo cost), warn and abort. The post-dialog check still catches "asked for 3 shots, only enough loaded for 2."
 - **Range modifiers** (`pointBlank: 0, short: -10, medium: -20, long: -40, extreme: -80`) live as the module-level constant `RANGE_BAND_MODS` in `character-sheet.mjs`. They were removed from `CONFIG.SF` to prevent stale-read bugs from old database values. Weapons do NOT store per-band modifiers.
 - A range band with both `min === null` and `max === null` is treated as **unavailable** for that weapon (e.g. Gyrojet has no PB or Short range). Both the attack dialog and auto-detection from token distance skip null/null bands.
@@ -199,20 +203,24 @@
 - Armor and screen items have a 2-state cycle button (`carried ↔ stored`), not the 3-state cycle other items use. The "worn" state is the character-side ref, not a fourth carry-state value. The schema still has `"ready"` as a valid stored value (for backward compat with old data); 0.2.2 normalizes it to `"carried"` and the cycle button never produces it.
 
 ### Encumbrance / equipment / carry state
-- Carry state is universal: every wearable/carryable item type (weapon, armor, screen, ammo, powerSource, gear, consumable) has `system.carryState ∈ {ready, carried, stored}`. Default is `"ready"` for weapons, `"carried"` for everything else.
+- Carry state is universal across physical inventory item types: weapon, armor, screen, ammo, powerSource, gear, consumable, and computer. Default is `"ready"` for weapons, `"carried"` for everything else.
 - `cycleCarryState` action (formerly `cycleWeaponCarryState`) is the generic cycle-button handler used by both weapon rows and equipment rows. The 3-state visual button class is shared (`weapon-carry-state weapon-carry-state--<state>`).
 - **Carry-state localization labels:** `STARFRONTIERS.Choice.CarryState.ready` is now `"Equipped"` (was `"Ready"`). The schema value is still `"ready"` — only the displayed label changed. The cycle button's `title`/`aria-label` is per-state via `row.carryStateLabel` so hovering tells the player the current state.
-- **Equipment section layout** (`templates/actor/character-sheet.hbs`): four columns — Name | Quantity | Mass | Actions — using a single `grid-template-columns: minmax(0, 1fr) 64px 64px 110px`. Header and rows are SEPARATE grid containers, so the actions column is fixed-width (not `auto`) to keep both aligned. The actions cell groups carry-state cycle + edit + delete (no Duplicate). The `Total Mass: <total> / <threshold> kg` summary lives at the bottom of the section (was originally in the header — moved because the total counts weapons/armor/screens too and the header placement was misleading).
+- **Equipment section layout** (`templates/actor/character-sheet.hbs`): flex-row model, not grid. Each row has a collapsed line (Name | Quantity | Mass | Actions) and, for `consumable`, `powerSource`, `computer`, and `ammo`, an expandable detail pane that opens without rerendering. The expanded pane has a `.equipment-row__expanded-header` containing a pencil/Edit button (`data-action="openItem"`) — this is the only way to reach the item sheet for these expandable types from the character sheet, so don't remove it.
+- **Consumable use chat:** `#onUseConsumable` picks between `STARFRONTIERS.Item.UsedConsumable` (target selected) and `STARFRONTIERS.Item.UsedConsumableSelf` (no target). Do not collapse them into one key — Foundry's `i18n.format` does not support handlebars conditionals inside string values, so a single key always renders the literal `{target}` placeholder or its `NoTarget` fallback.
 - **Quantity** is on weapon, ammo, powerSource, gear, consumable. Not on armor, screen.
-- **Mass** is on weapon, ammo, powerSource, gear, consumable, armor, screen.
+- Computers also have `quantity` in schema, but the equipment UI intentionally hides the inline quantity cell for computer/program/vehicle rows.
+- **Mass** is on weapon, ammo, powerSource, gear, consumable, armor, screen, computer.
 - **Encumbrance is computed in `Character.prepareDerivedData`** via the module-level `computeCarriedMass(actor)` helper:
-  - Walks `actor.items`, sums `mass × (quantity ?? 1)` for every item where `carryState ∈ {ready, carried}` AND `mass > 0`.
+  - Walks `actor.items`, sums `mass × (quantity ?? 1)` for every qualifying item where `carryState ∈ {ready, carried}` AND `mass > 0`.
   - Stored items skipped. Items without a `mass` field skipped.
+  - Always excludes `program`, `vehicle`, and non-portable `computer` items (level above the world `computerPortabilityLevel` setting).
 - `derived.totalMass`, `derived.encumbranceThreshold` (= STR/2), `derived.encumbered` are available on the actor for sheet display, roll modifiers, and any future Active Effects integration.
 - Movement (walking/running/hourly) is **halved** when encumbered, applied right in `prepareDerivedData` after race-movement lookup. Basic rules ignore this — but the flag is still set.
 - **Combat encumbrance modifiers (Expanded only):** `#getCombatEncumbranceMods(actor, rulesEdition)` returns `{ attackerMod, targetMod }`. Attacker encumbered = −10. Target token's actor encumbered = +10 to the attacker's roll. Always applied in Expanded; not gated by world settings. Shown as separate rows in the attack chat card.
 - **Optional encumbrance penalty on ability checks (Expanded only):** `#getAbilityEncumbranceMod(actor, ability)` checks `encumbranceAffectsPhysical` (STR/STA/DEX/RS) or `encumbranceAffectsNonPhysical` (INT/LOG/PER/LDR) world settings and applies −10 to the check's target value (not the die roll). The dialog shows the post-encumbrance target.
-- **Equipment section UI** (character sheet): five-column grid (Name | Quantity | Mass | Carry State | Actions). Header row shows `Carried: <total> / <threshold>` with an "Encumbered" badge when over. The total counts items across **all** slots (weapons, armor, screens, equipment items) — see Outstanding issues for the labeling concern.
+- **Equipment section UI** (character sheet): inventory rows cover `gear`, `consumable`, `ammo`, `powerSource`, `computer`, and `program`; a conditional **Assets** subsection holds `vehicle` plus non-portable computers. Add controls now live under one `Add Item` hover menu instead of multiple dedicated add buttons.
+- Non-portable computers are determined purely by `computer.system.level > game.settings.get(SYSTEM_ID, "computerPortabilityLevel")`. Those items belong in Assets, not inventory, and never count toward carried mass.
 - **Skills section** is **Expanded-only**. The fieldset legend reads "Equipment" in Basic and "Skills and Equipment" in Expanded. The "Add Skill" button is similarly hidden in Basic.
 
 ## Item and weapon sheet decisions already made
@@ -250,6 +258,9 @@
   - 4-column row: Roll Type | Base Chance | Cap | XP/Point
   - Active Effects block below: lists embedded AEs on the item with Open and Delete buttons; Add creates a new AE and opens Foundry's `ActiveEffectConfig` dialog
   - do **not** show `system.key`, `system.raceKey`, or `system.currentChance` (that field no longer exists)
+- Consumable item sheets:
+  - expose the `requiredSkillRef` drop zone using the same linked-skill pattern as weapons
+  - do **not** invent a separate free-text "requires medic" field
 - Weapon item sheets:
   - have no extra generic “button row”; the **weapon name** on the actor sheet is the attack trigger
   - expose `attributeKey` dropdown (DEX / STR) — the base ability for attack rolls; replaces the old `weaponSkillKey` dropdown in the UI
@@ -266,6 +277,17 @@
   - expose `variableSetting.min` / `.max` in Expanded mode for any SEU weapon; `.current` is on the character sheet gear panel
   - expose per-band `damageFormula` in the range editor (4-column: label, min, max, damage)
   - hide Expanded-only `mass` when not in Expanded rules
+- Power Source item sheets:
+  - expose linked-weapon and linked-screen drop zones/lists
+  - linking a weapon must also update `weapon.system.ammo.clipItem` to this power source
+  - unlinking a weapon must also clear `weapon.system.ammo.clipItem` if it pointed here
+- Computer item sheets:
+  - expose `cost` and `quantity`
+  - do **not** expose `carryState`; computer portability/carry-state remains actor-context UI
+- Program item sheets:
+  - `programType` is a dropdown, not free text
+- Vehicle item sheets:
+  - expose `movement.accel`, `.decel`, `.topSpeed`, `.turnSpeed`, plus `parabatteryType`, `rangeKm`, and `cover`
 - Character weapon rows:
   - weapon name rolls attack; damage cell rolls damage
   - range band columns show **max distance only** (not min–max)
@@ -357,6 +379,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Weapons:
   - variable SEU damage formula — inject `seuSetting` into roll data so formulas like `@seuSetting`d10 scale with dial
   - confirm attack formulas against the actual rules PDFs
+- Equipment expansion follow-through:
+  - Foundry smoke-test the new inventory/assets split, add-item hover menu, consumable use flow, and power-source link/unlink UX
+  - decide whether consumables need first-class Active Effect authoring UI (the use flow already supports `effectIds`, but the sheet does not yet expose a dedicated editor)
 - Damage application:
   - "Apply damage to target" workflow — read target's `defenses.suit` / `.screen` refs, inspect `armor.system.reductions[]` and `screen.system.defends` / `.reduction` against the weapon's `damageType`, consume `screen.system.seuPerHit` per absorbed strike. Defense slot data is already in place.
 - Races:
@@ -387,6 +412,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not store world-item IDs in `skill.system.subskillRefs` on actor-owned skills. After dropping a main skill and auto-creating its sub-skills, the refs must be rewritten to the new embedded item IDs. The cascade delete and level-sync both rely on `refs.includes(i.id)` where `i.id` is the embedded ID.
 - Do not add a fourth `"active"` / `"worn"` carry state for armor/screen — "worn" is tracked on the character via `defenses.suit/screen` refs, not on the item. Armor/screen carry-state is intentionally `carried ↔ stored` only.
 - Do not merge `armor` and `screen` into one item type. They have genuinely different mechanics (per-damage-type reductions vs. defends-set + SEU absorption with power source). The shared item sheet already factors common fields (cost, mass, description, image).
+- Do not treat `powerSource` items as ammo. Beltpacks/backpacks/parabatteries deplete via `system.remaining`, not `shots`; powerclips are the `ammo` items with `ammoType: "seu"`.
+- Do not clean up `linkedWeaponRefs` / `linkedScreenRefs` opportunistically in unrelated code paths. Bidirectional power-source links should only be updated in the explicit link/unlink/reload flows and `#onDeleteItem`, so both sides stay atomic.
+- Do not count `program`, `vehicle`, or non-portable `computer` items in `computeCarriedMass`.
 
 ## Testing and runtime expectations
 - There is no automated test suite beyond validation scripts.

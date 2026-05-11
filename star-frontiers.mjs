@@ -39,6 +39,7 @@ function applySheetTheme(theme = game.settings.get(SYSTEM_ID, "sheetTheme")) {
 
 Hooks.once("init", () => {
   registerMigrationSettings();
+  Handlebars.registerHelper("eq", (a, b) => a === b);
 
   CONFIG.SF = {
     ...(CONFIG.SF ?? {}),
@@ -152,6 +153,16 @@ Hooks.once("init", () => {
     config: true,
     type: Boolean,
     default: true
+  });
+
+  game.settings.register(SYSTEM_ID, "computerPortabilityLevel", {
+    name: "STARFRONTIERS.Settings.ComputerPortabilityLevel.Name",
+    hint: "STARFRONTIERS.Settings.ComputerPortabilityLevel.Hint",
+    scope: "world",
+    config: true,
+    type: Number,
+    range: { min: 1, max: 6, step: 1 },
+    default: 4
   });
 
   game.settings.register(SYSTEM_ID, "encumbranceAffectsPhysical", {

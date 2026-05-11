@@ -1,4 +1,4 @@
-import { STAR_FRONTIERS_CONFIG } from "../config.mjs";
+import { STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
 import {
   arrayField,
   boolField,
@@ -103,9 +103,14 @@ const MASS_CARRIED_STATES = new Set(["ready", "carried"]);
 
 function computeCarriedMass(actor) {
   if (!actor?.items) return 0;
+  const portabilityThreshold = game.settings?.get?.(SYSTEM_ID, "computerPortabilityLevel")
+    ?? globalThis.sf?.config?.computerPortabilityLevel
+    ?? 4;
   let total = 0;
   for (const item of actor.items) {
     const sys = item.system ?? {};
+    if (item.type === "program" || item.type === "vehicle") continue;
+    if (item.type === "computer" && Number(sys.level ?? 1) > portabilityThreshold) continue;
     const mass = Number(sys.mass ?? 0);
     if (!mass) continue;
     if (sys.carryState && !MASS_CARRIED_STATES.has(sys.carryState)) continue;

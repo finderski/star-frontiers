@@ -269,7 +269,14 @@
                     <label class="seu-dial-label">
                       <span>{{localize "STARFRONTIERS.Item.LinkedAmmo"}}</span>
                       <select data-item-field="system.ammo.clipItem" aria-label="{{localize "STARFRONTIERS.Item.LinkedAmmo"}}">
-                        {{selectOptions row.data.clipChoices selected=row.data.linkedClipId blank="—" valueAttr="id" labelAttr="name"}}
+                        <option value="">—</option>
+                        {{#each row.data.clipChoices as |group|}}
+                          <optgroup label="{{group.group}}">
+                            {{#each group.options as |option|}}
+                              <option value="{{option.id}}" {{#if option.selected}}selected{{/if}}>{{option.name}}</option>
+                            {{/each}}
+                          </optgroup>
+                        {{/each}}
                       </select>
                     </label>
                   {{/if}}
@@ -530,39 +537,183 @@
 
       <fieldset class="paper-box equipment-box">
         <legend>{{localize "STARFRONTIERS.Character.Equipment"}}</legend>
-        <div class="equipment-grid equipment-grid--header">
+        <div class="equipment-header">
           <span>{{localize "STARFRONTIERS.Item.Name"}}</span>
-          <span class="ls-Center">{{localize "STARFRONTIERS.Item.Quantity"}}</span>
-          <span class="ls-Center">{{localize "STARFRONTIERS.Item.Mass"}}</span>
-          <span></span>
+          <span class="equipment-col--qty">{{localize "STARFRONTIERS.Item.Quantity"}}</span>
+          <span class="equipment-col--mass">{{localize "STARFRONTIERS.Item.Mass"}}</span>
+          <span class="equipment-col--actions">{{localize "STARFRONTIERS.Item.Actions"}}</span>
         </div>
         <div class="equipment-list">
-          {{#each equipmentRows as |row|}}
-            <div class="equipment-grid equipment-row" data-item-id="{{row.id}}">
-              <button type="button" class="item-name-button" data-action="openItem" data-item-drag="true" draggable="true" title="{{localize "STARFRONTIERS.Item.Open"}}">{{row.name}}</button>
-              <input type="number" class="ls-Center" min="0" step="1" value="{{row.quantity}}" data-item-field="system.quantity" aria-label="{{localize "STARFRONTIERS.Item.Quantity"}}" />
-              <span class="ls-Center">{{row.mass}}</span>
-              <div class="item-actions">
-                <button type="button" class="weapon-carry-state weapon-carry-state--{{row.carryState}}" data-action="cycleCarryState" title="{{row.carryStateLabel}}" aria-label="{{row.carryStateLabel}}"></button>
-                <!--<button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}"><i class="fa-solid fa-pen-to-square"></i></button> -->
-                <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+          {{#each inventoryRows as |row|}}
+            <div class="equipment-row" data-item-id="{{row.id}}" data-item-type="{{row.type}}">
+              <div class="equipment-row__collapsed">
+                <button type="button"
+                        class="equipment-row__name"
+                        data-action="{{#if row.expandable}}toggleEquipmentRow{{else}}openItem{{/if}}"
+                        data-item-drag="true"
+                        draggable="true"
+                        title="{{#if row.expandable}}{{localize "STARFRONTIERS.Item.Expand"}}{{else}}{{localize "STARFRONTIERS.Item.Open"}}{{/if}}">
+                  <span class="equipment-row__name-text">{{row.name}}</span>
+                  {{#if row.statusBadge}}
+                    <span class="equipment-row__badge">{{row.statusBadge}}</span>
+                  {{/if}}
+                  {{#if row.expandable}}
+                    <i class="fa-solid fa-chevron-down equipment-row__chevron"></i>
+                  {{/if}}
+                </button>
+                <span class="equipment-col--qty">
+                  {{#if (eq row.quantity null)}}{{else}}
+                    <input type="number" min="0" step="1" value="{{row.quantity}}" data-item-field="system.quantity" aria-label="{{localize "STARFRONTIERS.Item.Quantity"}}" />
+                  {{/if}}
+                </span>
+                <span class="equipment-col--mass">
+                  {{#if (eq row.mass null)}}—{{else}}{{row.mass}}{{/if}}
+                </span>
+                <div class="equipment-col--actions item-actions">
+                  {{#if row.carryStateCycleable}}
+                    <button type="button" class="weapon-carry-state weapon-carry-state--{{row.carryState}}" data-action="cycleCarryState" title="{{row.carryStateLabel}}" aria-label="{{row.carryStateLabel}}"></button>
+                  {{else}}
+                    {{#if row.carryStateLocked}}
+                      <button type="button" class="weapon-carry-state weapon-carry-state--stored" disabled title="{{row.carryStateLabel}}" aria-label="{{row.carryStateLabel}}"></button>
+                    {{/if}}
+                  {{/if}}
+                  <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                </div>
               </div>
+
+              {{#if row.expandable}}
+                <div class="equipment-row__expanded" hidden>
+                  <div class="equipment-row__expanded-header">
+                    <button type="button" class="equipment-row__edit" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
+                      <i class="fa-solid fa-pen-to-square"></i>
+                      <span>{{localize "STARFRONTIERS.Item.Edit"}}</span>
+                    </button>
+                  </div>
+                  {{#if (eq row.type "consumable")}}
+                    <div class="equipment-expanded__consumable">
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Item.Uses"}}</span>
+                        <input type="number" min="0" value="{{row.uses.value}}" data-item-field="system.uses.value" />
+                        <span>/</span>
+                        <input type="number" min="0" value="{{row.uses.max}}" data-item-field="system.uses.max" />
+                      </label>
+                      {{#if row.linkedRequiredSkillName}}
+                        <label>
+                          <span>{{localize "STARFRONTIERS.Item.RequiredSkill"}}</span>
+                          <span>{{row.linkedRequiredSkillName}}</span>
+                        </label>
+                      {{/if}}
+                      {{#if row.hasUseButton}}
+                        <div class="roll-label-group">
+                          <button type="button" class="sf-use-button" data-action="useConsumable" title="{{localize "STARFRONTIERS.Item.UsePublic"}}">
+                            <i class="fa-solid fa-syringe"></i>
+                            <span>{{localize "STARFRONTIERS.Item.Use"}}</span>
+                          </button>
+                          <div class="roll-label-actions">
+                            <button type="button" class="roll-label-action roll-label-action--blind" data-action="useConsumable" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Item.UseBlind"}}"></button>
+                            <button type="button" class="roll-label-action roll-label-action--gm" data-action="useConsumable" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Item.UseWhisper"}}"></button>
+                          </div>
+                        </div>
+                      {{/if}}
+                    </div>
+                  {{/if}}
+
+                  {{#if (eq row.type "powerSource")}}
+                    <div class="equipment-expanded__powersource">
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Item.SEURemaining"}}</span>
+                        <input type="number" min="0" value="{{row.remaining.value}}" data-item-field="system.remaining" />
+                        <span>/</span>
+                        <span>{{row.remaining.max}}</span>
+                      </label>
+                    </div>
+                  {{/if}}
+
+                  {{#if (eq row.type "computer")}}
+                    <div class="equipment-expanded__computer">
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Item.FunctionPoints"}}</span>
+                        <span>{{row.functionPoints.used}} / {{row.functionPoints.max}}</span>
+                      </label>
+                    </div>
+                  {{/if}}
+
+                  {{#if (eq row.type "ammo")}}
+                    <div class="equipment-expanded__ammo">
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Item.ShotsPerClip"}}</span>
+                        <span>{{row.shots}}</span>
+                      </label>
+                    </div>
+                  {{/if}}
+                </div>
+              {{/if}}
             </div>
           {{/each}}
         </div>
+
+        {{#if hasAssets}}
+          <div class="equipment-assets-separator">
+            <span>{{localize "STARFRONTIERS.Character.Assets"}}</span>
+          </div>
+          <div class="equipment-list equipment-list--assets">
+            {{#each assetRows as |row|}}
+              <div class="equipment-row" data-item-id="{{row.id}}" data-item-type="{{row.type}}">
+                <div class="equipment-row__collapsed">
+                  <button type="button" class="equipment-row__name" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
+                    <span class="equipment-row__name-text">{{row.name}}</span>
+                    {{#if row.statusBadge}}
+                      <span class="equipment-row__badge">{{row.statusBadge}}</span>
+                    {{/if}}
+                  </button>
+                  <span class="equipment-col--qty"></span>
+                  <span class="equipment-col--mass">—</span>
+                  <div class="equipment-col--actions item-actions">
+                    <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                </div>
+              </div>
+            {{/each}}
+          </div>
+        {{/if}}
+
         <div class="section-controls">
-          <button type="button" data-action="createItem" data-type="gear" data-name="{{localize "STARFRONTIERS.Item.NewGear"}}" title="{{localize "STARFRONTIERS.Character.AddEquipment"}}">
-            <i class="fa-solid fa-plus"></i>
-            <span>{{localize "STARFRONTIERS.Character.AddEquipment"}}</span>
-          </button>
-          <button type="button" data-action="createItem" data-type="ammo" data-name="{{localize "STARFRONTIERS.Item.NewAmmo"}}" title="{{localize "STARFRONTIERS.Character.AddAmmo"}}">
-            <i class="fa-solid fa-plus"></i>
-            <span>{{localize "STARFRONTIERS.Character.AddAmmo"}}</span>
-          </button>
-          <button type="button" data-action="createItem" data-type="powerSource" data-name="{{localize "STARFRONTIERS.Item.NewPowerSource"}}" title="{{localize "STARFRONTIERS.Character.AddPowerSource"}}">
-            <i class="fa-solid fa-plus"></i>
-            <span>{{localize "STARFRONTIERS.Character.AddPowerSource"}}</span>
-          </button>
+          <div class="add-item-wrap">
+            <button type="button" class="add-item-btn" data-action="toggleAddItemMenu" title="{{localize "STARFRONTIERS.Character.AddItem"}}">
+              <i class="fa-solid fa-plus"></i>
+              <span>{{localize "STARFRONTIERS.Character.AddItem"}}</span>
+            </button>
+            <div class="add-item-menu" hidden>
+              <button type="button" data-action="createItem" data-type="gear" data-name="{{localize "STARFRONTIERS.Item.NewGear"}}" title="{{localize "STARFRONTIERS.Item.TypeLabels.gear"}}">
+                <img src="systems/star-frontiers/assets/images/sheet-icons/light-backpack.svg" alt="" />
+                <span>{{localize "STARFRONTIERS.Item.TypeLabels.gear"}}</span>
+              </button>
+              <button type="button" data-action="createItem" data-type="consumable" data-name="{{localize "STARFRONTIERS.Item.NewConsumable"}}" title="{{localize "STARFRONTIERS.Item.TypeLabels.consumable"}}">
+                <i class="fa-solid fa-pills"></i>
+                <span>{{localize "STARFRONTIERS.Item.TypeLabels.consumable"}}</span>
+              </button>
+              <button type="button" data-action="createItem" data-type="ammo" data-name="{{localize "STARFRONTIERS.Item.NewAmmo"}}" title="{{localize "STARFRONTIERS.Item.TypeLabels.ammo"}}">
+                <img src="systems/star-frontiers/assets/images/sheet-icons/ammo-box.svg" alt="" />
+                <span>{{localize "STARFRONTIERS.Item.TypeLabels.ammo"}}</span>
+              </button>
+              <button type="button" data-action="createItem" data-type="powerSource" data-name="{{localize "STARFRONTIERS.Item.NewPowerSource"}}" title="{{localize "STARFRONTIERS.Item.TypeLabels.powerSource"}}">
+                <img src="systems/star-frontiers/assets/images/sheet-icons/power-generator.svg" alt="" />
+                <span>{{localize "STARFRONTIERS.Item.TypeLabels.powerSource"}}</span>
+              </button>
+              <button type="button" data-action="createItem" data-type="computer" data-name="{{localize "STARFRONTIERS.Item.NewComputer"}}" title="{{localize "STARFRONTIERS.Item.TypeLabels.computer"}}">
+                <img src="systems/star-frontiers/assets/images/sheet-icons/tablet.svg" alt="" />
+                <span>{{localize "STARFRONTIERS.Item.TypeLabels.computer"}}</span>
+              </button>
+              <button type="button" data-action="createItem" data-type="program" data-name="{{localize "STARFRONTIERS.Item.NewProgram"}}" title="{{localize "STARFRONTIERS.Item.TypeLabels.program"}}">
+                <img src="systems/star-frontiers/assets/images/sheet-icons/computing.svg" alt="" />
+                <span>{{localize "STARFRONTIERS.Item.TypeLabels.program"}}</span>
+              </button>
+              <button type="button" data-action="createItem" data-type="vehicle" data-name="{{localize "STARFRONTIERS.Item.NewVehicle"}}" title="{{localize "STARFRONTIERS.Item.TypeLabels.vehicle"}}">
+                <img src="systems/star-frontiers/assets/images/sheet-icons/steering-wheel.svg" alt="" />
+                <span>{{localize "STARFRONTIERS.Item.TypeLabels.vehicle"}}</span>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="encumbrance-total{{#if encumbrance.encumbered}} encumbrance-total--encumbered{{/if}}" title="{{localize "STARFRONTIERS.Character.EncumbranceTooltip"}}">
           <span class="encumbrance-label">{{localize "STARFRONTIERS.Character.TotalMass"}}:</span>

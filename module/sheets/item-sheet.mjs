@@ -1,4 +1,4 @@
-import { ITEM_TYPE_LABELS, SYSTEM_ID } from "../config.mjs";
+import { ITEM_TYPE_LABELS, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -29,7 +29,9 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       removeBonusPick: StarFrontiersItemSheet.#onRemoveBonusPick,
       removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility,
       removeSubskill: StarFrontiersItemSheet.#onRemoveSubskill,
-      toggleLinkedRaceAbilityExpanded: StarFrontiersItemSheet.#onToggleLinkedRaceAbilityExpanded
+      toggleLinkedRaceAbilityExpanded: StarFrontiersItemSheet.#onToggleLinkedRaceAbilityExpanded,
+      unlinkPowerSourceScreen: StarFrontiersItemSheet.#onUnlinkPowerSourceScreen,
+      unlinkPowerSourceWeapon: StarFrontiersItemSheet.#onUnlinkPowerSourceWeapon
     }
   };
 
@@ -63,7 +65,9 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.skillIsMain = item.type === "skill" && item.system.category === "main";
     context.isMilitarySkill = item.type === "skill" && item.system.psa === "military";
     context.linkedSubskills = context.skillIsMain ? await this.#resolveLinkedSubskills(item) : [];
-    context.linkedRequiredSkill = item.type === "weapon" ? await this.#resolveRequiredSkill(item) : null;
+    context.linkedRequiredSkill = ["weapon", "consumable"].includes(item.type) ? await this.#resolveRequiredSkill(item) : null;
+    context.linkedPowerSourceWeapons = item.type === "powerSource" ? await this.#resolvePowerSourceLinks(item, "linkedWeaponRefs", "weapon") : [];
+    context.linkedPowerSourceScreens = item.type === "powerSource" ? await this.#resolvePowerSourceLinks(item, "linkedScreenRefs", "screen") : [];
     context.itemEffects = item.type === "trainedAbility"
       ? Array.from(item.effects ?? []).map(e => ({
           id: e.id,
@@ -113,6 +117,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       screenReduction: this.#choices(["", "half", "full", "absorbsN"], "STARFRONTIERS.Choice.ScreenReduction"),
       screenType: this.#choices(["", "albedo", "inertia", "gauss", "sonic", "chameleon", "holo"], "STARFRONTIERS.Choice.ScreenType"),
       sourceType: this.#choices(["", "powerclip", "beltpack", "powerpack", "parabatteryT1", "parabatteryT2", "parabatteryT3", "parabatteryT4", "ammoClip"], "STARFRONTIERS.Choice.SourceType"),
+      programType: { ...STAR_FRONTIERS_CONFIG.programTypes },
       vehicleDamageType: this.#choices(["", "ground", "flying"], "STARFRONTIERS.Choice.VehicleDamageType"),
       attributeKey: this.#choices(["dex", "str"], "STARFRONTIERS.Choice.AttributeKey"),
       rollType: this.#choices(["active", "passive"], "STARFRONTIERS.Choice.RollType"),
@@ -186,6 +191,14 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       return document;
     }
 
+    if (this.item.type === "consumable" && document.documentName === "Item" && document.type === "skill") {
+      const sameActor = document.parent && document.parent === this.item.parent;
+      const ref = sameActor ? document.id : document.uuid;
+      await this.item.update({ "system.requiredSkillRef": ref });
+      ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.SkillLinked", { name: document.name }));
+      return document;
+    }
+
     if (this.item.type === "race" && document.documentName === "Item" && document.type === "trainedAbility") {
       const sameActor = document.parent && document.parent === this.item.parent;
       const ref = sameActor ? document.id : document.uuid;
@@ -206,6 +219,21 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     if (this.item.type === "weapon" && document.documentName === "Item" && document.type === "ammo") {
       const sameActor = document.parent && document.parent === this.item.parent;
       const ref = sameActor ? document.id : document.uuid;
+      const currentRef = this.item.system.ammo?.clipItem ?? "";
+      if (currentRef && currentRef !== ref) {
+        let currentSource = this.item.actor?.items?.get(currentRef) ?? game.items?.get(currentRef) ?? null;
+        if (!currentSource && globalThis.fromUuid) {
+          try { currentSource = await globalThis.fromUuid(currentRef); } catch { currentSource = null; }
+        }
+        if (currentSource?.type === "powerSource") {
+          const refs = Array.from(currentSource.system.linkedWeaponRefs ?? []);
+          if (refs.includes(this.item.id)) {
+            await currentSource.update({
+              "system.linkedWeaponRefs": refs.filter((entry) => entry !== this.item.id)
+            });
+          }
+        }
+      }
       const updateData = {
         "system.ammo.clipItem": ref,
         "system.ammo.capacity": document.system.shots ?? 0
@@ -215,8 +243,38 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       return document;
     }
 
+    const powerSourceDropType = event.target?.closest?.("[data-drop-type]")?.dataset.dropType ?? "";
+
+    if (this.item.type === "powerSource" && document.documentName === "Item" && document.type === "weapon") {
+      if (powerSourceDropType && powerSourceDropType !== "weapon") {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropWeapon"));
+        return null;
+      }
+      await this.#linkPowerSourceWeapon(document);
+      return document;
+    }
+
+    if (this.item.type === "powerSource" && document.documentName === "Item" && document.type === "screen") {
+      if (powerSourceDropType && powerSourceDropType !== "screen") {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropScreen"));
+        return null;
+      }
+      await this.#linkPowerSourceScreen(document);
+      return document;
+    }
+
     if (this.item.type === "weapon" && document.documentName === "Item") {
       ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropAmmoOnly"));
+      return null;
+    }
+
+    if (this.item.type === "consumable" && document.documentName === "Item") {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropSkillOnly"));
+      return null;
+    }
+
+    if (this.item.type === "powerSource" && document.documentName === "Item") {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropPowerSourceLinkOnly"));
       return null;
     }
 
@@ -277,7 +335,20 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   }
 
   static async #onClearAmmo(event, target) {
+    const currentRef = this.item.system.ammo?.clipItem ?? "";
     await this.item.update({ "system.ammo.clipItem": "" });
+
+    if (!currentRef) return;
+    let doc = this.item.actor?.items?.get(currentRef) ?? game.items?.get(currentRef) ?? null;
+    if (!doc && globalThis.fromUuid) {
+      try { doc = await globalThis.fromUuid(currentRef); } catch { doc = null; }
+    }
+    if (doc?.type !== "powerSource") return;
+
+    const refs = Array.from(doc.system.linkedWeaponRefs ?? []);
+    if (refs.includes(this.item.id)) {
+      await doc.update({ "system.linkedWeaponRefs": refs.filter((entry) => entry !== this.item.id) });
+    }
   }
 
   static async #onRemoveLinkedRaceAbility(event, target) {
@@ -340,6 +411,49 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     try { return await globalThis.fromUuid(ref); } catch { return null; }
   }
 
+  async #resolvePowerSourceLinks(item, field, expectedType) {
+    const refs = Array.from(item.system?.[field] ?? []);
+    const docs = [];
+    for (const ref of refs) {
+      let doc = item.actor?.items?.get(ref) ?? game.items?.get(ref) ?? null;
+      if (!doc && globalThis.fromUuid) {
+        try { doc = await globalThis.fromUuid(ref); } catch { doc = null; }
+      }
+      if (!doc || doc.type !== expectedType) continue;
+      docs.push({ id: ref, name: doc.name });
+    }
+    return docs;
+  }
+
+  async #linkPowerSourceWeapon(document) {
+    const sameActor = document.parent && document.parent === this.item.parent;
+    const ref = sameActor ? document.id : document.uuid;
+    const current = Array.from(this.item.system.linkedWeaponRefs ?? []);
+    if (!current.includes(ref)) current.push(ref);
+
+    const sourceType = this.item.system.sourceType || "";
+    const limit = sourceType === "beltpack" ? 1 : sourceType === "powerpack" ? 2 : null;
+    if (limit && current.length > limit) {
+      ui.notifications.warn(game.i18n.format("STARFRONTIERS.Item.PowerSourceLinkLimit", {
+        name: this.item.name,
+        limit
+      }));
+    }
+
+    await this.item.update({ "system.linkedWeaponRefs": current });
+    await document.update({
+      "system.ammo.clipItem": sameActor ? this.item.id : this.item.uuid
+    });
+  }
+
+  async #linkPowerSourceScreen(document) {
+    const sameActor = document.parent && document.parent === this.item.parent;
+    const ref = sameActor ? document.id : document.uuid;
+    const current = Array.from(this.item.system.linkedScreenRefs ?? []);
+    if (!current.includes(ref)) current.push(ref);
+    await this.item.update({ "system.linkedScreenRefs": current });
+  }
+
   static async #onRemoveSubskill(event, target) {
     target ??= event.currentTarget;
     const ref = target.dataset.ref ?? "";
@@ -350,6 +464,34 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
 
   static async #onClearRequiredSkill(event, target) {
     await this.item.update({ "system.requiredSkillRef": "" });
+  }
+
+  static async #onUnlinkPowerSourceWeapon(event, target) {
+    target ??= event.currentTarget;
+    const ref = String(target.dataset.ref ?? "");
+    if (!ref) return;
+
+    const current = Array.from(this.item.system.linkedWeaponRefs ?? []).filter((entry) => entry !== ref);
+    await this.item.update({ "system.linkedWeaponRefs": current });
+
+    let doc = this.item.actor?.items?.get(ref) ?? game.items?.get(ref) ?? null;
+    if (!doc && globalThis.fromUuid) {
+      try { doc = await globalThis.fromUuid(ref); } catch { doc = null; }
+    }
+    if (!doc) return;
+
+    const clipRef = doc.system?.ammo?.clipItem ?? "";
+    if (clipRef === this.item.id || clipRef === this.item.uuid) {
+      await doc.update({ "system.ammo.clipItem": "" });
+    }
+  }
+
+  static async #onUnlinkPowerSourceScreen(event, target) {
+    target ??= event.currentTarget;
+    const ref = String(target.dataset.ref ?? "");
+    if (!ref) return;
+    const current = Array.from(this.item.system.linkedScreenRefs ?? []).filter((entry) => entry !== ref);
+    await this.item.update({ "system.linkedScreenRefs": current });
   }
 
   static async #onAddEffect(event, target) {

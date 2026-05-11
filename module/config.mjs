@@ -49,5 +49,22 @@ export const STAR_FRONTIERS_CONFIG = {
     military: [3, 6, 9, 12, 15, 18],
     technological: [4, 8, 12, 16, 20, 24],
     biosocial: [5, 10, 15, 20, 25, 30]
+  },
+  programTypes: {
+    "": "",
+    analysis: "STARFRONTIERS.ProgramType.Analysis",
+    bureaucracy: "STARFRONTIERS.ProgramType.Bureaucracy",
+    commerce: "STARFRONTIERS.ProgramType.Commerce",
+    communication: "STARFRONTIERS.ProgramType.Communication",
+    computerSecurity: "STARFRONTIERS.ProgramType.ComputerSecurity",
+    industry: "STARFRONTIERS.ProgramType.Industry",
+    informationStorage: "STARFRONTIERS.ProgramType.InformationStorage",
+    installationSecurity: "STARFRONTIERS.ProgramType.InstallationSecurity",
+    language: "STARFRONTIERS.ProgramType.Language",
+    lawEnforcement: "STARFRONTIERS.ProgramType.LawEnforcement",
+    lifeSupport: "STARFRONTIERS.ProgramType.LifeSupport",
+    maintenance: "STARFRONTIERS.ProgramType.Maintenance",
+    robotManagement: "STARFRONTIERS.ProgramType.RobotManagement",
+    transportation: "STARFRONTIERS.ProgramType.Transportation"
   }
 };

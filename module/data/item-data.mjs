@@ -1,3 +1,4 @@
+import { STAR_FRONTIERS_CONFIG } from "../config.mjs";
 import {
   arrayField,
   boolField,
@@ -262,6 +263,8 @@ export class StarFrontiersPowerSourceData extends StarFrontiersItemData {
       }),
       capacity: numberField({ initial: 0, min: 0 }),
       remaining: numberField({ initial: 0, min: 0 }),
+      linkedWeaponRefs: arrayField(textField()),
+      linkedScreenRefs: arrayField(textField()),
       rechargeable: boolField(),
       cost: numberField({ initial: 0, min: 0 }),
       mass: numberField({ initial: 0, min: 0, integer: false })
@@ -305,6 +308,7 @@ export class StarFrontiersConsumableData extends StarFrontiersItemData {
         max: numberField({ initial: 1, min: 0 })
       }),
       cost: numberField({ initial: 0, min: 0 }),
+      requiredSkillRef: textField(),
       effectIds: arrayField(textField()),
       consumeOnUse: boolField(true)
     };
@@ -351,6 +355,9 @@ export class StarFrontiersComputerData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
+      carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
+      quantity: numberField({ initial: 1, min: 0 }),
+      cost: numberField({ initial: 0, min: 0 }),
       level: numberField({ initial: 1, min: 1, max: 6 }),
       functionPoints: schemaField({
         used: numberField({ initial: 0, min: 0 }),
@@ -371,7 +378,7 @@ export class StarFrontiersProgramData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
-      programType: textField(),
+      programType: textField({ choices: Object.keys(STAR_FRONTIERS_CONFIG.programTypes) }),
       level: numberField({ initial: 1, min: 1, max: 6 }),
       functionPoints: numberField({ initial: 0, min: 0 }),
       cost: numberField({ initial: 0, min: 0 })
