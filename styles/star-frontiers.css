@@ -2444,6 +2444,18 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   background: color-mix(in srgb, var(--sf-chat-ink) 10%, transparent);
 }
 
+.chat-card-actions--avoidance {
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.chat-card-actions__hint {
+  font-size: 0.85em;
+  font-style: italic;
+  opacity: 0.75;
+}
+
 
 /* =====================================================================
  * 15. Responsive (max-width: 820px)

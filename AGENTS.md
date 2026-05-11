@@ -183,6 +183,8 @@
 - **Variable SEU damage scaling**: `weapon.system.damageFormula` is treated as the **per-SEU unit** only when the weapon has a real variable dial (`ammo.uses === "seu"`, `variableSetting.max > variableSetting.min`, `variableSetting.min >= 1`, and `current >= 1`). Every display/roll path must call `#buildEffectiveDamageFormula(weapon, bandKey)` instead of reading `weapon.system.damageFormula` directly.
 - **Weapon firing modes (Phase 1)**: weapons may define `system.mechanics.modes[]` and `system.activeModeKey`. The active mode overrides top-level `damageFormula`, `ammo.seuPerShot`, `mechanics.defenseTypes`, and `mechanics.onHitEffectIds` when present. An active mode with an empty `damageFormula` explicitly means "no damage" and must suppress the damage button.
 - **Active weapon mode resolution**: `#getActiveWeaponMode(weapon)` in `character-sheet.mjs` is the single source of truth. If a weapon has modes but no `activeModeKey`, the first mode is treated as active for display, ammo use, and chat-card context.
+- **Avoidance target capture**: when an attack is rolled, the first currently-targeted token is captured into the attack chat card as `targetTokenUuid` / `targetActorUuid`. Avoidance resolution must read those UUIDs from the card dataset, not from `game.user.targets` at click time.
+- **Avoidance checks**: `#rollAvoidanceCheck` rolls against `target.system.abilities[ability].value` (current score, not base) and posts the result as the **target's** speaker, not the attacker's. Failed rolls attach `flags["star-frontiers"].avoidanceFailure` for future Active Effect application.
 - **Ammo type**: `ammoType` on ammo items is now a dropdown (`rounds` · `seu`), not free text.
 - **Weapon quantity**: `weapon.system.quantity` is on the schema. It is **not** exposed on the weapon item sheet — edit it via the character sheet's weapon **gear panel** (slide-up). This keeps character-tied data off the item sheet.
 
@@ -384,7 +386,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
   - When the required skill has `mechanics.applyMeleeBonus` or `mechanics.applyRangeBonus` set, read `actor.system.combatProfile.meleeBonus` / `.rangeBonus` (written by active AEs) and fold into the attack target
   - **Note:** skill roll checks (`rollSkill` action) are implemented; the rework is for weapon attack rolls specifically
 - Weapons:
-  - weapon firing modes Phase 2 — replace the informational Avoidance row with an actual target-side avoidance workflow/button and apply the configured effect on failure
+  - Avoidance Phase 3 — consume `flags["star-frontiers"].avoidanceFailure` to actually apply the configured effect/AE to the target on failure, and decide how re-rolls should interact with existing effects
   - decide whether mode authoring needs first-class item-sheet UI or stays data-driven / compendium-authored for now
   - confirm attack formulas against the actual rules PDFs
   - decide how needler ammo-type variants and other future mode-bearing weapons should layer onto the new `mechanics.modes[]` model
@@ -418,6 +420,11 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not read `weapon.system.damageFormula` directly in roll or preview code anymore. Variable-SEU scaling and mode overrides live behind `#buildEffectiveDamageFormula(weapon, bandKey)`, and bypassing that helper will silently reintroduce wrong laser damage.
 - Do not treat every `ammo.uses === "seu"` weapon as variable-damage. Sonic melee weapons, sonic disruptors, electrostunners, and powertorches can all consume SEU while still using a fixed damage/effect profile. The dial only counts when `variableSetting.max > variableSetting.min` and `variableSetting.min >= 1`.
 - Do not collapse mode-bearing weapons back into top-level single-mode assumptions. When `mechanics.modes[]` is present, `activeModeKey` + `#getActiveWeaponMode()` must stay authoritative for damage, SEU cost, defense labels, and future on-hit/avoidance behavior.
+- Avoidance rolls are spoken by the **target**, not the attacker. `#rollAvoidanceCheck` sets the chat speaker from the target actor, and permission is gated on `target.testUserPermission(game.user, "OWNER") || game.user.isGM`. The attacker's player must not be able to roll the target's avoidance check.
+- Avoidance uses the target's **current** ability value (`system.abilities[ability].value`), not `base`. Current stamina/ability damage and any live modifiers must affect the avoidance threshold.
+- The avoidance target is captured **at attack time** and embedded in the chat-card dataset via UUID. Avoidance resolution must not look at `game.user.targets` when the button is clicked.
+- `#createCheckChatMessage` stays minimal and does not carry extra flags. Roll flows that need structured flags, such as `#rollAvoidanceCheck`, should build their own `ChatMessage.create` payload inline.
+- The avoidance button is both hit-gated and target-gated. It should only appear when `hitCount > 0`, `targetActorUuid` is present, and the active mode has `avoidance.enabled`.
 - Do not store free text in `system.defenses.suit` / `system.defenses.screen` — those fields hold owned-item IDs only. The legacy free-text behavior was deprecated in 0.2.2 and the migration cleared stale values.
 - Do not add `currentChance` back to `StarFrontiersTrainedAbilityData`. It was deliberately moved to `system.racialSkillProgress` on the actor because skill progress is character state, not item-template data.
 - Do not repurpose `system.experience.earned` away from “available XP” without asking. The Personal File advancement controls now treat `earned` as the spendable pool, `spent` as the refund/undo pool, and `total` as the derived sum.

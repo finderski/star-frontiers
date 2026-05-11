@@ -1203,17 +1203,46 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static async handleChatCardAction(element) {
-    const { action, itemUuid, rollMode, bandKey } = element.dataset;
-    if (!action || !itemUuid || !globalThis.fromUuid) return;
+    const { action, itemUuid, rollMode, bandKey, targetTokenUuid, targetActorUuid } = element.dataset;
+    if (!action || !globalThis.fromUuid) return;
 
-    const item = await globalThis.fromUuid(itemUuid);
     if (action === "rollWeaponDamage") {
+      if (!itemUuid) return;
+      const item = await globalThis.fromUuid(itemUuid);
       if (!item?.actor || item.type !== "weapon") return;
       await StarFrontiersCharacterSheet.#rollWeaponDamage(item.actor, item, rollMode ?? "public", bandKey ?? "");
       return;
     }
 
+    if (action === "rollAvoidance") {
+      if (!itemUuid || !targetActorUuid) return;
+
+      const item = await globalThis.fromUuid(itemUuid);
+      const targetActor = await globalThis.fromUuid(targetActorUuid);
+      if (!item?.actor || item.type !== "weapon" || !targetActor) {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceTargetGone"));
+        return;
+      }
+
+      const targetIsOwned = targetActor.testUserPermission(game.user, "OWNER");
+      if (!targetIsOwned && !game.user.isGM) {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceNoPermission"));
+        return;
+      }
+
+      await StarFrontiersCharacterSheet.#rollAvoidanceCheck({
+        attacker: item.actor,
+        weapon: item,
+        target: targetActor,
+        targetTokenUuid,
+        rollMode: rollMode ?? "public"
+      });
+      return;
+    }
+
     if (action === "rollRacialAbility") {
+      if (!itemUuid) return;
+      const item = await globalThis.fromUuid(itemUuid);
       if (!item?.actor || item.type !== "trainedAbility") return;
       await StarFrontiersCharacterSheet.#rollRacialAbility(item.actor, item, rollMode ?? "public");
     }
@@ -1274,6 +1303,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static async #rollWeaponAttack(actor, weapon, rollMode = "public") {
     const profile = StarFrontiersCharacterSheet.#getWeaponAttackProfile(actor, weapon);
     const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
+    const targetedToken = [...(game.user?.targets ?? [])][0] ?? null;
+    const targetTokenUuid = targetedToken?.document?.uuid ?? "";
+    const targetActorUuid = targetedToken?.actor?.uuid ?? "";
 
     const ammoCheck = StarFrontiersCharacterSheet.#getAmmoConsumption(weapon);
     const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
@@ -1385,20 +1417,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       ? `${hitCount}/${shots} ${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")}: ${anyHit ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure")}`
       : anyHit ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure");
 
-    if (activeMode?.avoidance?.enabled) {
-      const abilityKey = String(activeMode.avoidance.ability ?? "");
-      const abilityLabel = abilityKey ? game.i18n.localize(`STARFRONTIERS.Ability.${abilityKey}`) : "";
-      const effectKey = String(activeMode.avoidance.onSuccessEffect ?? "");
-      const effectLabel = effectKey ? game.i18n.localize(effectKey) : "";
-      rows.push({
-        label: game.i18n.localize("STARFRONTIERS.Weapon.Avoidance"),
-        value: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceDescription", {
-          ability: abilityLabel,
-          effect: effectLabel
-        })
-      });
-    }
-
     const effectiveDamageFormula = StarFrontiersCharacterSheet.#buildEffectiveDamageFormula(weapon, activeBandKey ?? "");
 
     await StarFrontiersCharacterSheet.#createWeaponAttackChatMessage(actor, weapon, {
@@ -1408,7 +1426,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       outcomeClass: anyHit ? "success" : "failure",
       rollHtml: allRollHtmls.join(""),
       canRollDamage: Boolean(effectiveDamageFormula),
-      activeBandKey: activeBandKey ?? ""
+      activeBandKey: activeBandKey ?? "",
+      targetTokenUuid,
+      targetActorUuid,
+      hitCount,
+      shots
     });
   }
 
@@ -1451,6 +1473,92 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       rollMode,
       rollHtml
     });
+  }
+
+  static async #rollAvoidanceCheck({ attacker, weapon, target, targetTokenUuid = "", rollMode = "public" }) {
+    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
+    if (!activeMode?.avoidance?.enabled) return;
+
+    const ability = String(activeMode.avoidance.ability ?? "");
+    const abilityRecord = target.system.abilities?.[ability];
+    if (!abilityRecord) {
+      ui.notifications.error(game.i18n.format(
+        "STARFRONTIERS.Weapon.AvoidanceUnknownAbility",
+        { ability }
+      ));
+      return;
+    }
+
+    const targetScore = Number(abilityRecord.value ?? 0);
+    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
+    const success = roll.total <= targetScore;
+
+    const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
+    const modeLabel = StarFrontiersCharacterSheet.#getWeaponModeLabel(activeMode);
+    const effectLabel = activeMode.avoidance.onSuccessEffect
+      ? game.i18n.localize(activeMode.avoidance.onSuccessEffect)
+      : "";
+
+    const rollHtml = await roll.render({
+      flavor: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceFlavor", {
+        target: target.name,
+        ability: abilityLabel
+      })
+    });
+
+    const outcome = success
+      ? game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceSuccess")
+      : game.i18n.format("STARFRONTIERS.Weapon.AvoidanceFailure", { effect: effectLabel });
+    const outcomeClass = success ? "success" : "failure";
+
+    const rows = [
+      {
+        label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceAttackerLabel"),
+        value: attacker.name
+      },
+      {
+        label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceWeaponLabel"),
+        value: `${weapon.name} (${modeLabel})`
+      },
+      {
+        label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceTargetLabel"),
+        value: `${abilityLabel} ${targetScore}`
+      }
+    ];
+
+    const content = await renderTemplate("systems/star-frontiers/templates/chat/check-roll-card.hbs", {
+      title: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceTitle", {
+        name: target.name,
+        ability: abilityLabel
+      }),
+      subtitle: "",
+      rows,
+      outcome,
+      outcomeClass,
+      rollHtml
+    });
+
+    const chatData = {
+      content,
+      speaker: ChatMessage.getSpeaker({ actor: target })
+    };
+
+    if (!success && activeMode.avoidance.onSuccessEffect) {
+      chatData.flags = {
+        "star-frontiers": {
+          avoidanceFailure: {
+            targetActorUuid: target.uuid,
+            targetTokenUuid,
+            weaponUuid: weapon.uuid,
+            modeKey: activeMode.key,
+            onSuccessEffect: activeMode.avoidance.onSuccessEffect
+          }
+        }
+      };
+    }
+
+    StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
+    await ChatMessage.create(chatData);
   }
 
   static async #promptAbilityModifier(actor, ability, targetValue) {
@@ -2571,8 +2679,35 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     rollHtml,
     rollMode = "public",
     canRollDamage = false,
-    activeBandKey = ""
+    activeBandKey = "",
+    targetTokenUuid = "",
+    targetActorUuid = "",
+    hitCount = 0,
+    shots = 1
   }) {
+    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
+    const avoidance = activeMode?.avoidance?.enabled ? {
+      ability: activeMode.avoidance.ability,
+      abilityLabel: activeMode.avoidance.ability
+        ? game.i18n.localize(`STARFRONTIERS.Ability.${activeMode.avoidance.ability}`)
+        : "",
+      onSuccessEffect: activeMode.avoidance.onSuccessEffect ?? "",
+      effectLabel: activeMode.avoidance.onSuccessEffect
+        ? game.i18n.localize(activeMode.avoidance.onSuccessEffect)
+        : ""
+    } : null;
+
+    const canRollAvoidance = Boolean(
+      avoidance
+      && hitCount > 0
+      && targetActorUuid
+      && shots > 0
+    );
+
+    const avoidanceButtonLabel = avoidance
+      ? game.i18n.format("STARFRONTIERS.Weapon.RollAvoidanceButton", { ability: avoidance.abilityLabel })
+      : "";
+
     const content = await renderTemplate("systems/star-frontiers/templates/chat/weapon-attack-card.hbs", {
       title: game.i18n.format("STARFRONTIERS.Weapon.AttackTitle", { weapon: weapon.name }),
       subtitle: StarFrontiersCharacterSheet.#getRollTitleName(actor),
@@ -2584,7 +2719,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       damageButtonLabel: game.i18n.localize("STARFRONTIERS.Weapon.RollDamage"),
       itemUuid: weapon.uuid,
       bandKey: activeBandKey,
-      rollMode
+      rollMode,
+      canRollAvoidance,
+      avoidance,
+      avoidanceButtonLabel,
+      targetTokenUuid,
+      targetActorUuid
     });
 
     const chatData = {

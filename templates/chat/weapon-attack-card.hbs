@@ -36,5 +36,24 @@
     </div>
   {{/if}}
 
+  {{#if canRollAvoidance}}
+    <div class="chat-card-actions chat-card-actions--avoidance">
+      <button
+        type="button"
+        class="sf-chat-action"
+        data-action="rollAvoidance"
+        data-item-uuid="{{itemUuid}}"
+        data-target-token-uuid="{{targetTokenUuid}}"
+        data-target-actor-uuid="{{targetActorUuid}}"
+        data-roll-mode="{{rollMode}}"
+      >
+        {{avoidanceButtonLabel}}
+      </button>
+      {{#if avoidance.effectLabel}}
+        <span class="chat-card-actions__hint">{{avoidance.effectLabel}}</span>
+      {{/if}}
+    </div>
+  {{/if}}
+
   {{{rollHtml}}}
 </section>
