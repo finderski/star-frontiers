@@ -142,6 +142,9 @@
             <select name="system.damageType">{{selectOptions choices.damageType selected=system.damageType}}</select>
           </label>
         </div>
+        {{#if hasVariableSeuDial}}
+          <p class="form-hint">{{localize "STARFRONTIERS.Item.WeaponDamageFormulaSeuHint"}}</p>
+        {{/if}}
 
         <div class="range-editor">
           <span></span>

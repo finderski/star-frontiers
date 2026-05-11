@@ -483,6 +483,7 @@
       "VehicleClass": "Vehicle Class",
       "VehicleData": "Vehicle",
       "WeaponData": "Weapon",
+      "WeaponDamageFormulaSeuHint": "This weapon has a variable SEU setting. The formula above is the damage per SEU; the weapon will roll this formula multiplied by the current SEU setting at damage time.",
       "WeaponSkill": "Skill",
       "WeaponType": "Type",
       "Weight": "Weight",
@@ -573,6 +574,17 @@
       "ChooseAmmoTitle": "Choose Power Source",
       "ChooseAmmoPrompt": "Select which power source to load into {weapon}.",
       "ClipGroup": "Clips",
+      "Mode": {
+        "Label": "Mode",
+        "Stun": "Stun",
+        "Blast": "Blast"
+      },
+      "Avoidance": "Avoidance",
+      "AvoidanceDescription": "Target rolls {ability} or less. On failure: {effect}.",
+      "Effects": {
+        "Unconscious": "Unconscious for d100 turns",
+        "Stunned": "Stunned"
+      },
       "AttackerEncumbered": "Attacker Encumbered",
       "TargetEncumbered": "Target Encumbered",
       "Reload": "Reload",

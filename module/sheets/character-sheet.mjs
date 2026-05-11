@@ -66,6 +66,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       cycleCarryState: StarFrontiersCharacterSheet.#onCycleCarryState,
       clearDefenseSlot: StarFrontiersCharacterSheet.#onClearDefenseSlot,
       reloadWeapon: StarFrontiersCharacterSheet.#onReloadWeapon,
+      setWeaponMode: StarFrontiersCharacterSheet.#onSetWeaponMode,
       toggleWeaponGear: StarFrontiersCharacterSheet.#onToggleWeaponGear,
       toggleRacialAbilityExpanded: StarFrontiersCharacterSheet.#onToggleRacialAbilityExpanded,
       shareRacialAbility: StarFrontiersCharacterSheet.#onShareRacialAbility,
@@ -198,13 +199,21 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const clipChoices = hasAmmo
         ? StarFrontiersCharacterSheet.#prepareAmmoLinkChoices(actor, uses, linkedClipId)
         : [];
+      const modeList = Array.from(item.system.mechanics?.modes ?? []).map((mode) => ({
+        key: mode.key,
+        label: StarFrontiersCharacterSheet.#getWeaponModeLabel(mode),
+        isActive: mode.key === item.system.activeModeKey
+      }));
+      const activeMode = modeList.find((mode) => mode.isActive) ?? modeList[0] ?? null;
+      const effectiveDamage = StarFrontiersCharacterSheet.#buildEffectiveDamageFormula(item, "");
       return {
         key: item.id,
         item,
         editable: true,
         data: {
           name: item.name,
-          damage: item.system.damageFormula,
+          damage: effectiveDamage || "—",
+          hasDamage: Boolean(effectiveDamage),
           toHit: StarFrontiersCharacterSheet.#formatAttackTarget(
             StarFrontiersCharacterSheet.#getWeaponAttackProfile(actor, item).baseTarget
           ),
@@ -221,6 +230,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           canReload,
           carryState: item.system.carryState || "ready",
           carryStateLabel: game.i18n.localize(`STARFRONTIERS.Choice.CarryState.${item.system.carryState || "ready"}`),
+          modes: modeList,
+          activeModeKey: activeMode?.key ?? "",
+          hasModes: modeList.length > 0,
           quantity: Number(item.system.quantity ?? 1),
           clipChoices,
           linkedClipId,
@@ -442,6 +454,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     this._restoreScrollPosition();
     for (const input of this.element.querySelectorAll("[data-item-field], [data-item-ammo-loaded], [data-item-seu-dial]")) {
       input.addEventListener("change", this.#onItemFieldChange.bind(this));
+    }
+    for (const select of this.element.querySelectorAll('select[data-action="setWeaponMode"]')) {
+      select.addEventListener("change", (event) => {
+        StarFrontiersCharacterSheet.#onSetWeaponMode.call(this, event, select);
+      });
     }
     for (const dragHandle of this.element.querySelectorAll("[data-item-drag]")) {
       dragHandle.addEventListener("dragstart", this.#onItemDragStart.bind(this));
@@ -1055,6 +1072,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }));
   }
 
+  static async #onSetWeaponMode(event, target) {
+    target ??= event.currentTarget;
+    const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!weapon || weapon.type !== "weapon") return;
+    const newKey = String(target.value ?? "");
+    this._rememberScrollPosition();
+    await weapon.update({ "system.activeModeKey": newKey });
+  }
+
   static #canReloadWeapon(actor, weapon, linkedAmmo) {
     const uses = weapon.system.ammo?.uses ?? "none";
     if (uses === "none") return false;
@@ -1247,6 +1273,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static async #rollWeaponAttack(actor, weapon, rollMode = "public") {
     const profile = StarFrontiersCharacterSheet.#getWeaponAttackProfile(actor, weapon);
+    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
 
     const ammoCheck = StarFrontiersCharacterSheet.#getAmmoConsumption(weapon);
     const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
@@ -1296,6 +1323,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       { label: game.i18n.localize("STARFRONTIERS.Weapon.Skill"), value: profile.skillLabel },
       { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(profile.baseTarget) }
     ];
+
+    if (activeMode) {
+      rows.unshift({
+        label: game.i18n.localize("STARFRONTIERS.Weapon.Mode.Label"),
+        value: StarFrontiersCharacterSheet.#getWeaponModeLabel(activeMode)
+      });
+    }
 
     if (autoRangeBand && targetDistance !== null) {
       const units = canvas?.grid?.units || "m";
@@ -1351,8 +1385,21 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       ? `${hitCount}/${shots} ${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")}: ${anyHit ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure")}`
       : anyHit ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure");
 
-    const bandFormula = activeBandKey ? (weapon.system.rangeBands[activeBandKey]?.damageFormula ?? "") : "";
-    const effectiveDamageFormula = bandFormula || weapon.system.damageFormula || "";
+    if (activeMode?.avoidance?.enabled) {
+      const abilityKey = String(activeMode.avoidance.ability ?? "");
+      const abilityLabel = abilityKey ? game.i18n.localize(`STARFRONTIERS.Ability.${abilityKey}`) : "";
+      const effectKey = String(activeMode.avoidance.onSuccessEffect ?? "");
+      const effectLabel = effectKey ? game.i18n.localize(effectKey) : "";
+      rows.push({
+        label: game.i18n.localize("STARFRONTIERS.Weapon.Avoidance"),
+        value: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceDescription", {
+          ability: abilityLabel,
+          effect: effectLabel
+        })
+      });
+    }
+
+    const effectiveDamageFormula = StarFrontiersCharacterSheet.#buildEffectiveDamageFormula(weapon, activeBandKey ?? "");
 
     await StarFrontiersCharacterSheet.#createWeaponAttackChatMessage(actor, weapon, {
       rollMode,
@@ -1372,8 +1419,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static async #rollWeaponDamage(actor, weapon, rollMode = "public", bandKey = "") {
-    const bandFormula = bandKey ? (weapon.system.rangeBands[bandKey]?.damageFormula ?? "") : "";
-    const formula = bandFormula || weapon.system.damageFormula || "";
+    const formula = StarFrontiersCharacterSheet.#buildEffectiveDamageFormula(weapon, bandKey);
 
     if (!formula) {
       ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoDamageFormula"));
@@ -1399,7 +1445,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }),
       subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
       rows: [
-        { label: game.i18n.localize("STARFRONTIERS.Weapon.Defense"), value: StarFrontiersCharacterSheet.#damageTypeLabel(weapon.system.damageType) },
+        { label: game.i18n.localize("STARFRONTIERS.Weapon.Defense"), value: StarFrontiersCharacterSheet.#getWeaponDefenseLabel(weapon) },
         { label: game.i18n.localize("STARFRONTIERS.Weapon.DamageFormulaLabel"), value: formula }
       ],
       rollMode,
@@ -2176,14 +2222,65 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (uses === "none") return { amount: 0 };
     if (uses === "rounds") return { amount: 1 };
 
+    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
+    const modePerShot = activeMode ? Number(activeMode.seuPerShot ?? 0) : 0;
     const variable = Number(weapon.system.ammo?.variableSetting?.current ?? 0);
-    const perShot = Number(weapon.system.ammo?.seuPerShot ?? 0);
+    const perShot = modePerShot || Number(weapon.system.ammo?.seuPerShot ?? 0);
     return { amount: Math.max(variable || perShot || 1, 0) };
+  }
+
+  static #getActiveWeaponMode(weapon) {
+    const modes = Array.from(weapon.system.mechanics?.modes ?? []);
+    if (!modes.length) return null;
+    const key = String(weapon.system.activeModeKey ?? "");
+    return modes.find((mode) => mode.key === key) ?? modes[0] ?? null;
+  }
+
+  static #buildEffectiveDamageFormula(weapon, bandKey = "") {
+    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
+    const modeFormula = activeMode?.damageFormula ?? "";
+    if (activeMode && !modeFormula && !bandKey) return "";
+
+    const bandFormula = bandKey
+      ? (weapon.system.rangeBands?.[bandKey]?.damageFormula ?? "")
+      : "";
+    const baseFormula = bandFormula || modeFormula || weapon.system.damageFormula || "";
+    if (!baseFormula) return "";
+
+    const uses = weapon.system.ammo?.uses ?? "none";
+    if (uses !== "seu") return baseFormula;
+
+    const setting = weapon.system.ammo?.variableSetting ?? {};
+    const min = Number(setting.min ?? 0);
+    const max = Number(setting.max ?? 0);
+    const current = Number(setting.current ?? 0);
+    const hasVariableDial = max > min && min >= 1 && current >= 1;
+    if (!hasVariableDial) return baseFormula;
+
+    return baseFormula.replace(/(\d*)([dD])(\d+)/g, (match, count, d, faces) => {
+      const n = Number(count || 1) * current;
+      return `${n}${d}${faces}`;
+    });
   }
 
   static #damageTypeLabel(value) {
     if (!value) return game.i18n.localize("STARFRONTIERS.Choice.DefenseType.None");
     return game.i18n.localize(`STARFRONTIERS.Choice.DefenseType.${value}`);
+  }
+
+  static #getWeaponModeLabel(mode) {
+    const label = String(mode?.label ?? "");
+    if (!label) return String(mode?.key ?? "");
+    return game.i18n.has(label) ? game.i18n.localize(label) : label;
+  }
+
+  static #getWeaponDefenseLabel(weapon) {
+    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
+    const defenseTypes = Array.from(activeMode?.defenseTypes ?? []);
+    if (defenseTypes.length) {
+      return defenseTypes.map((value) => StarFrontiersCharacterSheet.#damageTypeLabel(value)).join(", ");
+    }
+    return StarFrontiersCharacterSheet.#damageTypeLabel(weapon.system.damageType);
   }
 
   static #buildRaceCharacterUpdates(actor, race, { applyStats = false, racialAbilitySummary = null, raceBonusSelections = [] } = {}) {

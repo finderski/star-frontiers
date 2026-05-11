@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.2.5";
+export const CURRENT_SCHEMA_VERSION = "0.2.6";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -264,6 +264,15 @@ const MIGRATIONS = [
           if (updates.length) await tokenDoc.actor.updateEmbeddedDocuments("Item", updates);
         }
       }
+    }
+  },
+  {
+    version: "0.2.6",
+    description: "Behavioral: variable SEU damage scales weapon formula by current setting. Schema: added optional mechanics.modes[] and activeModeKey on weapons. No stored data changes; mode features are opt-in per-weapon.",
+    async migrate() {
+      // No-op. Damage scaling is computed at roll time from existing
+      // weapon.system.ammo.variableSetting fields. Mode fields default to
+      // empty for all existing weapons, which preserves legacy behavior.
     }
   }
 ];

@@ -1061,6 +1061,13 @@ button.roll-label-main:focus-visible {
   text-align: center;
 }
 
+.weapons-grid .weapon-roll-button--empty {
+  color: var(--sf-muted);
+  cursor: default;
+  display: inline-flex;
+  justify-content: center;
+}
+
 .weapons-grid span.labelSpan.ls-Left {
   justify-self: left;
   text-align: left;
@@ -1208,9 +1215,20 @@ button.roll-label-main:focus-visible {
   white-space: nowrap;
 }
 
+.weapon-gear-panel .weapon-mode-selector {
+  width: 100%;
+}
+
 .weapon-gear-panel .seu-dial {
   text-align: center;
   width: 44px;
+}
+
+.star-frontiers-item-sheet .form-hint {
+  color: var(--sf-muted);
+  font-family: var(--body);
+  font-size: 0.8rem;
+  margin: 0.35rem 0 0;
 }
 
 /* --- 8d. Defenses (left column) ---

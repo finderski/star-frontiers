@@ -220,11 +220,15 @@
               </div>
             </div>
             <div class="roll-label-group">
-                <button type="button" class="weapon-roll-button weapon-roll-button--damage" data-action="rollWeaponDamage" title="{{localize "STARFRONTIERS.Weapon.RollDamage"}}">{{row.data.damage}}</button>
-                <div class="roll-label-actions">
-                  <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollWeaponDamage" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Weapon.RollDamageBlind"}}"></button>
-                  <button type="button" class="roll-label-action roll-label-action--gm" data-action="rollWeaponDamage" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Weapon.RollDamageWhisper"}}"></button>
-                </div>
+                {{#if row.data.hasDamage}}
+                  <button type="button" class="weapon-roll-button weapon-roll-button--damage" data-action="rollWeaponDamage" title="{{localize "STARFRONTIERS.Weapon.RollDamage"}}">{{row.data.damage}}</button>
+                  <div class="roll-label-actions">
+                    <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollWeaponDamage" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Weapon.RollDamageBlind"}}"></button>
+                    <button type="button" class="roll-label-action roll-label-action--gm" data-action="rollWeaponDamage" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Weapon.RollDamageWhisper"}}"></button>
+                  </div>
+                {{else}}
+                  <span class="weapon-roll-button weapon-roll-button--damage weapon-roll-button--empty">{{row.data.damage}}</span>
+                {{/if}}
             </div>
           {{else}}
             <input type="text" value="{{row.data.name}}" aria-label="{{localize "STARFRONTIERS.Weapon.Name"}}" readonly />
@@ -265,6 +269,16 @@
                   <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
                     <i class="fa-solid fa-pen-to-square"></i>
                   </button>
+                  {{#if row.data.hasModes}}
+                    <label class="seu-dial-label weapon-mode-selector">
+                      <span>{{localize "STARFRONTIERS.Weapon.Mode.Label"}}</span>
+                      <select data-action="setWeaponMode" aria-label="{{localize "STARFRONTIERS.Weapon.Mode.Label"}}">
+                        {{#each row.data.modes as |mode|}}
+                          <option value="{{mode.key}}" {{#if mode.isActive}}selected{{/if}}>{{mode.label}}</option>
+                        {{/each}}
+                      </select>
+                    </label>
+                  {{/if}}
                   {{#if row.data.hasAmmo}}
                     <label class="seu-dial-label">
                       <span>{{localize "STARFRONTIERS.Item.LinkedAmmo"}}</span>

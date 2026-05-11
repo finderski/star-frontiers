@@ -151,6 +151,7 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
       attributeKey: textField({ initial: "dex", choices: ["dex", "str"] }),
       requiredSkillRef: textField(),
       weaponSkillKey: textField({ choices: ["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"] }),
+      activeModeKey: textField(),
       damageFormula: textField(),
       damageType: textField({ choices: ["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"] }),
       rangeBands: rangeBandsField(),
@@ -174,6 +175,21 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
         onHitEffectIds: arrayField(textField()),
         isHeavy: boolField(),
         rateOfFire: numberField({ initial: 1, min: 0 }),
+        modes: arrayField(schemaField({
+          key: textField(),
+          label: textField(),
+          damageFormula: textField(),
+          seuPerShot: numberField({ initial: 0, min: 0 }),
+          avoidance: schemaField({
+            enabled: boolField(),
+            ability: textField({ choices: ["", "sta", "rs", "dex", "str", "int", "log", "per", "ldr", "im"] }),
+            comparison: textField({ initial: "currentOrLess", choices: ["currentOrLess"] }),
+            onSuccessEffect: textField(),
+            failNote: textField()
+          }),
+          defenseTypes: setField(textField()),
+          onHitEffectIds: arrayField(textField())
+        })),
         burst: schemaField({
           available: boolField(),
           dice: textField(),

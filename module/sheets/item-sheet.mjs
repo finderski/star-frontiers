@@ -60,6 +60,14 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
     context.weaponUsesSeu = item.type === "weapon" && item.system.ammo?.uses === "seu";
+    if (item.type === "weapon") {
+      const setting = item.system.ammo?.variableSetting ?? {};
+      context.hasVariableSeuDial = item.system.ammo?.uses === "seu"
+        && Number(setting.max ?? 0) > Number(setting.min ?? 0)
+        && Number(setting.min ?? 0) >= 1;
+    } else {
+      context.hasVariableSeuDial = false;
+    }
     context.linkedRacialAbilities = item.type === "race" ? await this.#resolveLinkedRacialAbilities(item) : [];
     context.bonusPickRows = item.type === "race" ? Array.from(item.system.bonusPicks ?? []) : [];
     context.skillIsMain = item.type === "skill" && item.system.category === "main";

@@ -145,7 +145,7 @@ module/data/item-data.mjs       Item TypeDataModels: Race, Skill, TrainedAbility
                                   Ammo, PowerSource, Gear, Consumable, Vehicle, Computer, Program
 module/sheets/character-sheet.mjs  StarFrontiersCharacterSheet (ActorSheetV2) — all rolls, dialogs, item CRUD
 module/sheets/item-sheet.mjs    StarFrontiersItemSheet (ItemSheetV2) — generic item sheet, ammo linking
-module/migration/migrations.mjs Schema migration runner — current version 0.2.0
+module/migration/migrations.mjs Schema migration runner — current version 0.2.6
 templates/actor/character-sheet.hbs   Main character sheet (single PARTS template)
 templates/item/item-sheet.hbs         Item sheet (single PARTS template, subtype-conditional sections)
 templates/chat/check-roll-card.hbs    Ability check / damage / initiative chat card
@@ -251,6 +251,9 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - **0.2.5 — Portable computer setting + encumbrance update** (Codex). Added the world `computerPortabilityLevel` setting. Computers above that level now move into the Assets subsection, their carry-state button is suppressed/locked to stored in the character UI, and `computeCarriedMass` excludes them along with Programs and Vehicles.
   - **0.2.5 — Career PSA** (Human). Character sheet now exposes `system.psa` as the Expanded Rules Career PSA selector, with choices limited to Military, Technological, and Biosocial.
   - **0.2.5 — Equipment expansion polish.** Expandable inventory rows (consumable, powerSource, computer, ammo) now expose a pencil/Edit button (`.equipment-row__edit`, `data-action="openItem"`) at the top of the expanded panel, providing a path back to the item sheet for fields not surfaced inline (description, mass, cost, requiredSkillRef, effectIds, sourceType, etc.). Consumable use chat now picks between `STARFRONTIERS.Item.UsedConsumable` (with selected target) and `STARFRONTIERS.Item.UsedConsumableSelf` (no target) instead of always emitting "...on no target." Foundry's `i18n.format` does not support handlebars conditionals inside string values, so the pick has to happen in JS.
+  - **0.2.6 — Variable SEU damage scaling.** Weapon damage resolution now goes through `#buildEffectiveDamageFormula(weapon, bandKey)`, which treats `weapon.system.damageFormula` as the per-SEU unit only when the weapon has a true variable dial (`ammo.uses === "seu"`, `variableSetting.max > variableSetting.min`, `variableSetting.min >= 1`, `current >= 1`). Weapon-row previews, attack-card damage-button gating, and actual damage rolls all use the same helper, so laser pistols/rifles/heavy lasers now show and roll `3d10`, `10d10`, etc. correctly.
+  - **0.2.6 — Weapon firing modes (Phase 1).** Weapons may now define `system.activeModeKey` plus `system.mechanics.modes[]`; the active mode overrides damage formula, SEU-per-shot, defense labels, and future effect hooks. Character weapon gear panels expose a mode selector when modes are present, attack chat cards label the active mode, and avoidance-based modes currently add an informational Avoidance row instead of automation.
+  - **0.2.6 — Canonical Electrostunner shape documented.** Mode-bearing data model is now documented around the Electrostunner pattern: top-level `damageFormula: ""`, `activeModeKey: "stun"`, and two modes (`stun` with STA avoidance + unconscious effect, `blast` with `4d10` + gauss defense). Use this as the reference when hand-authoring the item until compendium content exists.
   - **Actor-owned racial skill progress** — `currentChance` is not on the `trainedAbility` item schema. Character-specific advancement lives on `system.racialSkillProgress` (plain object keyed by owned item ID), and the item sheet only defines template data such as `rollType`, `baseChance`, `cap`, and `xpPerPoint`.
   - **Skill category choices converted** — `StarFrontiersSkillData.category` now uses `["main", "subskill"]`; the older `racial/psa/general` values are no longer part of the active sheet model.
   - **Item sheet header cleanup (all types)** — removed the `typeLabel` span, the `Key` field, and the `<Item Type>` label from the meta row on every item sheet. `nameLabel` is now always `ITEM_TYPE_LABELS[item.type]` (e.g. "WEAPON", "SKILL", "RACIAL ABILITY"). The header is now just: image + localized-type-name label + name input.
@@ -280,6 +283,7 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 - `attributeKey` choices: `dex` · `str` (default `"dex"`) — the base ability used for attack rolls (replaces the old `weaponSkillKey` UI convention for this purpose)
 - `requiredSkillRef`: ID or UUID of the skill item required to use this weapon (shown as a drop zone on the item sheet). The attack roll will eventually use this to compute the Expanded-rules formula and apply an unskilled penalty when the character doesn't own the skill. The field is on the schema but not yet wired into the attack roll.
 - `weaponSkillKey` choices: `""` · `dex` · `str` · `beam` · `gyrojet` · `projectile` · `thrown` · `melee` — kept in schema for backward compat with the current attack roll code; hidden from the item sheet
+- `activeModeKey`: optional top-level string selecting the active entry in `system.mechanics.modes[]`; empty string means legacy single-mode behavior
 - `damageType` choices (UI label "Defense"): `albedo` · `gaussAS` · `sonic` · `sonicAS` · `inertia` · `reactionSpeed` · `stamina` · `ir`
 - `carryState` (default `"ready"`): `ready` · `carried` · `stored`
 - `quantity` (default `1`): edited via the character sheet weapon **gear panel**, NOT on the item sheet (avoids cluttering item sheet with character-tied data)
@@ -287,10 +291,70 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 - `ammo.uses` choices: `seu` · `rounds` · `none` (default `none`; auto-defaults when weaponType changes in item sheet)
 - `ammo.capacity` / `ammo.consumed` / `ammo.seuPerShot` — tracked on weapon, NOT shown on item sheet (character sheet only)
 - `ammo.variableSetting.min` / `.max` — shown on item sheet for any SEU weapon in Expanded mode; `.current` is editable on the character sheet via the gear panel SEU dial
+- `mechanics.modes[]`: optional firing-mode list. Each mode can override `damageFormula`, `seuPerShot`, `defenseTypes`, `onHitEffectIds`, and supply an avoidance stub (`enabled`, `ability`, `comparison`, `onSuccessEffect`, `failNote`). Actor-side weapon rows expose a mode selector when this array is populated.
 - `mechanics.rateOfFire` — shown on item sheet in Expanded mode; drives multi-shot dialog
 - `rangeBands[key].damageFormula` — optional per-band damage formula; empty = use weapon base formula
 - Range band availability: a band with both `min === null` and `max === null` is unavailable for that weapon
 - Range band display on character sheet shows max distance only
+- Damage resolution invariant: never read `weapon.system.damageFormula` directly in roll/preview code. `#buildEffectiveDamageFormula(weapon, bandKey)` is the single source of truth because it layers range-band overrides, active-mode overrides, and variable-SEU scaling.
+
+### Canonical Electrostunner configuration
+
+Use this exact shape when hand-authoring the Electrostunner until compendium content exists:
+
+```js
+{
+  name: "Electrostunner",
+  type: "weapon",
+  system: {
+    weaponType: "beam",
+    attributeKey: "dex",
+    damageFormula: "",
+    damageType: "gaussAS",
+    ammo: {
+      uses: "seu",
+      capacity: 20,
+      seuPerShot: 2,
+      variableSetting: { min: 0, max: 0, current: 0 }
+    },
+    activeModeKey: "stun",
+    mechanics: {
+      modes: [
+        {
+          key: "stun",
+          label: "STARFRONTIERS.Weapon.Mode.Stun",
+          damageFormula: "",
+          seuPerShot: 2,
+          avoidance: {
+            enabled: true,
+            ability: "sta",
+            comparison: "currentOrLess",
+            onSuccessEffect: "STARFRONTIERS.Weapon.Effects.Unconscious",
+            failNote: ""
+          },
+          defenseTypes: ["gaussAS"],
+          onHitEffectIds: []
+        },
+        {
+          key: "blast",
+          label: "STARFRONTIERS.Weapon.Mode.Blast",
+          damageFormula: "4d10",
+          seuPerShot: 2,
+          avoidance: {
+            enabled: false,
+            ability: "",
+            comparison: "currentOrLess",
+            onSuccessEffect: "",
+            failNote: ""
+          },
+          defenseTypes: ["gauss"],
+          onHitEffectIds: []
+        }
+      ]
+    }
+  }
+}
+```
 
 ### Ammo item data model (current)
 - `ammoType`: dropdown — `rounds` · `seu` (no longer free text). Default is `"rounds"` so newly created ammo items aren't blank.
@@ -313,16 +377,16 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 - Phase 6+ (Expanded rules UI, skills, trained abilities, screens, SEU economy)
 - NPC and creature sheets
 - Vehicle actor sheet
-- Variable SEU damage formula (e.g. `@seuSetting`d10 scaling with dial) — dial saves current but damage formula doesn't yet interpolate it
-
 ---
 
 ## Outstanding issues
 
-- **Variable SEU damage** — `variableSetting.current` is saved and read for ammo consumption, but there is no formula interpolation yet (e.g. firing at 3 SEU should do 3d10 for a laser pistol). Needs: injecting `seuSetting` into roll data so formulas like `@seuSetting`d10 work.
+- **Weapon firing modes — Phase 2 avoidance automation.** Phase 1 only labels the active mode and, when relevant, adds an informational Avoidance row to the attack chat card. Still missing: a target-side avoidance workflow/button, applying the configured failure effect automatically, and deciding how that interacts with targeting / GM-only resolution.
 - **Racial Ability model shape** — the UI label is now `Racial Ability`, but the underlying item type is still `trainedAbility`. That is intentional for now. Remaining design question: long-term fate of `cap` and `xpPerPoint`, and whether the current fixed-cost `1 XP` Personal File advancement testbed should start honoring `xpPerPoint`.
 - **Battle Rage / racial ability rolls — partially done.** Roll UI is implemented (Profile tab Personal File chips, 1d100 vs chance, chat card, AE enable on success, manual effect toggle button). Still missing: wire `combatProfile.meleeBonus` into the attack roll so the AE's +20 actually modifies the to-hit, and confirm in Foundry that the transferred AE `disabled` cycle behaves end-to-end.
 - **Attack roll rework** — weapon now has `system.requiredSkillRef` (skill item reference) and `system.attributeKey` (`dex`/`str`). The attack calculation still uses the old `weaponSkillKey` string convention. Rework needed: read `requiredSkillRef` + `attributeKey`, look up the skill level if owned, apply Expanded formula (`½ attr + level×10`), pre-populate the modifier dialog with an unskilled penalty when the required skill is not owned.
+- **Weapon mode authoring UX.** Phase 1 added the schema and actor-side mode selector, but there is not yet first-class item-sheet UI for editing `mechanics.modes[]`. Right now the assumption is hand-authored data / future compendium seeding. Decide whether to expose a dedicated editor before more mode-bearing weapons appear.
+- **Needler / alternate-ammo future shape.** `mechanics.modes[]` is now the likely home for stun/blast/ammo-variant style toggles. Before adding needler dart variants or similar gear, decide whether that lives as weapon modes, linked ammo metadata, or both.
 - **Race movement presentation** — walking/running/hourly still need a final UX decision on the race item sheet (show units, and decide whether Hourly should remain visible in Basic mode or just be treated as optional worldbuilding data).
 - **Encumbrance indicator placement** — currently the Total Mass / Encumbered badge lives in the Equipment section header, but the underlying total counts weapons/armor/screens too. Easy to misread as "Equipment-section mass." Candidate fixes: relabel to "Total Mass" + relocate near Walking/Running, or add a per-section breakdown tooltip.
 - **Consumable effect authoring** — the character-sheet Use flow supports `system.effectIds` on consumables, but the consumable item sheet still lacks a dedicated Active Effects picker/editor. Decide whether to expose that directly on consumables or leave it as advanced/manual data entry for now.
