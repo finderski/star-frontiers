@@ -1526,7 +1526,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }
     ];
 
-    const content = await renderTemplate("systems/star-frontiers/templates/chat/check-roll-card.hbs", {
+    const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/check-roll-card.hbs", {
       title: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceTitle", {
         name: target.name,
         ability: abilityLabel
@@ -1651,7 +1651,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }
     );
 
-    const content = await renderTemplate("systems/star-frontiers/templates/chat/racial-ability-card.hbs", {
+    const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/racial-ability-card.hbs", {
       title: item.name,
       subtitle: StarFrontiersCharacterSheet.#getRollTitleName(actor),
       description,
@@ -2652,7 +2652,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static async #createStatsChatMessage(actor, results, { initiativeMod, initiativeSource, race }) {
-    const content = await renderTemplate("systems/star-frontiers/templates/chat/stat-roll-card.hbs", {
+    const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/stat-roll-card.hbs", {
       title: game.i18n.format("STARFRONTIERS.Character.RollForStatsTitle", {
         name: StarFrontiersCharacterSheet.#getRollTitleName(actor)
       }),
@@ -2708,7 +2708,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       ? game.i18n.format("STARFRONTIERS.Weapon.RollAvoidanceButton", { ability: avoidance.abilityLabel })
       : "";
 
-    const content = await renderTemplate("systems/star-frontiers/templates/chat/weapon-attack-card.hbs", {
+    const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/weapon-attack-card.hbs", {
       title: game.i18n.format("STARFRONTIERS.Weapon.AttackTitle", { weapon: weapon.name }),
       subtitle: StarFrontiersCharacterSheet.#getRollTitleName(actor),
       rows,
@@ -2737,7 +2737,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static async #createCheckChatMessage(actor, { title, subtitle, rows, outcome, outcomeClass, rollHtml, rollMode = "public" }) {
-    const content = await renderTemplate("systems/star-frontiers/templates/chat/check-roll-card.hbs", {
+    const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/check-roll-card.hbs", {
       title,
       subtitle,
       rows,

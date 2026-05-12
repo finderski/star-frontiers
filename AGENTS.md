@@ -434,6 +434,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not treat `powerSource` items as ammo. Beltpacks/backpacks/parabatteries deplete via `system.remaining`, not `shots`; powerclips are the `ammo` items with `ammoType: "seu"`.
 - Do not clean up `linkedWeaponRefs` / `linkedScreenRefs` opportunistically in unrelated code paths. Bidirectional power-source links should only be updated in the explicit link/unlink/reload flows and `#onDeleteItem`, so both sides stay atomic.
 - Do not count `program`, `vehicle`, or non-portable `computer` items in `computeCarriedMass`.
+- Use modern Foundry namespaced APIs for UI primitives: `foundry.applications.handlebars.renderTemplate` (not the global `renderTemplate`), `foundry.applications.api.DialogV2` (not V1 `Dialog`), and `foundry.applications.apps.FilePicker.implementation` (not the global `FilePicker`). The deprecated globals/classes are scheduled for removal in Foundry v15-v16.
 
 ## Testing and runtime expectations
 - There is no automated test suite beyond validation scripts.

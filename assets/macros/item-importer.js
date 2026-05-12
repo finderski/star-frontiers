@@ -201,15 +201,17 @@ const content = `
 </form>
 `;
 
-new Dialog({
-  title: "Import Star Frontiers Items",
+await foundry.applications.api.DialogV2.wait({
+  window: { title: "Import Star Frontiers Items" },
   content,
-  buttons: {
-    import: {
-      icon: '<i class="fas fa-file-import"></i>',
+  buttons: [
+    {
+      action: "import",
+      icon: "fas fa-file-import",
       label: "Import",
-      callback: async (html) => {
-        const raw = html.find("[name='payload']").val();
+      default: true,
+      callback: async (event, button, dialog) => {
+        const raw = dialog.element.querySelector("[name='payload']")?.value ?? "";
         try {
           await importItems(raw);
         } catch (err) {
@@ -218,14 +220,17 @@ new Dialog({
         }
       }
     },
-    cancel: {
-      icon: '<i class="fas fa-times"></i>',
+    {
+      action: "cancel",
+      icon: "fas fa-times",
       label: "Cancel"
     }
+  ],
+  render: (event, dialog) => {
+    dialog.element.querySelector("textarea")?.focus();
   },
-  default: "import",
-  render: (html) => html.find("textarea").focus()
-}).render(true);
+  rejectClose: false
+});
 
 /* Top Level Wrapper */
 /*

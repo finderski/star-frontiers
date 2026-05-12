@@ -332,7 +332,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   }
 
   static async #onEditImage(event, target) {
-    const fp = new FilePicker({
+    const FilePickerImpl = foundry.applications.apps.FilePicker.implementation;
+    const fp = new FilePickerImpl({
       type: "image",
       current: this.document.img,
       callback: async (path) => this.document.update({ img: path }),
