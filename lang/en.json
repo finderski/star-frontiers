@@ -488,6 +488,8 @@
       "WeaponType": "Type",
       "Weight": "Weight",
       "XPPerPoint": "XP/Point"
+      ,
+      "XPPerPointHint": "XP cost to raise this ability by 1 percentage point. Set to 0 for abilities that improve without spending experience."
     },
     "Placeholder": {
       "Action": "Placeholder action",
@@ -591,6 +593,8 @@
         "Stun": "Stun",
         "Blast": "Blast"
       },
+      "MeleeBonus": "Melee Bonus",
+      "RangedBonus": "Ranged Bonus",
       "Effects": {
         "Unconscious": "Unconscious for d100 turns",
         "Stunned": "Stunned"

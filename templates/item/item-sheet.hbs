@@ -261,7 +261,11 @@
           <label><span>{{localize "STARFRONTIERS.Item.RollType"}}</span><select name="system.rollType">{{selectOptions choices.rollType selected=system.rollType}}</select></label>
           <label><span>{{localize "STARFRONTIERS.Item.BaseChance"}}</span><input type="number" name="system.baseChance" value="{{system.baseChance}}" min="0" max="100" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Cap"}}</span><input type="number" name="system.cap" value="{{system.cap}}" min="0" max="100" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.XPPerPoint"}}</span><input type="number" name="system.xpPerPoint" value="{{system.xpPerPoint}}" min="0" /></label>
+          <label>
+            <span>{{localize "STARFRONTIERS.Item.XPPerPoint"}}</span>
+            <input type="number" name="system.xpPerPoint" value="{{system.xpPerPoint}}" min="0" />
+            <small class="form-hint">{{localize "STARFRONTIERS.Item.XPPerPointHint"}}</small>
+          </label>
         </div>
 
         <div class="race-editor-block">

@@ -185,6 +185,7 @@
 - **Active weapon mode resolution**: `#getActiveWeaponMode(weapon)` in `character-sheet.mjs` is the single source of truth. If a weapon has modes but no `activeModeKey`, the first mode is treated as active for display, ammo use, and chat-card context.
 - **Avoidance target capture**: when an attack is rolled, the first currently-targeted token is captured into the attack chat card as `targetTokenUuid` / `targetActorUuid`. Avoidance resolution must read those UUIDs from the card dataset, not from `game.user.targets` at click time.
 - **Avoidance checks**: `#rollAvoidanceCheck` rolls against `target.system.abilities[ability].value` (current score, not base) and posts the result as the **target's** speaker, not the attacker's. Failed rolls attach `flags["star-frontiers"].avoidanceFailure` for future Active Effect application.
+- **Combat-profile attack bonuses**: `actor.system.combatProfile.meleeBonus` and `.rangedBonus` are the canonical persistent to-hit bonus fields. `#getWeaponAttackProfile` adds the relevant one to `baseTarget` before clamping, and attack chat cards show the consolidated value as `Melee Bonus` or `Ranged Bonus` when non-zero.
 - **Ammo type**: `ammoType` on ammo items is now a dropdown (`rounds` · `seu`), not free text.
 - **Weapon quantity**: `weapon.system.quantity` is on the schema. It is **not** exposed on the weapon item sheet — edit it via the character sheet's weapon **gear panel** (slide-up). This keeps character-tied data off the item sheet.
 
@@ -192,8 +193,8 @@
 - Character-level progression state for racial abilities lives on the **actor**, not the item. The `trainedAbility` item is a template; the actor tracks how good each character is at each ability.
 - `system.racialSkillProgress` on character actors is a plain `ObjectField` (no inner schema) keyed by the owned `trainedAbility` item's ID: `{ [itemId]: { currentChance: number } }`.
 - When reading current chance for a racial ability roll, look up `actor.system.racialSkillProgress[item.id]?.currentChance ?? item.system.baseChance`.
-- The Profile-tab racial-ability chip controls are now an **XP-spend testbed**: `+` costs 1 available XP and adds 1 spent XP, `-` refunds 1 spent XP back to available, and chance cannot drop below `item.system.baseChance`.
-- `item.system.xpPerPoint` is still template data on the Racial Ability item sheet, but the current character-sheet advancement controls do **not** consume it yet. Live behavior is fixed-cost `1 XP` per `±1 chance`.
+- The Profile-tab racial-ability chip controls now honor `item.system.xpPerPoint`: `+` spends that many XP from `system.experience.earned`, `-` refunds the same amount from `system.experience.spent`, and chance cannot drop below `item.system.baseChance`.
+- `item.system.xpPerPoint = 0` means free adjustment with no XP change in either direction. New `trainedAbility` items default `xpPerPoint` to `1`.
 - Do not add `currentChance` back to `StarFrontiersTrainedAbilityData` — it is intentionally actor-owned progression state.
 
 ### Defense slots (Suit / Screen)
@@ -375,15 +376,11 @@ This reflects the current local notes and implemented work, not a live Asana syn
 
 ## Current next tasks
 - Battle Rage follow-through:
-  - Wire `combatProfile.meleeBonus` into the attack roll so AEs that write to that field actually modify the to-hit calculation
   - Verify the AE `transfer: true` / `disabled` toggle cycle works end-to-end in Foundry (set `disabled: false` on success → AE propagates to actor → bonus applies; fire button sets `disabled: true` → bonus removed)
-- Racial Abilities:
-  - decide whether chip advancement should start honoring `item.system.xpPerPoint` instead of the current fixed-cost `1 XP` testbed
 - Attack roll rework:
   - Replace `weaponSkillKey` string lookup with `weapon.system.requiredSkillRef` + `weapon.system.attributeKey`
   - Use `attributeKey` (dex/str) as the base ability for the Expanded-rules formula: `½ attr + (skill.system.level * 10)`
   - Pre-populate modifier dialog with an unskilled penalty when the character does not own the required skill
-  - When the required skill has `mechanics.applyMeleeBonus` or `mechanics.applyRangeBonus` set, read `actor.system.combatProfile.meleeBonus` / `.rangeBonus` (written by active AEs) and fold into the attack target
   - **Note:** skill roll checks (`rollSkill` action) are implemented; the rework is for weapon attack rolls specifically
 - Weapons:
   - Avoidance Phase 3 — consume `flags["star-frontiers"].avoidanceFailure` to actually apply the configured effect/AE to the target on failure, and decide how re-rolls should interact with existing effects
@@ -435,6 +432,10 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not clean up `linkedWeaponRefs` / `linkedScreenRefs` opportunistically in unrelated code paths. Bidirectional power-source links should only be updated in the explicit link/unlink/reload flows and `#onDeleteItem`, so both sides stay atomic.
 - Do not count `program`, `vehicle`, or non-portable `computer` items in `computeCarriedMass`.
 - Use modern Foundry namespaced APIs for UI primitives: `foundry.applications.handlebars.renderTemplate` (not the global `renderTemplate`), `foundry.applications.api.DialogV2` (not V1 `Dialog`), and `foundry.applications.apps.FilePicker.implementation` (not the global `FilePicker`). The deprecated globals/classes are scheduled for removal in Foundry v15-v16.
+- The character sheet uses `submitOnChange: true`, which re-renders on every form field change. `_onChangeForm` is intentionally overridden to call `_rememberScrollPosition()` before delegating to `super`; plain top-level fields depend on this hook for scroll preservation.
+- All player-initiated d100 target-vs-roll checks from the character sheet must prompt for a misc. modifier through `#promptModifier(label, targetValue)`. That includes ability checks, skill checks, and active racial ability rolls. Weapon attacks intentionally use their own range-band-plus-modifier prompt.
+- Racial Ability XP adjustments must honor `item.system.xpPerPoint` and must be serialized per actor via the `_racialAbilityAdjustQueue` promise chain stored on the sheet instance. Do not replace this with a simple in-flight flag; that drops user clicks and reintroduces XP/chance desync.
+- `system.combatProfile.meleeBonus` and `.rangedBonus` are the canonical attachment points for persistent state-based attack bonuses. Active Effects, racial abilities, and GM tooling should target those fields; per-attack situational modifiers still belong in the attack prompt.
 
 ## Testing and runtime expectations
 - There is no automated test suite beyond validation scripts.

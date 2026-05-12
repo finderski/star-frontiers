@@ -127,7 +127,7 @@ export class StarFrontiersTrainedAbilityData extends StarFrontiersItemData {
       raceKey: textField(),
       baseChance: numberField({ initial: 0, min: 0, max: 100 }),
       cap: numberField({ initial: 100, min: 0, max: 100 }),
-      xpPerPoint: numberField({ initial: 0, min: 0 }),
+      xpPerPoint: numberField({ initial: 1, min: 0 }),
       rollType: textField({ initial: "active", choices: ["active", "passive"] }),
       triggersEffectId: textField(),
       cooldown: schemaField({

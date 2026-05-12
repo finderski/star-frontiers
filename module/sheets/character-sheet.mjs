@@ -489,6 +489,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
   }
 
+  _onChangeForm(formConfig, event) {
+    this._rememberScrollPosition();
+    return super._onChangeForm(formConfig, event);
+  }
+
   #applyActiveTab() {
     const root = this.element;
     if (!root) return;
@@ -1251,13 +1256,13 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static async #rollAbilityCheck(actor, ability, rollMode = "public") {
     const target = StarFrontiersCharacterSheet.#getAbilityCheckTarget(actor, ability);
     const encumbranceMod = StarFrontiersCharacterSheet.#getAbilityEncumbranceMod(actor, ability);
-    const modifier = await StarFrontiersCharacterSheet.#promptAbilityModifier(actor, ability, target.target + encumbranceMod);
+    const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
+    const modifier = await StarFrontiersCharacterSheet.#promptModifier(abilityLabel, target.target + encumbranceMod);
     if (modifier === null) return;
 
     const adjustedTarget = target.target + modifier + encumbranceMod;
     const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
     const success = roll.total <= adjustedTarget;
-    const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
     const rollHtml = await roll.render({
       flavor: game.i18n.format("STARFRONTIERS.Character.AbilityCheckFlavor", { ability: abilityLabel })
     });
@@ -1303,6 +1308,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static async #rollWeaponAttack(actor, weapon, rollMode = "public") {
     const profile = StarFrontiersCharacterSheet.#getWeaponAttackProfile(actor, weapon);
     const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
+    const isMelee = weapon.system.weaponSkillKey === "melee" || weapon.system.weaponType === "melee";
+    const combatProfileBonus = Number(
+      isMelee
+        ? actor.system.combatProfile?.meleeBonus ?? 0
+        : actor.system.combatProfile?.rangedBonus ?? 0
+    );
     const targetedToken = [...(game.user?.targets ?? [])][0] ?? null;
     const targetTokenUuid = targetedToken?.document?.uuid ?? "";
     const targetActorUuid = targetedToken?.actor?.uuid ?? "";
@@ -1376,6 +1387,14 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
     if (encumbrance.targetMod) {
       rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.TargetEncumbered"), value: encumbrance.targetMod >= 0 ? `+${encumbrance.targetMod}` : String(encumbrance.targetMod) });
+    }
+    if (combatProfileBonus) {
+      rows.push({
+        label: game.i18n.localize(isMelee
+          ? "STARFRONTIERS.Weapon.MeleeBonus"
+          : "STARFRONTIERS.Weapon.RangedBonus"),
+        value: combatProfileBonus >= 0 ? `+${combatProfileBonus}` : String(combatProfileBonus)
+      });
     }
     rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: prompt.modifier >= 0 ? `+${prompt.modifier}` : String(prompt.modifier) });
 
@@ -1561,17 +1580,18 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     await ChatMessage.create(chatData);
   }
 
-  static async #promptAbilityModifier(actor, ability, targetValue) {
-    const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
+  static async #promptModifier(label, targetValue, {
+    titleKey = "STARFRONTIERS.Character.RollAbilityModifierTitle",
+    promptKey = "STARFRONTIERS.Character.RollAbilityModifierPrompt",
+    titleData = {},
+    promptData = {}
+  } = {}) {
     return foundry.applications.api.DialogV2.prompt({
       window: {
-        title: game.i18n.format("STARFRONTIERS.Character.RollAbilityModifierTitle", { ability: abilityLabel })
+        title: game.i18n.format(titleKey, { ability: label, name: label, target: targetValue, ...titleData })
       },
       content: `
-        <p>${game.i18n.format("STARFRONTIERS.Character.RollAbilityModifierPrompt", {
-          ability: abilityLabel,
-          target: targetValue
-        })}</p>
+        <p>${game.i18n.format(promptKey, { ability: label, name: label, target: targetValue, ...promptData })}</p>
         <input name="modifier" type="number" step="1" value="0" autofocus>
       `,
       ok: {
@@ -1607,9 +1627,15 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static async #rollRacialAbility(actor, item, rollMode = "public") {
+    if (item.system.rollType !== "active") return;
+
     const chance = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
+    const modifier = await StarFrontiersCharacterSheet.#promptModifier(item.name, chance);
+    if (modifier === null) return;
+
+    const adjustedTarget = chance + modifier;
     const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
-    const success = roll.total <= chance;
+    const success = roll.total <= adjustedTarget;
     const rollHtml = await roll.render({
       flavor: game.i18n.format("STARFRONTIERS.Character.RacialAbilityRollFlavor", { name: item.name })
     });
@@ -1628,7 +1654,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }),
       subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
       rows: [
-        { label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(chance) },
+        { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(chance) },
+        ...(modifier ? [{
+          label: game.i18n.localize("STARFRONTIERS.Character.Modifier"),
+          value: modifier >= 0 ? `+${modifier}` : String(modifier)
+        }] : []),
+        { label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(adjustedTarget) },
         { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(roll.total).padStart(2, "0") }
       ],
       rollMode,
@@ -1673,16 +1704,29 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static async #adjustRacialAbilityChance(actor, item, delta) {
-    const current = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
+    const sheet = actor.sheet;
+    const previous = sheet?._racialAbilityAdjustQueue ?? Promise.resolve();
+    const next = previous.catch(() => {}).then(() =>
+      StarFrontiersCharacterSheet.#performRacialAbilityChanceAdjustment(actor, item, delta)
+    );
+    if (sheet) sheet._racialAbilityAdjustQueue = next;
+    return next;
+  }
+
+  static async #performRacialAbilityChanceAdjustment(actor, item, delta) {
+    if (!delta) return;
+
     const base = Number(item.system.baseChance ?? 0);
     const cap = Number(item.system.cap ?? 100);
+    const costPerPoint = Math.max(Number(item.system.xpPerPoint ?? 0), 0);
+    const current = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
     const availableXp = Number(actor.system.experience?.earned ?? 0);
     const spentXp = Number(actor.system.experience?.spent ?? 0);
     const next = Math.min(Math.max(current + delta, base), cap);
     if (next === current) return;
 
-    if (delta > 0 && availableXp <= 0) return;
-    if (delta < 0 && (spentXp <= 0 || current <= base)) return;
+    if (delta > 0 && availableXp < costPerPoint) return;
+    if (delta < 0 && current <= base) return;
 
     const progress = foundry.utils.deepClone(actor.system.racialSkillProgress ?? {});
     if (next <= base) {
@@ -1694,11 +1738,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       };
     }
 
-    const xpDirection = delta > 0 ? 1 : -1;
+    const xpDelta = delta > 0 ? -costPerPoint : costPerPoint;
     await actor.update({
       "system.racialSkillProgress": progress,
-      "system.experience.earned": Math.max(availableXp - xpDirection, 0),
-      "system.experience.spent": Math.max(spentXp + xpDirection, 0)
+      "system.experience.earned": Math.max(availableXp + xpDelta, 0),
+      "system.experience.spent": Math.max(spentXp - xpDelta, 0)
     });
   }
 
@@ -1721,16 +1765,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     await baseTargetRoll.evaluate({ allowInteractive: false });
     const baseTarget = Math.floor(baseTargetRoll.total);
 
-    const modifier = await foundry.applications.api.DialogV2.prompt({
-      window: { title: game.i18n.format("STARFRONTIERS.Character.SkillModifierTitle", { name: skill.name }) },
-      content: `<p>${game.i18n.format("STARFRONTIERS.Character.SkillModifierPrompt", { name: skill.name, target: baseTarget })}</p>
-        <input name="modifier" type="number" step="1" value="0" autofocus>`,
-      ok: {
-        label: game.i18n.localize("STARFRONTIERS.Character.RollAbilityModifierSubmit"),
-        callback: (event, button) => button.form.elements.modifier.valueAsNumber || 0
-      },
-      modal: true,
-      rejectClose: false
+    const modifier = await StarFrontiersCharacterSheet.#promptModifier(skill.name, baseTarget, {
+      titleKey: "STARFRONTIERS.Character.SkillModifierTitle",
+      promptKey: "STARFRONTIERS.Character.SkillModifierPrompt"
     });
     if (modifier === null) return;
 
