@@ -436,6 +436,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - All player-initiated d100 target-vs-roll checks from the character sheet must prompt for a misc. modifier through `#promptModifier(label, targetValue)`. That includes ability checks, skill checks, and active racial ability rolls. Weapon attacks intentionally use their own range-band-plus-modifier prompt.
 - Racial Ability XP adjustments must honor `item.system.xpPerPoint` and must be serialized per actor via the `_racialAbilityAdjustQueue` promise chain stored on the sheet instance. Do not replace this with a simple in-flight flag; that drops user clicks and reintroduces XP/chance desync.
 - `system.combatProfile.meleeBonus` and `.rangedBonus` are the canonical attachment points for persistent state-based attack bonuses. Active Effects, racial abilities, and GM tooling should target those fields; per-attack situational modifiers still belong in the attack prompt.
+- To remove a key from a nested object on a Document, set the full-path key to `null` in the update (e.g. `"system.racialSkillProgress.<itemId>": null`). The legacy `-=keyName` syntax still works but is deprecated in Foundry v13+. Do NOT clone the object, `delete` a key locally, then write the clone back — `actor.update()` deep-merges by default, so the deletion is silently lost.
 
 ## Testing and runtime expectations
 - There is no automated test suite beyond validation scripts.

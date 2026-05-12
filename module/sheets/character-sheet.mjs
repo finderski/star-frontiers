@@ -1728,22 +1728,23 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (delta > 0 && availableXp < costPerPoint) return;
     if (delta < 0 && current <= base) return;
 
-    const progress = foundry.utils.deepClone(actor.system.racialSkillProgress ?? {});
+    const xpDelta = delta > 0 ? -costPerPoint : costPerPoint;
+    const update = {
+      "system.experience.earned": Math.max(availableXp + xpDelta, 0),
+      "system.experience.spent": Math.max(spentXp - xpDelta, 0)
+    };
+
     if (next <= base) {
-      delete progress[item.id];
+      update[`system.racialSkillProgress.${item.id}`] = null;
     } else {
-      progress[item.id] = {
-        ...(progress[item.id] ?? {}),
+      const existing = actor.system.racialSkillProgress?.[item.id] ?? {};
+      update[`system.racialSkillProgress.${item.id}`] = {
+        ...existing,
         currentChance: next
       };
     }
 
-    const xpDelta = delta > 0 ? -costPerPoint : costPerPoint;
-    await actor.update({
-      "system.racialSkillProgress": progress,
-      "system.experience.earned": Math.max(availableXp + xpDelta, 0),
-      "system.experience.spent": Math.max(spentXp - xpDelta, 0)
-    });
+    await actor.update(update);
   }
 
   static async #rollSkillCheck(actor, skill, rollMode = "public") {
