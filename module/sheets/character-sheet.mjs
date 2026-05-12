@@ -2341,15 +2341,21 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           action: "roll",
           label: game.i18n.localize("STARFRONTIERS.Weapon.RollAttack"),
           default: true,
-          callback: (event, button) => {
-            const form = button.form;
-            const rangeBand = rangeBands.length ? form.elements.rangeBand.value : "";
+          callback: (event, button, dialog) => {
+            const root = dialog.element;
+            const modifierInput = root.querySelector("[name='modifier']");
+            const rangeBandInput = root.querySelector("[name='rangeBand']");
+            const shotsInput = root.querySelector("[name='shots']");
+
+            const rangeBand = rangeBandInput?.value ?? "";
             const rangeLabel = rangeBands.find((band) => band.key === rangeBand)?.label ?? "";
+            const shotsValue = shotsInput ? parseInt(shotsInput.value, 10) : 1;
+
             return {
-              modifier: form.elements.modifier.valueAsNumber || 0,
+              modifier: Number.isFinite(modifierInput?.valueAsNumber) ? modifierInput.valueAsNumber : 0,
               rangeBand,
               rangeLabel,
-              shots: rof > 1 ? Math.min(Math.max(parseInt(form.elements.shots.value) || 1, 1), rof) : 1
+              shots: rof > 1 ? Math.min(Math.max(shotsValue || 1, 1), rof) : 1
             };
           }
         },
