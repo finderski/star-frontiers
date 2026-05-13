@@ -30,8 +30,15 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility,
       removeSubskill: StarFrontiersItemSheet.#onRemoveSubskill,
       toggleLinkedRaceAbilityExpanded: StarFrontiersItemSheet.#onToggleLinkedRaceAbilityExpanded,
+      clearGearRequiredSkill: StarFrontiersItemSheet.#onClearGearRequiredSkill,
+      clearScreenPowerSource: StarFrontiersItemSheet.#onClearScreenPowerSource,
+      clearVehiclePowerSource: StarFrontiersItemSheet.#onClearVehiclePowerSource,
+      unlinkComputerProgram: StarFrontiersItemSheet.#onUnlinkComputerProgram,
+      unlinkKitItem: StarFrontiersItemSheet.#onUnlinkKitItem,
       unlinkPowerSourceScreen: StarFrontiersItemSheet.#onUnlinkPowerSourceScreen,
-      unlinkPowerSourceWeapon: StarFrontiersItemSheet.#onUnlinkPowerSourceWeapon
+      unlinkPowerSourceVehicle: StarFrontiersItemSheet.#onUnlinkPowerSourceVehicle,
+      unlinkPowerSourceWeapon: StarFrontiersItemSheet.#onUnlinkPowerSourceWeapon,
+      updateKitItemQuantity: StarFrontiersItemSheet.#onUpdateKitItemQuantity
     }
   };
 
@@ -73,9 +80,65 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.skillIsMain = item.type === "skill" && item.system.category === "main";
     context.isMilitarySkill = item.type === "skill" && item.system.psa === "military";
     context.linkedSubskills = context.skillIsMain ? await this.#resolveLinkedSubskills(item) : [];
-    context.linkedRequiredSkill = ["weapon", "consumable"].includes(item.type) ? await this.#resolveRequiredSkill(item) : null;
+    context.linkedRequiredSkill = ["weapon", "consumable", "gear"].includes(item.type) ? await this.#resolveRequiredSkill(item) : null;
     context.linkedPowerSourceWeapons = item.type === "powerSource" ? await this.#resolvePowerSourceLinks(item, "linkedWeaponRefs", "weapon") : [];
     context.linkedPowerSourceScreens = item.type === "powerSource" ? await this.#resolvePowerSourceLinks(item, "linkedScreenRefs", "screen") : [];
+    context.linkedPowerSourceVehicles = item.type === "powerSource" ? await this.#resolvePowerSourceLinks(item, "linkedVehicleRefs", "vehicle") : [];
+    if (item.type === "computer") {
+      const programs = [];
+      for (const ref of item.system.installedPrograms ?? []) {
+        const program = this.#resolveItemRef(ref, "program");
+        if (!program) continue;
+        programs.push({
+          id: ref,
+          name: program.name,
+          level: program.system.level,
+          functionPoints: program.system.functionPoints
+        });
+      }
+      context.linkedComputerPrograms = programs;
+      const used = Number(item.system.functionPoints?.used ?? 0);
+      const max = Number(item.system.functionPoints?.max ?? 0);
+      context.functionPointsExceeded = max > 0 && used > max;
+    } else {
+      context.linkedComputerPrograms = [];
+      context.functionPointsExceeded = false;
+    }
+    if (item.type === "gear" && item.system.isKit) {
+      const contents = [];
+      for (const entry of item.system.contents ?? []) {
+        const linked = this.#resolveItemRef(entry.ref);
+        if (!linked) continue;
+        contents.push({ ref: entry.ref, name: linked.name, quantity: entry.quantity ?? 1 });
+      }
+      context.linkedKitContents = contents;
+    } else {
+      context.linkedKitContents = [];
+    }
+    if (item.type === "vehicle") {
+      const ref = item.system.powerSourceRef;
+      const ps = ref ? this.#resolveItemRef(ref, "powerSource") : null;
+      context.linkedVehiclePowerSource = ps ? {
+        id: ref,
+        name: ps.name,
+        remaining: ps.system.remaining,
+        capacity: ps.system.capacity
+      } : null;
+    } else {
+      context.linkedVehiclePowerSource = null;
+    }
+    if (item.type === "screen") {
+      const ref = item.system.powerSourceRef;
+      const ps = ref ? this.#resolveItemRef(ref, "powerSource") : null;
+      context.linkedScreenPowerSource = ps ? {
+        id: ref,
+        name: ps.name,
+        remaining: ps.system.remaining,
+        capacity: ps.system.capacity
+      } : null;
+    } else {
+      context.linkedScreenPowerSource = null;
+    }
     context.itemEffects = item.type === "trainedAbility"
       ? Array.from(item.effects ?? []).map(e => ({
           id: e.id,
@@ -154,6 +217,9 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
           });
         }
       });
+    }
+    for (const input of this.element.querySelectorAll(".kit-quantity-input")) {
+      input.addEventListener("change", (event) => StarFrontiersItemSheet.#onUpdateKitItemQuantity.call(this, event, event.currentTarget));
     }
   }
 
@@ -251,10 +317,10 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       return document;
     }
 
-    const powerSourceDropType = event.target?.closest?.("[data-drop-type]")?.dataset.dropType ?? "";
+    const dropType = event.target?.closest?.("[data-drop-type]")?.dataset.dropType ?? "";
 
     if (this.item.type === "powerSource" && document.documentName === "Item" && document.type === "weapon") {
-      if (powerSourceDropType && powerSourceDropType !== "weapon") {
+      if (dropType && dropType !== "weapon") {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropWeapon"));
         return null;
       }
@@ -263,11 +329,48 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     }
 
     if (this.item.type === "powerSource" && document.documentName === "Item" && document.type === "screen") {
-      if (powerSourceDropType && powerSourceDropType !== "screen") {
+      if (dropType && dropType !== "screen") {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropScreen"));
         return null;
       }
       await this.#linkPowerSourceScreen(document);
+      return document;
+    }
+
+    if (this.item.type === "powerSource" && document.documentName === "Item" && document.type === "vehicle") {
+      if (dropType && dropType !== "vehicle") {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.DropVehicle"));
+        return null;
+      }
+      await this.#linkPowerSourceVehicle(document);
+      return document;
+    }
+
+    if (this.item.type === "vehicle" && document.documentName === "Item" && document.type === "powerSource") {
+      await this.#linkVehiclePowerSource(document);
+      return document;
+    }
+
+    if (this.item.type === "screen" && document.documentName === "Item" && document.type === "powerSource") {
+      await this.#linkScreenPowerSource(document);
+      return document;
+    }
+
+    if (this.item.type === "computer" && document.documentName === "Item" && document.type === "program") {
+      await this.#installComputerProgram(document);
+      return document;
+    }
+
+    if (this.item.type === "gear" && document.documentName === "Item" && document.type === "skill") {
+      const sameActor = document.parent && document.parent === this.item.parent;
+      const ref = sameActor ? document.id : document.uuid;
+      await this.item.update({ "system.requiredSkillRef": ref });
+      ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.SkillLinked", { name: document.name }));
+      return document;
+    }
+
+    if (this.item.type === "gear" && dropType === "kitItem" && document.documentName === "Item") {
+      await this.#addKitContent(document);
       return document;
     }
 
@@ -287,6 +390,22 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     }
 
     return super._onDropDocument(event, document);
+  }
+
+  #resolveItemRef(ref, expectedType = null) {
+    if (!ref) return null;
+    const owner = this.item?.parent;
+    if (owner?.items) {
+      const local = owner.items.get(ref);
+      if (local && (!expectedType || local.type === expectedType)) return local;
+    }
+    try {
+      const resolved = globalThis.fromUuidSync?.(ref);
+      if (resolved && (!expectedType || resolved.type === expectedType)) return resolved;
+    } catch {
+      /* ignore */
+    }
+    return null;
   }
 
   async #resolveLinkedAmmo(item) {
@@ -458,9 +577,111 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   async #linkPowerSourceScreen(document) {
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
+    const psRef = sameActor ? this.item.id : this.item.uuid;
     const current = Array.from(this.item.system.linkedScreenRefs ?? []);
     if (!current.includes(ref)) current.push(ref);
+
+    const prevPsRef = document.system?.powerSourceRef ?? "";
+    if (prevPsRef && prevPsRef !== this.item.id && prevPsRef !== this.item.uuid) {
+      const prev = this.#resolveItemRef(prevPsRef, "powerSource");
+      if (prev) {
+        const prevRefs = Array.from(prev.system.linkedScreenRefs ?? []).filter((r) => r !== document.id && r !== document.uuid);
+        await prev.update({ "system.linkedScreenRefs": prevRefs });
+      }
+    }
+
     await this.item.update({ "system.linkedScreenRefs": current });
+    await document.update({ "system.powerSourceRef": psRef });
+  }
+
+  async #linkPowerSourceVehicle(document) {
+    const sameActor = document.parent && document.parent === this.item.parent;
+    const ref = sameActor ? document.id : document.uuid;
+    const psRef = sameActor ? this.item.id : this.item.uuid;
+    const current = Array.from(this.item.system.linkedVehicleRefs ?? []);
+    if (!current.includes(ref)) current.push(ref);
+
+    const prevPsRef = document.system?.powerSourceRef ?? "";
+    if (prevPsRef && prevPsRef !== this.item.id && prevPsRef !== this.item.uuid) {
+      const prev = this.#resolveItemRef(prevPsRef, "powerSource");
+      if (prev) {
+        const prevRefs = Array.from(prev.system.linkedVehicleRefs ?? []).filter((r) => r !== document.id && r !== document.uuid);
+        await prev.update({ "system.linkedVehicleRefs": prevRefs });
+      }
+    }
+
+    await this.item.update({ "system.linkedVehicleRefs": current });
+    await document.update({ "system.powerSourceRef": psRef });
+  }
+
+  async #linkVehiclePowerSource(document) {
+    const sameActor = document.parent && document.parent === this.item.parent;
+    const psRef = sameActor ? document.id : document.uuid;
+    const vehRef = sameActor ? this.item.id : this.item.uuid;
+
+    const prevRef = this.item.system.powerSourceRef ?? "";
+    if (prevRef && prevRef !== psRef) {
+      const prev = this.#resolveItemRef(prevRef, "powerSource");
+      if (prev) {
+        const refs = Array.from(prev.system.linkedVehicleRefs ?? []).filter((r) => r !== this.item.id && r !== this.item.uuid);
+        await prev.update({ "system.linkedVehicleRefs": refs });
+      }
+    }
+
+    await this.item.update({ "system.powerSourceRef": psRef });
+    const refs = Array.from(document.system.linkedVehicleRefs ?? []);
+    if (!refs.includes(vehRef)) refs.push(vehRef);
+    await document.update({ "system.linkedVehicleRefs": refs });
+  }
+
+  async #linkScreenPowerSource(document) {
+    const sameActor = document.parent && document.parent === this.item.parent;
+    const psRef = sameActor ? document.id : document.uuid;
+    const screenRef = sameActor ? this.item.id : this.item.uuid;
+
+    const prevRef = this.item.system.powerSourceRef ?? "";
+    if (prevRef && prevRef !== psRef) {
+      const prev = this.#resolveItemRef(prevRef, "powerSource");
+      if (prev) {
+        const refs = Array.from(prev.system.linkedScreenRefs ?? []).filter((r) => r !== this.item.id && r !== this.item.uuid);
+        await prev.update({ "system.linkedScreenRefs": refs });
+      }
+    }
+
+    await this.item.update({ "system.powerSourceRef": psRef });
+    const refs = Array.from(document.system.linkedScreenRefs ?? []);
+    if (!refs.includes(screenRef)) refs.push(screenRef);
+    await document.update({ "system.linkedScreenRefs": refs });
+  }
+
+  async #installComputerProgram(document) {
+    const sameActor = document.parent && document.parent === this.item.parent;
+    const ref = sameActor ? document.id : document.uuid;
+    const installed = Array.from(this.item.system.installedPrograms ?? []);
+    if (installed.includes(ref)) {
+      ui.notifications.info(game.i18n.localize("STARFRONTIERS.Item.ProgramAlreadyInstalled"));
+      return;
+    }
+    installed.push(ref);
+    await this.item.update({ "system.installedPrograms": installed });
+  }
+
+  async #addKitContent(document) {
+    if (!this.item.system.isKit) return;
+    if (document.type === "gear" && document.system.isKit) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.NoKitsInKits"));
+      return;
+    }
+    const sameActor = document.parent && document.parent === this.item.parent;
+    const ref = sameActor ? document.id : document.uuid;
+    const contents = Array.from(this.item.system.contents ?? []).map((e) => ({ ref: e.ref, quantity: e.quantity }));
+    const idx = contents.findIndex((e) => e.ref === ref);
+    if (idx >= 0) {
+      contents[idx] = { ref, quantity: (contents[idx].quantity ?? 1) + 1 };
+    } else {
+      contents.push({ ref, quantity: 1 });
+    }
+    await this.item.update({ "system.contents": contents });
   }
 
   static async #onRemoveSubskill(event, target) {
@@ -501,6 +722,80 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     if (!ref) return;
     const current = Array.from(this.item.system.linkedScreenRefs ?? []).filter((entry) => entry !== ref);
     await this.item.update({ "system.linkedScreenRefs": current });
+
+    const screen = this.#resolveItemRef(ref, "screen");
+    if (screen && (screen.system.powerSourceRef === this.item.id || screen.system.powerSourceRef === this.item.uuid)) {
+      await screen.update({ "system.powerSourceRef": "" });
+    }
+  }
+
+  static async #onUnlinkPowerSourceVehicle(event, target) {
+    target ??= event.currentTarget;
+    const ref = String(target.dataset.ref ?? "");
+    if (!ref) return;
+    const current = Array.from(this.item.system.linkedVehicleRefs ?? []).filter((entry) => entry !== ref);
+    await this.item.update({ "system.linkedVehicleRefs": current });
+
+    const vehicle = this.#resolveItemRef(ref, "vehicle");
+    if (vehicle && (vehicle.system.powerSourceRef === this.item.id || vehicle.system.powerSourceRef === this.item.uuid)) {
+      await vehicle.update({ "system.powerSourceRef": "" });
+    }
+  }
+
+  static async #onClearVehiclePowerSource(event, target) {
+    const ref = this.item.system.powerSourceRef ?? "";
+    if (ref) {
+      const ps = this.#resolveItemRef(ref, "powerSource");
+      if (ps) {
+        const refs = Array.from(ps.system.linkedVehicleRefs ?? []).filter((r) => r !== this.item.id && r !== this.item.uuid);
+        await ps.update({ "system.linkedVehicleRefs": refs });
+      }
+    }
+    await this.item.update({ "system.powerSourceRef": "" });
+  }
+
+  static async #onClearScreenPowerSource(event, target) {
+    const ref = this.item.system.powerSourceRef ?? "";
+    if (ref) {
+      const ps = this.#resolveItemRef(ref, "powerSource");
+      if (ps) {
+        const refs = Array.from(ps.system.linkedScreenRefs ?? []).filter((r) => r !== this.item.id && r !== this.item.uuid);
+        await ps.update({ "system.linkedScreenRefs": refs });
+      }
+    }
+    await this.item.update({ "system.powerSourceRef": "" });
+  }
+
+  static async #onUnlinkComputerProgram(event, target) {
+    target ??= event.currentTarget;
+    const ref = String(target.dataset.ref ?? "");
+    if (!ref) return;
+    const installed = Array.from(this.item.system.installedPrograms ?? []).filter((r) => r !== ref);
+    await this.item.update({ "system.installedPrograms": installed });
+  }
+
+  static async #onUnlinkKitItem(event, target) {
+    target ??= event.currentTarget;
+    const ref = String(target.dataset.ref ?? "");
+    if (!ref) return;
+    const contents = Array.from(this.item.system.contents ?? [])
+      .filter((e) => e.ref !== ref)
+      .map((e) => ({ ref: e.ref, quantity: e.quantity }));
+    await this.item.update({ "system.contents": contents });
+  }
+
+  static async #onUpdateKitItemQuantity(event, target) {
+    target ??= event.currentTarget;
+    const ref = String(target.dataset.ref ?? "");
+    if (!ref) return;
+    const newQty = Math.max(parseInt(target.value, 10) || 1, 1);
+    const contents = Array.from(this.item.system.contents ?? [])
+      .map((e) => e.ref === ref ? { ref: e.ref, quantity: newQty } : { ref: e.ref, quantity: e.quantity });
+    await this.item.update({ "system.contents": contents });
+  }
+
+  static async #onClearGearRequiredSkill(event, target) {
+    await this.item.update({ "system.requiredSkillRef": "" });
   }
 
   static async #onAddEffect(event, target) {

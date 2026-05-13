@@ -1690,14 +1690,15 @@ button.roll-label-main:focus-visible {
 }
 
 .add-item-menu {
-  background: var(--sf-paper-bg, var(--color-bg));
+  background: linear-gradient(rgba(75, 220, 255, 0.05) 50%, transparent 50%) 0 0 / 100% 4px,
+    var(--sf-paper);
   border: 1px solid var(--sf-border);
   border-radius: 4px;
   bottom: calc(100% + 0.3rem);
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  left: 0;
+  left: -60px;
   min-width: 180px;
   padding: 0.35rem;
   position: absolute;

@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.2.6";
+export const CURRENT_SCHEMA_VERSION = "0.2.7";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -273,6 +273,48 @@ const MIGRATIONS = [
       // No-op. Damage scaling is computed at roll time from existing
       // weapon.system.ammo.variableSetting fields. Mode fields default to
       // empty for all existing weapons, which preserves legacy behavior.
+    }
+  },
+  {
+    version: "0.2.7",
+    description: "Screen power state migrates to PowerSource link. `power.capacityRef` moves to `powerSourceRef`; orphan `seuRemaining` values are dropped with a console warning.",
+    async migrate() {
+      const screens = [];
+      for (const item of game.items) {
+        if (item.type === "screen") screens.push({ item, ownerName: null });
+      }
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          if (item.type === "screen") screens.push({ item, ownerName: actor.name });
+        }
+      }
+      for (const scene of game.scenes ?? []) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink) continue;
+          const synthetic = tokenDoc.actor;
+          if (!synthetic) continue;
+          for (const item of synthetic.items) {
+            if (item.type === "screen") screens.push({ item, ownerName: synthetic.name });
+          }
+        }
+      }
+
+      for (const { item, ownerName } of screens) {
+        const power = item._source?.system?.power ?? item.system?.power;
+        if (!power) continue;
+        const oldRef = power.capacityRef;
+        const seuRemaining = power.seuRemaining;
+        const update = { "system.power": null };
+        if (oldRef && !item.system.powerSourceRef) {
+          update["system.powerSourceRef"] = oldRef;
+        } else if (seuRemaining && !oldRef) {
+          const owner = ownerName ? ` (owned by ${ownerName})` : "";
+          console.warn(
+            `[Star Frontiers] Screen "${item.name}"${owner} had power.seuRemaining=${seuRemaining} with no capacityRef. State is not migratable; create a PowerSource and link it manually.`
+          );
+        }
+        await item.update(update);
+      }
     }
   }
 ];

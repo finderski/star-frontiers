@@ -104,7 +104,7 @@
 
 ## Schema versioning
 
-- Current schema version: **0.2.6** (stored in world setting `schemaVersion`).
+- Current schema version: **0.2.7** (stored in world setting `schemaVersion`).
 - Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
 - During development (pre-1.0), prefer patch bumps (`0.2.0 → 0.2.1`) for incremental schema fixes rather than jumping minor versions. Reserve minor bumps for end-of-phase milestones.
 - Character sheet now exposes `system.psa` as the Expanded Rules Career PSA selector, with choices limited to Military, Technological, and Biosocial.
@@ -112,6 +112,7 @@
 - **0.2.1** — repairs items the 0.2.0 walk could not see. Documents that fail schema validation get filtered out of `game.items` / `actor.items` and stashed in `collection.invalidDocumentIds`. 0.2.1 walks those IDs (using `collection.get(id, { invalid: true })`), and walks raw `tokenDoc.delta._source.items` for unlinked tokens (which similarly hides invalid docs). Reads from `_source` because `system.*` may have been replaced with defaults.
 - **0.2.2** — converts `system.defenses.suit` / `.screen` from free text to owned-item-ID refs (resolves stored value against the actor's items; clears if it doesn't point to a valid armor/screen). Also normalizes `carryState === "ready"` on armor/screen items to `"carried"`.
 - **0.2.6** — no-op migration. Variable SEU damage now scales at roll time from `weapon.system.ammo.variableSetting.current`, and weapons may optionally define `system.activeModeKey` plus `system.mechanics.modes[]` for firing-mode behavior. No stored-data rewrite required because the new mode fields are optional schema defaults.
+- **0.2.7** — Screen power state migrates to PowerSource link. Old `screen.system.power.capacityRef` is moved to `screen.system.powerSourceRef`; the entire `power` block is cleared. Orphan `power.seuRemaining` values without a `capacityRef` log a console warning and are dropped (manual GM re-link required). Walks world items, world actors + actor.items, and unlinked scene tokens.
 - **Always walk three places** for any document-data migration: world Items (`game.items`), world Actors (`game.actors` + `actor.items`), and unlinked scene tokens (`scene.tokens` filtered by `actorLink === false` → `tokenDoc.delta._source.items`, then update via `tokenDoc.actor.updateEmbeddedDocuments`). Also walk `invalidDocumentIds` if the migration is about choice-validated fields.
 - **New optional fields with schema defaults do not require a migration** — TypeDataModel fills in defaults for stored documents that predate the field. The encumbrance/equipment additions (carryState/quantity/mass on gear, consumable, ammo, powerSource, armor, screen, weapon) all rely on this — no migration was bumped.
 
@@ -437,6 +438,10 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Racial Ability XP adjustments must honor `item.system.xpPerPoint` and must be serialized per actor via the `_racialAbilityAdjustQueue` promise chain stored on the sheet instance. Do not replace this with a simple in-flight flag; that drops user clicks and reintroduces XP/chance desync.
 - `system.combatProfile.meleeBonus` and `.rangedBonus` are the canonical attachment points for persistent state-based attack bonuses. Active Effects, racial abilities, and GM tooling should target those fields; per-attack situational modifiers still belong in the attack prompt.
 - To remove a key from a nested object on a Document, set the full-path key to `null` in the update (e.g. `"system.racialSkillProgress.<itemId>": null`). The legacy `-=keyName` syntax still works but is deprecated in Foundry v13+. Do NOT clone the object, `delete` a key locally, then write the clone back — `actor.update()` deep-merges by default, so the deletion is silently lost.
+- All items that consume SEU power link to a PowerSource via a `powerSourceRef` text field on the consuming item. The PowerSource maintains parallel `linkedWeaponRefs`, `linkedScreenRefs`, and `linkedVehicleRefs` arrays. Links are bidirectional; both sides must be updated atomically on connect/disconnect/delete (item-sheet drop helpers AND `#onDeleteItem` cascade). Do not duplicate SEU state (`seuRemaining` etc.) on the consuming item — read remaining capacity from the linked PowerSource. Weapons remain the exception: they use `system.ammo.clipItem` for the link because they can also link to powerclips (`ammo` items).
+- Gear items with `isKit = true` use `system.contents[].ref` (id or uuid) and `system.contents[].quantity` for listed items. Kits cannot contain other kits. Kit `mass` and `cost` are independent of contents — contents are display-only references, not auto-summed. Dangling refs (deleted target) silently drop on display; do not cascade-delete.
+- Toolkits (medkit, robcomkit, techkit, envirokit) are Gear items with `requiredSkillRef` set to the relevant skill. The skill warning fires when a character without that skill uses the kit's contents — not when picking up the kit itself.
+- `computer.system.installedPrograms` stores Program ids/uuids. `computer.system.functionPoints.used` and `.max` are both derived in `StarFrontiersComputerData.prepareDerivedData` — do not edit either directly. `max` is fixed by computer level (1=10, 2=20, 3=40, 4=80, 5=160, 6=320 per Alpha Dawn).
 
 ## Testing and runtime expectations
 - There is no automated test suite beyond validation scripts.

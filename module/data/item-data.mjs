@@ -242,11 +242,7 @@ export class StarFrontiersScreenData extends StarFrontiersItemData {
       reduction: textField({ choices: ["", "half", "full", "absorbsN"] }),
       capacity: numberField({ initial: 0, min: 0 }),
       seuPerHit: numberField({ initial: 0, min: 0 }),
-      power: schemaField({
-        source: textField({ choices: ["", "clip", "beltpack", "powerpack"] }),
-        capacityRef: textField(),
-        seuRemaining: numberField({ initial: 0, min: 0 })
-      }),
+      powerSourceRef: textField(),
       donTime: numberField({ initial: 5, min: 0 }),
       active: boolField(),
       cost: numberField({ initial: 0, min: 0 })
@@ -281,6 +277,7 @@ export class StarFrontiersPowerSourceData extends StarFrontiersItemData {
       remaining: numberField({ initial: 0, min: 0 }),
       linkedWeaponRefs: arrayField(textField()),
       linkedScreenRefs: arrayField(textField()),
+      linkedVehicleRefs: arrayField(textField()),
       rechargeable: boolField(),
       cost: numberField({ initial: 0, min: 0 }),
       mass: numberField({ initial: 0, min: 0, integer: false })
@@ -300,6 +297,7 @@ export class StarFrontiersGearData extends StarFrontiersItemData {
       quantity: numberField({ initial: 1, min: 0 }),
       mass: numberField({ initial: 0, min: 0, integer: false }),
       cost: numberField({ initial: 0, min: 0 }),
+      requiredSkillRef: textField(),
       isKit: boolField(),
       contents: arrayField(schemaField({
         ref: textField(),
@@ -353,6 +351,7 @@ export class StarFrontiersVehicleData extends StarFrontiersItemData {
         waterCapable: boolField()
       }),
       parabatteryType: numberField({ initial: null, min: 1, max: 4, nullable: true }),
+      powerSourceRef: textField(),
       rangeKm: numberField({ initial: 0, min: 0 }),
       damage: schemaField({
         type: textField({ choices: ["", "ground", "flying"] }),
@@ -366,6 +365,8 @@ export class StarFrontiersVehicleData extends StarFrontiersItemData {
     };
   }
 }
+
+const COMPUTER_FP_BY_LEVEL = { 1: 10, 2: 20, 3: 40, 4: 80, 5: 160, 6: 320 };
 
 export class StarFrontiersComputerData extends StarFrontiersItemData {
   static defineSchema() {
@@ -387,6 +388,29 @@ export class StarFrontiersComputerData extends StarFrontiersItemData {
       }),
       powerSource: textField()
     };
+  }
+
+  prepareDerivedData() {
+    this.functionPoints.max = COMPUTER_FP_BY_LEVEL[this.level] ?? 0;
+    const parent = this.parent;
+    let used = 0;
+    for (const ref of this.installedPrograms ?? []) {
+      const program = StarFrontiersComputerData.#resolveProgram(parent, ref);
+      if (program?.type === "program") {
+        used += Number(program.system.functionPoints ?? 0);
+      }
+    }
+    this.functionPoints.used = used;
+  }
+
+  static #resolveProgram(parentItem, ref) {
+    if (!ref) return null;
+    const owner = parentItem?.parent;
+    if (owner?.items) {
+      const local = owner.items.get(ref);
+      if (local) return local;
+    }
+    try { return globalThis.fromUuidSync?.(ref) ?? null; } catch { return null; }
   }
 }
 

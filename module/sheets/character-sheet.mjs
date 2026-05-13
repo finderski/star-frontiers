@@ -784,6 +784,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (item.type === "powerSource") {
       const linkedWeaponRefs = Array.from(item.system.linkedWeaponRefs ?? []);
       const linkedScreenRefs = Array.from(item.system.linkedScreenRefs ?? []);
+      const linkedVehicleRefs = Array.from(item.system.linkedVehicleRefs ?? []);
       for (const ref of linkedWeaponRefs) {
         const linkedWeapon = actor.items.get(ref) ?? null;
         if (!linkedWeapon) continue;
@@ -793,15 +794,27 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           this._rememberScrollPosition();
         }
       }
-      if (linkedScreenRefs.length) {
-        // Screens only maintain the power-source-side ref right now.
-        await item.update({ "system.linkedScreenRefs": [] });
+      for (const ref of linkedScreenRefs) {
+        const linkedScreen = actor.items.get(ref) ?? null;
+        if (!linkedScreen) continue;
+        if (linkedScreen.system?.powerSourceRef === item.id || linkedScreen.system?.powerSourceRef === item.uuid) {
+          await linkedScreen.update({ "system.powerSourceRef": "" });
+        }
+      }
+      for (const ref of linkedVehicleRefs) {
+        const linkedVehicle = actor.items.get(ref) ?? null;
+        if (!linkedVehicle) continue;
+        if (linkedVehicle.system?.powerSourceRef === item.id || linkedVehicle.system?.powerSourceRef === item.uuid) {
+          await linkedVehicle.update({ "system.powerSourceRef": "" });
+        }
       }
     }
 
-    if (item.type === "weapon" || item.type === "screen") {
+    if (item.type === "weapon" || item.type === "screen" || item.type === "vehicle") {
       for (const powerSource of actor.items.filter((owned) => owned.type === "powerSource")) {
-        const field = item.type === "weapon" ? "linkedWeaponRefs" : "linkedScreenRefs";
+        const field = item.type === "weapon"
+          ? "linkedWeaponRefs"
+          : item.type === "screen" ? "linkedScreenRefs" : "linkedVehicleRefs";
         const refs = Array.from(powerSource.system?.[field] ?? []);
         if (!refs.includes(item.id)) continue;
         await powerSource.update({
@@ -1403,7 +1416,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     for (let i = 0; i < shots; i++) {
       const shotPenalty = i * -20;
       const shotTarget = StarFrontiersCharacterSheet.#clampAttackTarget(
-        profile.baseTarget + rangeMod + prompt.modifier + shotPenalty + encumbrance.attackerMod + encumbrance.targetMod
+        profile.baseTarget + combatProfileBonus + rangeMod + prompt.modifier + shotPenalty + encumbrance.attackerMod + encumbrance.targetMod
       );
       const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
       const hit = StarFrontiersCharacterSheet.#isHit(roll.total, shotTarget, profile.rulesEdition);
