@@ -439,5 +439,7 @@ await foundry.applications.api.DialogV2.prompt({
     }
   },
   rejectClose: false,
-  render: (event, dialog) => dialog.form.elements.payload?.focus()
+  render: (event, dialog) => {
+    dialog.element?.querySelector?.("[name='payload']")?.focus();
+  }
 });

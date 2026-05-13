@@ -297,6 +297,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const quantity = Number(sys.quantity ?? 1);
       const mass = Number(sys.mass ?? 0);
       const isPortableComputer = !(item.type === "computer" && Number(sys.level ?? 1) > portabilityThreshold);
+      const isAssetComputer = item.type === "computer" && !isPortableComputer;
       const carryState = item.type === "computer" && !isPortableComputer
         ? "stored"
         : (sys.carryState || "carried");
@@ -320,9 +321,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         type: item.type,
         name: item.name,
         img: item.img,
-        quantity: ["program", "vehicle", "computer"].includes(item.type) ? null : quantity,
-        mass: ["program", "vehicle"].includes(item.type) ? null : mass,
-        totalMass: ["program", "vehicle"].includes(item.type) ? 0 : Number((mass * quantity).toFixed(2)),
+        quantity: ["program", "vehicle"].includes(item.type) || isAssetComputer ? null : quantity,
+        mass: ["program", "vehicle"].includes(item.type) || isAssetComputer ? null : mass,
+        totalMass: ["program", "vehicle"].includes(item.type) || isAssetComputer ? 0 : Number((mass * quantity).toFixed(2)),
         carryState,
         carryStateLabel: game.i18n.localize(`STARFRONTIERS.Choice.CarryState.${carryState}`),
         carryStateCycleable,

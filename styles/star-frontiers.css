@@ -501,10 +501,6 @@ label.field-line,
   width: 24px;
 }
 
-.checkbox-line {
-  text-align: right;
-}
-
 
 /* =====================================================================
  * 5. Shared interactive controls
@@ -1600,6 +1596,7 @@ button.roll-label-main:focus-visible {
 .equipment-col--mass {
   flex: 0 0 56px;
   text-align: center;
+  font-family: var(--input);
 }
 
 .equipment-col--actions {
@@ -1829,7 +1826,7 @@ button.roll-label-main:focus-visible {
 .equipment-row input[type="number"] {
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--sf-row-line);
+  /*border-bottom: 1px solid var(--sf-row-line);*/
   color: var(--sf-ink);
   font-family: var(--input);
   min-height: 0;
@@ -2028,6 +2025,29 @@ button.roll-label-main:focus-visible {
   margin-top: 8px;
 }
 
+label.hasHint {
+  position: relative;
+}
+
+.form-hint {
+  display: none;
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  max-width: 240px;
+  padding: 4px 6px;
+  background: var(--sf-paper, #111);
+  border: 1px solid currentColor;
+  font-size: 0.8em;
+  line-height: 1.2;
+}
+
+label.hasHint:hover .form-hint,
+label.hasHint:focus-within .form-hint {
+  display: block;
+}
+
 
 /* =====================================================================
  * 12. Item sheet — weapon-specific
@@ -2098,6 +2118,7 @@ button.roll-label-main:focus-visible {
 .checkbox-line {
   align-items: center;
   grid-template-columns: 1fr 24px;
+  text-align: right;
 }
 
 .checkbox-line input {

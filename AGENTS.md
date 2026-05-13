@@ -216,8 +216,8 @@
 - **Carry-state localization labels:** `STARFRONTIERS.Choice.CarryState.ready` is now `"Equipped"` (was `"Ready"`). The schema value is still `"ready"` — only the displayed label changed. The cycle button's `title`/`aria-label` is per-state via `row.carryStateLabel` so hovering tells the player the current state.
 - **Equipment section layout** (`templates/actor/character-sheet.hbs`): flex-row model, not grid. Each row has a collapsed line (Name | Quantity | Mass | Actions) and, for `consumable`, `powerSource`, `computer`, and `ammo`, an expandable detail pane that opens without rerendering. The expanded pane has a `.equipment-row__expanded-header` containing a pencil/Edit button (`data-action="openItem"`) — this is the only way to reach the item sheet for these expandable types from the character sheet, so don't remove it.
 - **Consumable use chat:** `#onUseConsumable` picks between `STARFRONTIERS.Item.UsedConsumable` (target selected) and `STARFRONTIERS.Item.UsedConsumableSelf` (no target). Do not collapse them into one key — Foundry's `i18n.format` does not support handlebars conditionals inside string values, so a single key always renders the literal `{target}` placeholder or its `NoTarget` fallback.
-- **Quantity** is on weapon, ammo, powerSource, gear, consumable. Not on armor, screen.
-- Computers also have `quantity` in schema, but the equipment UI intentionally hides the inline quantity cell for computer/program/vehicle rows.
+- **Quantity** is on weapon, ammo, powerSource, gear, consumable, and computer. It is not on armor or screen.
+- Programs and vehicles intentionally hide the inline quantity cell. Computers do **not**; their quantity is actor-context inventory state and is shown on the character sheet equipment list.
 - **Mass** is on weapon, ammo, powerSource, gear, consumable, armor, screen, computer.
 - **Encumbrance is computed in `Character.prepareDerivedData`** via the module-level `computeCarriedMass(actor)` helper:
   - Walks `actor.items`, sums `mass × (quantity ?? 1)` for every qualifying item where `carryState ∈ {ready, carried}` AND `mass > 0`.
@@ -229,6 +229,7 @@
 - **Optional encumbrance penalty on ability checks (Expanded only):** `#getAbilityEncumbranceMod(actor, ability)` checks `encumbranceAffectsPhysical` (STR/STA/DEX/RS) or `encumbranceAffectsNonPhysical` (INT/LOG/PER/LDR) world settings and applies −10 to the check's target value (not the die roll). The dialog shows the post-encumbrance target.
 - **Equipment section UI** (character sheet): inventory rows cover `gear`, `consumable`, `ammo`, `powerSource`, `computer`, and `program`; a conditional **Assets** subsection holds `vehicle` plus non-portable computers. Add controls now live under one `Add Item` hover menu instead of multiple dedicated add buttons.
 - Non-portable computers are determined purely by `computer.system.level > game.settings.get(SYSTEM_ID, "computerPortabilityLevel")`. Those items belong in Assets, not inventory, and never count toward carried mass.
+- Portable computers show `quantity` on the character-sheet Equipment list. Non-portable computers do not; once a computer crosses the portability threshold it behaves like an asset row (`quantity: null`, `mass: null`, `totalMass: 0`) rather than carried inventory.
 - **Skills section** is **Expanded-only**. The fieldset legend reads "Equipment" in Basic and "Skills and Equipment" in Expanded. The "Add Skill" button is similarly hidden in Basic.
 
 ## Item and weapon sheet decisions already made
@@ -290,7 +291,9 @@
   - linking a weapon must also update `weapon.system.ammo.clipItem` to this power source
   - unlinking a weapon must also clear `weapon.system.ammo.clipItem` if it pointed here
 - Computer item sheets:
-  - expose `cost` and `quantity`
+  - expose only computer-specific fields in the Computer section (`level`, derived Function Points, installed programs)
+  - do **not** expose `quantity`; computer quantity is actor-context inventory state controlled from the character sheet equipment list
+  - do **not** duplicate `cost` or `mass` in the Computer section; both belong in the Common section only
   - do **not** expose `carryState`; computer portability/carry-state remains actor-context UI
 - Program item sheets:
   - `programType` is a dropdown, not free text
