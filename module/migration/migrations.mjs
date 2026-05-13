@@ -277,25 +277,27 @@ const MIGRATIONS = [
   },
   {
     version: "0.2.7",
-    description: "Screen power state migrates to PowerSource link. `power.capacityRef` moves to `powerSourceRef`; orphan `seuRemaining` values are dropped with a console warning.",
+    description: "Screen power state migrates to PowerSource link (`power.capacityRef` → `powerSourceRef`); Gear kit contents extend to `{ ref, name, quantity, remaining, consumeOnUse }` with backfill.",
     async migrate() {
       const screens = [];
-      for (const item of game.items) {
-        if (item.type === "screen") screens.push({ item, ownerName: null });
-      }
-      for (const actor of game.actors) {
+      const kits = [];
+      const collectFromActor = (actor) => {
         for (const item of actor.items) {
           if (item.type === "screen") screens.push({ item, ownerName: actor.name });
+          if (item.type === "gear" && item.system?.isKit) kits.push({ item });
         }
+      };
+      for (const item of game.items) {
+        if (item.type === "screen") screens.push({ item, ownerName: null });
+        if (item.type === "gear" && item.system?.isKit) kits.push({ item });
       }
+      for (const actor of game.actors) collectFromActor(actor);
       for (const scene of game.scenes ?? []) {
         for (const tokenDoc of scene.tokens) {
           if (tokenDoc.actorLink) continue;
           const synthetic = tokenDoc.actor;
           if (!synthetic) continue;
-          for (const item of synthetic.items) {
-            if (item.type === "screen") screens.push({ item, ownerName: synthetic.name });
-          }
+          collectFromActor(synthetic);
         }
       }
 
@@ -314,6 +316,38 @@ const MIGRATIONS = [
           );
         }
         await item.update(update);
+      }
+
+      for (const { item } of kits) {
+        const oldContents = item._source?.system?.contents ?? item.system?.contents ?? [];
+        if (!oldContents.length) continue;
+        const newContents = [];
+        for (const entry of oldContents) {
+          let name = entry.name ?? "";
+          let consumeOnUse = entry.consumeOnUse;
+          if (entry.ref && (!name || consumeOnUse === undefined)) {
+            let doc = null;
+            try { doc = globalThis.fromUuidSync?.(entry.ref) ?? null; } catch { /* ignore */ }
+            if (!doc && item.parent?.items) doc = item.parent.items.get(entry.ref);
+            if (doc) {
+              if (!name) name = doc.name;
+              if (consumeOnUse === undefined) {
+                consumeOnUse = doc.type === "consumable" || doc.type === "ammo";
+              }
+            }
+          }
+          if (consumeOnUse === undefined) consumeOnUse = false;
+          const quantity = Number(entry.quantity ?? 0);
+          const remaining = entry.remaining !== undefined ? Number(entry.remaining) : quantity;
+          newContents.push({
+            ref: entry.ref ?? "",
+            name,
+            quantity,
+            remaining,
+            consumeOnUse
+          });
+        }
+        await item.update({ "system.contents": newContents });
       }
     }
   }

@@ -431,12 +431,11 @@
     {{#if is.gear}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.GearData"}}</legend>
-        <div class="compact-grid three-columns">
-          <label><span>{{localize "STARFRONTIERS.Item.Quantity"}}</span><input type="number" name="system.quantity" value="{{system.quantity}}" min="0" /></label>
-          {{#if expandedRules}}
-            <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
-          {{/if}}
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Kit"}}</span><input type="checkbox" name="system.isKit" {{checked system.isKit}} /></label>
+        <div class="compact-grid two-columns">
+          <label class="checkbox-line">
+            <span>{{localize "STARFRONTIERS.Item.Kit"}}</span>
+            <input type="checkbox" name="system.isKit" {{checked system.isKit}} />
+          </label>
         </div>
         <div class="ammo-drop-zone">
           <span>{{localize "STARFRONTIERS.Item.RequiredSkill"}}</span>
@@ -456,23 +455,36 @@
             <div class="race-editor-block__header">
               <span>{{localize "STARFRONTIERS.Item.KitContents"}}</span>
             </div>
-            <div class="linked-ability-drop-zone" data-drop-type="kitItem">
-              <span>{{localize "STARFRONTIERS.Item.DropKitItem"}}</span>
+            <div class="linked-ability-drop-zone" data-drop-type="kit-content">
+              <span>{{localize "STARFRONTIERS.Item.DropKitContent"}}</span>
             </div>
-            {{#if linkedKitContents.length}}
+            {{#if kitContentRows.length}}
               <div class="linked-ability-list">
-                {{#each linkedKitContents as |entry|}}
+                {{#each kitContentRows as |entry|}}
                   <div class="linked-ability-row">
                     <div class="linked-ability-row__body">
                       <strong>{{entry.name}}</strong>
-                      <input type="number" min="1" value="{{entry.quantity}}" data-action="updateKitItemQuantity" data-ref="{{entry.ref}}" class="kit-quantity-input" />
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Item.Quantity"}}</span>
+                        <input type="number" name="system.contents.{{entry.index}}.quantity" value="{{entry.quantity}}" min="0" />
+                      </label>
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Item.Remaining"}}</span>
+                        <input type="number" name="system.contents.{{entry.index}}.remaining" value="{{entry.remaining}}" min="0" />
+                      </label>
+                      <label class="checkbox-line">
+                        <span>{{localize "STARFRONTIERS.Item.ConsumeOnUse"}}</span>
+                        <input type="checkbox" name="system.contents.{{entry.index}}.consumeOnUse" {{checked entry.consumeOnUse}} />
+                      </label>
                     </div>
-                    <button type="button" data-action="unlinkKitItem" data-ref="{{entry.ref}}" title="{{localize "STARFRONTIERS.Item.RemoveFromKit"}}">
+                    <button type="button" data-action="removeKitContent" data-index="{{entry.index}}" title="{{localize "STARFRONTIERS.Item.RemoveKitContent"}}">
                       <i class="fa-solid fa-trash"></i>
                     </button>
                   </div>
                 {{/each}}
               </div>
+            {{else}}
+              <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoKitContents"}}</p>
             {{/if}}
           </div>
         {{/if}}

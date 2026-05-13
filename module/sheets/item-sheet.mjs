@@ -33,12 +33,11 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       clearGearRequiredSkill: StarFrontiersItemSheet.#onClearGearRequiredSkill,
       clearScreenPowerSource: StarFrontiersItemSheet.#onClearScreenPowerSource,
       clearVehiclePowerSource: StarFrontiersItemSheet.#onClearVehiclePowerSource,
+      removeKitContent: StarFrontiersItemSheet.#onRemoveKitContent,
       unlinkComputerProgram: StarFrontiersItemSheet.#onUnlinkComputerProgram,
-      unlinkKitItem: StarFrontiersItemSheet.#onUnlinkKitItem,
       unlinkPowerSourceScreen: StarFrontiersItemSheet.#onUnlinkPowerSourceScreen,
       unlinkPowerSourceVehicle: StarFrontiersItemSheet.#onUnlinkPowerSourceVehicle,
-      unlinkPowerSourceWeapon: StarFrontiersItemSheet.#onUnlinkPowerSourceWeapon,
-      updateKitItemQuantity: StarFrontiersItemSheet.#onUpdateKitItemQuantity
+      unlinkPowerSourceWeapon: StarFrontiersItemSheet.#onUnlinkPowerSourceWeapon
     }
   };
 
@@ -105,15 +104,23 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       context.functionPointsExceeded = false;
     }
     if (item.type === "gear" && item.system.isKit) {
-      const contents = [];
-      for (const entry of item.system.contents ?? []) {
-        const linked = this.#resolveItemRef(entry.ref);
-        if (!linked) continue;
-        contents.push({ ref: entry.ref, name: linked.name, quantity: entry.quantity ?? 1 });
+      const entries = item.system.contents ?? [];
+      const rows = [];
+      for (let index = 0; index < entries.length; index++) {
+        const entry = entries[index];
+        const doc = entry.ref ? this.#resolveItemRef(entry.ref) : null;
+        rows.push({
+          index,
+          ref: entry.ref ?? "",
+          name: doc?.name || entry.name || game.i18n.localize("STARFRONTIERS.Item.UnknownItem"),
+          quantity: Number(entry.quantity ?? 0),
+          remaining: Number(entry.remaining ?? entry.quantity ?? 0),
+          consumeOnUse: entry.consumeOnUse ?? false
+        });
       }
-      context.linkedKitContents = contents;
+      context.kitContentRows = rows;
     } else {
-      context.linkedKitContents = [];
+      context.kitContentRows = [];
     }
     if (item.type === "vehicle") {
       const ref = item.system.powerSourceRef;
@@ -217,9 +224,6 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
           });
         }
       });
-    }
-    for (const input of this.element.querySelectorAll(".kit-quantity-input")) {
-      input.addEventListener("change", (event) => StarFrontiersItemSheet.#onUpdateKitItemQuantity.call(this, event, event.currentTarget));
     }
   }
 
@@ -369,9 +373,9 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       return document;
     }
 
-    if (this.item.type === "gear" && dropType === "kitItem" && document.documentName === "Item") {
-      await this.#addKitContent(document);
-      return document;
+    if (this.item.type === "gear" && this.item.system.isKit && document.documentName === "Item" && document.type !== "skill") {
+      const added = await this.#addKitContent(document);
+      return added ? document : null;
     }
 
     if (this.item.type === "weapon" && document.documentName === "Item") {
@@ -667,21 +671,37 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   }
 
   async #addKitContent(document) {
-    if (!this.item.system.isKit) return;
+    if (!this.item.system.isKit) return false;
     if (document.type === "gear" && document.system.isKit) {
       ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.NoKitsInKits"));
-      return;
+      return false;
     }
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
-    const contents = Array.from(this.item.system.contents ?? []).map((e) => ({ ref: e.ref, quantity: e.quantity }));
-    const idx = contents.findIndex((e) => e.ref === ref);
-    if (idx >= 0) {
-      contents[idx] = { ref, quantity: (contents[idx].quantity ?? 1) + 1 };
+    const defaultConsume = document.type === "consumable" || document.type === "ammo";
+    const contents = Array.from(this.item.system.contents ?? []).map((e) => ({
+      ref: e.ref,
+      name: e.name,
+      quantity: Number(e.quantity ?? 0),
+      remaining: Number(e.remaining ?? 0),
+      consumeOnUse: Boolean(e.consumeOnUse)
+    }));
+    const existing = contents.find((e) => e.ref === ref);
+    if (existing) {
+      existing.quantity = Number(existing.quantity ?? 0) + 1;
+      existing.remaining = Number(existing.remaining ?? 0) + 1;
     } else {
-      contents.push({ ref, quantity: 1 });
+      contents.push({
+        ref,
+        name: document.name,
+        quantity: 1,
+        remaining: 1,
+        consumeOnUse: defaultConsume
+      });
     }
     await this.item.update({ "system.contents": contents });
+    ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.KitContentLinked", { name: document.name }));
+    return true;
   }
 
   static async #onRemoveSubskill(event, target) {
@@ -774,23 +794,18 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     await this.item.update({ "system.installedPrograms": installed });
   }
 
-  static async #onUnlinkKitItem(event, target) {
+  static async #onRemoveKitContent(event, target) {
     target ??= event.currentTarget;
-    const ref = String(target.dataset.ref ?? "");
-    if (!ref) return;
-    const contents = Array.from(this.item.system.contents ?? [])
-      .filter((e) => e.ref !== ref)
-      .map((e) => ({ ref: e.ref, quantity: e.quantity }));
-    await this.item.update({ "system.contents": contents });
-  }
-
-  static async #onUpdateKitItemQuantity(event, target) {
-    target ??= event.currentTarget;
-    const ref = String(target.dataset.ref ?? "");
-    if (!ref) return;
-    const newQty = Math.max(parseInt(target.value, 10) || 1, 1);
-    const contents = Array.from(this.item.system.contents ?? [])
-      .map((e) => e.ref === ref ? { ref: e.ref, quantity: newQty } : { ref: e.ref, quantity: e.quantity });
+    const index = Number(target.dataset.index ?? -1);
+    const contents = Array.from(this.item.system.contents ?? []).map((e) => ({
+      ref: e.ref,
+      name: e.name,
+      quantity: Number(e.quantity ?? 0),
+      remaining: Number(e.remaining ?? 0),
+      consumeOnUse: Boolean(e.consumeOnUse)
+    }));
+    if (index < 0 || index >= contents.length) return;
+    contents.splice(index, 1);
     await this.item.update({ "system.contents": contents });
   }
 

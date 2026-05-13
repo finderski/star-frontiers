@@ -301,12 +301,39 @@ export class StarFrontiersGearData extends StarFrontiersItemData {
       isKit: boolField(),
       contents: arrayField(schemaField({
         ref: textField(),
-        quantity: numberField({ initial: 1, min: 0 })
+        name: textField(),
+        quantity: numberField({ initial: 1, min: 0 }),
+        remaining: numberField({ initial: 1, min: 0 }),
+        consumeOnUse: boolField(true)
       })),
       mechanics: schemaField({
         tags: setField(textField())
       })
     };
+  }
+
+  prepareDerivedData() {
+    if (!this.isKit) {
+      this.isFullyStocked = true;
+      this.isDepleted = false;
+      return;
+    }
+    const consumables = (this.contents ?? []).filter((e) => e.consumeOnUse);
+    if (!consumables.length) {
+      this.isFullyStocked = true;
+      this.isDepleted = false;
+      return;
+    }
+    let stocked = 0;
+    let empty = 0;
+    for (const e of consumables) {
+      const remaining = Number(e.remaining ?? 0);
+      const quantity = Number(e.quantity ?? 0);
+      if (remaining >= quantity) stocked++;
+      if (remaining <= 0) empty++;
+    }
+    this.isFullyStocked = stocked === consumables.length;
+    this.isDepleted = empty === consumables.length;
   }
 }
 

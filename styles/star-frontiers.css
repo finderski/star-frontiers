@@ -501,6 +501,10 @@ label.field-line,
   width: 24px;
 }
 
+.checkbox-line {
+  text-align: right;
+}
+
 
 /* =====================================================================
  * 5. Shared interactive controls
