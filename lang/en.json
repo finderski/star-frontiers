@@ -346,6 +346,7 @@
       "Kit": "Kit",
       "Label": "Label",
       "Level": "Level",
+      "Level-Abbr": "Lvl",
       "LimbGrowMinutes": "Limb Grow (min)",
       "LimbsPerDexBucket": "Limbs / DEX",
       "LinkedAmmo": "Linked Ammo",

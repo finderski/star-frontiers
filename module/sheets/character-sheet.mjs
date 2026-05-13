@@ -383,11 +383,17 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       if (!program || program.type !== "program") continue;
       const level = Number(program.system.level ?? 0);
       const fp = Number(program.system.functionPoints ?? 0);
+      /*
       const programType = program.system.programType
         ? game.i18n.localize(`STARFRONTIERS.ProgramType.${program.system.programType}`)
         : "";
+      */
+      const programTypeKey = program.system.programType ?? "";
+      const programType = programTypeKey
+        ? game.i18n.localize(STAR_FRONTIERS_CONFIG.programTypes?.[programTypeKey] ?? programTypeKey)
+        : "";
       const typeSuffix = programType ? ` (${programType})` : "";
-      programRows.push(`${program.name}${typeSuffix} — ${game.i18n.localize("STARFRONTIERS.Item.Level")} ${level}, ${fp} ${game.i18n.localize("STARFRONTIERS.Item.FP")}`);
+      programRows.push(`${program.name}${typeSuffix} — ${game.i18n.localize("STARFRONTIERS.Item.Level-Abbr")} ${level}, ${fp} ${game.i18n.localize("STARFRONTIERS.Item.FP")}`);
     }
     if (programRows.length) {
       details.push({
