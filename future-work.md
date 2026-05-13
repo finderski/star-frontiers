@@ -72,87 +72,47 @@ A "Roll Damage" button posts `Nd10` to chat. Nothing decrements the target's `sy
 - Screen consumption: `seuPerHit` consumed from the linked PowerSource per absorbed hit (this requires the Screen ↔ PowerSource link landed in Round 4).
 - Suit consumption: tracked as `accumulatedDamage` on the suit; destroyed when total damage absorbed exceeds the suit's max.
 - Remaining damage reduces target STA.
-- Damage from "burns" (acid/fire/extreme heat, NOT lasers per the rules) has special incapacitation rules: target completely incapacitated and unable to act if burn damage exceeds half their STA, until hospitalized.
+- Damage from burns (acid, fire, extreme heat — not lasers) has special incapacitation rules: target completely incapacitated until hospitalized if burn damage exceeds half their STA.
 - STA at 0 → unconscious. STA at -30 → dead (unless preserved via staydose/freeze field within rules-defined windows).
 
 ### Work
 
-- Add a "Apply Damage" button on damage chat cards. Permission-gated to GM and target owner (mirror the avoidance button).
+- Add an "Apply Damage" button on damage chat cards. Permission-gated to GM and target owner (mirror the avoidance button).
 - Resolve the damage path:
   1. Look up the target's worn suit (`system.defenses.suit`) — apply its `reductions[]` matching the weapon's `damageType`.
   2. Look up the target's worn screen (`system.defenses.screen`) — if active, draw `seuPerHit` from the linked PowerSource. If insufficient SEU, screen fails to activate and damage passes through.
   3. Apply the screen's `reduction` mode (`half`, `full`, `absorbsN`) to remaining damage.
   4. Decrement target STA by what's left.
-- Track suit accumulated damage so suits become useless after 100/50 points (per type).
+- Track suit accumulated damage so suits become useless after their max-damage threshold.
 - Status thresholds: STA ≤ 0 → unconscious AE; STA ≤ -30 → dead AE.
 
 ### Open questions
 
-- How does the "burns" rule interact with the damage pipeline? Probably a check post-application: if STA loss this hit exceeds STA/2 AND damageType is in `["acid", "fire", "extreme-heat"]`, apply an "Incapacitated" AE with no auto-duration.
+- How does the burns rule interact with the damage pipeline? Probably a check post-application: if STA loss this hit exceeds STA/2 AND damageType is in `["acid", "fire", "extreme-heat"]`, apply an "Incapacitated" AE with no auto-duration.
 - World setting for automation level: full auto / GM-confirm-each-step / manual.
 - What about partial damage from avoidance success on grenades (passing avoidance halves damage)? The avoidance flag payload would need a `partialDamageMultiplier` field, and the damage application would apply it before defenses.
+- AE application on consumable use (Stimdose curing unconsciousness, etc.) is a related concern — the Kit Use workflow currently posts text only; full AE application across all consumable/kit-use paths should land alongside this pipeline.
 
 ### Dependencies
 
-- Round 4 Screen ↔ PowerSource link (already specified).
+- Round 4 Screen ↔ PowerSource link.
 - Avoidance Phase 3 (item 1) — same AE machinery.
 
 ---
 
-## 3. Kit "Use Content" Workflow
-
-**Source:** Gear Sheet Fix + Kit Contents Model (0.2.7).
-**Status:** Data model ready; UI workflow deferred.
-
-### Context
-
-Medkits and similar kits hold their own internal inventory of items (10 Stimdose, 5 Plastiflesh, etc.). The 0.2.7 schema stores these as `system.contents[]` with `{ref, name, quantity, remaining, consumeOnUse}`. Using a Stimdose from a medkit decrements *that kit instance's* `contents[i].remaining` — never the actor's standalone Stimdose pile.
-
-### Work
-
-On the character sheet Equipment section, for a Gear item with `system.isKit === true`:
-
-- Replace the simple "use" affordance with a "Open Kit" button (or expand-on-click).
-- Show a list of kit contents with name and current remaining count.
-- Each row that's `consumeOnUse: true` and `remaining > 0` has a "Use" button.
-- Clicking Use:
-  1. Decrements `kit.system.contents[i].remaining` by 1 (using Foundry's update syntax, not direct mutation).
-  2. Resolves the source item via `ref` and fires whatever the source item would fire — `effectIds` for consumables, etc.
-  3. If the source has `requiredSkillRef`, check the using character for that skill and warn (not block) if absent — matching the existing consumable warning pattern.
-  4. Posts a chat message: "X used Stimdose from their Medkit (9 remaining)."
-
-For `consumeOnUse: false` content (e.g. medscanner inside medkit), display the row but show no Use button — it's a presence marker indicating the kit grants access to the tool.
-
-Also consider:
-
-- A "Refill" button per row, GM-only, that resets remaining to quantity. Future enhancement: charge credits per the rules' refill cost table.
-- Visual cue when a kit is depleted (use the existing derived `isDepleted` flag from the data model).
-- Should durable kit contents apply some kind of skill-roll bonus when the kit is carried? The rules imply this loosely ("medscanner gives a diagnosis"). For now, leave it as flavor; pure-mechanical bonuses are too campaign-specific to automate.
-
-### Open questions
-
-- What happens when a kit content's `ref` no longer resolves (source item deleted)? Current code displays a fallback name; Use button should probably be hidden in that case since we can't fire the source's effects.
-- Does using a kit content interact with the kit's own `requiredSkillRef`? Probably: warn if the using character lacks the kit's skill, separately from any per-content skill warning. So a non-medic using a medkit's Stimdose gets two potential warnings (medkit requires Medical; Stimdose may also require Medical). Deduplicate to one if both fire.
-
-### Dependencies
-
-- None — the 0.2.7 data model has everything needed.
-
----
-
-## 4. Electrostunner Stun-vs-Blast and Other Weapon Modes — Compendium Seeding
+## 3. Mode-Bearing Weapon Compendium Seeding
 
 **Status:** Schema and mechanics in place from 0.2.6. No system-shipped weapon items exist.
 
 ### Context
 
-The system has no compendium pack. GMs hand-build weapon items per the canonical config documented in `CLAUDE.md`. Once a compendium pack is built, mode-bearing weapons (Electrostunner, future stunner variants) need to be seeded with their canonical mode configs.
+The system has no compendium pack. GMs hand-build weapon items per the canonical config documented in `CLAUDE.md`. Once a compendium pack is built, mode-bearing weapons need to be seeded with their canonical mode configs.
 
 ### Work
 
-- Build the Star Frontiers compendium pack.
-- Seed Electrostunner per Round 4's documented mode shape.
-- Seed any other mode-bearing weapons as they're identified. Per the rules audit, only Electrostunner has stun/blast modes. Other weapons that have multiple firing behaviors based on rules (Needler with barbed/anesthetic ammo) are NOT mode-bearing — they're ammo-type-driven, which is a separate model (item 5 below).
+- Build the Star Frontiers compendium pack (broader scope — see item 9).
+- Seed mode-bearing weapons per the documented mode shape.
+- Per the rules audit, the stun/blast electrostunner is currently the only weapon using the `mechanics.modes[]` pattern. Other weapons with multiple firing behaviors based on rules (Needler with barbed/anesthetic ammo) are NOT mode-bearing — they're ammo-type-driven, which is a separate model (item 4 below).
 
 ### Open questions
 
@@ -161,29 +121,24 @@ The system has no compendium pack. GMs hand-build weapon items per the canonical
 
 ### Dependencies
 
-- None.
+- None for the mode seeding specifically. Larger compendium scope depends on item 9.
 
 ---
 
-## 5. Needler Ammo-Type Variants
+## 4. Needler Ammo-Type Variants
 
 **Status:** Concept only. Currently a Needler weapon has one damage formula and one effect.
 
 ### Context
 
-Per rules, needler pistols and rifles fire two types of needle clips:
-
-- Barbed needles: 2d10 damage (pistol) or higher (rifle), straight damage.
-- Anesthetic needles: 1d10 damage + sleep for d100 turns (current STA-or-less to resist).
-
-This is NOT a weapon-mode toggle (which is the Electrostunner pattern). It's driven by which Ammo clip is currently loaded.
+Per rules, needler pistols and rifles fire two distinct ammo clip types — one straight-damage, one with a sleep effect resisted by current Stamina. This is NOT a weapon-mode toggle (the stun/blast pattern). It's driven by which Ammo clip is currently loaded.
 
 ### Work
 
 Add a small variant block to `StarFrontiersAmmoData`:
 
 ```js
-damageOverride: textField(),         // e.g. "2d10" — overrides weapon.damageFormula if non-empty
+damageOverride: textField(),         // overrides weapon.damageFormula if non-empty
 damageTypeOverride: textField(),     // overrides weapon.damageType if non-empty
 avoidance: schemaField({             // mirror of mode.avoidance from 0.2.6
   enabled: boolField(),
@@ -205,8 +160,8 @@ If both a mode and an ammo override are present (theoretically possible but no c
 
 ### Open questions
 
-- Should anesthetic needles also produce an avoidance button on the attack card, like Electrostunner Stun? Yes — same plumbing as Round 4's `canRollAvoidance` gate but the data source is the ammo, not the mode.
-- Do barbed/anesthetic needles share other attributes (range, capacity) or only diverge on damage/effect? Per rules, they share the clip mechanics. Only damage and effect differ.
+- Should anesthetic ammo also produce an avoidance button on the attack card, like mode-based stun? Yes — same plumbing as Round 4's `canRollAvoidance` gate but the data source is the ammo, not the mode.
+- Do the variants share other attributes (range, capacity) or only diverge on damage/effect? Per rules, they share the clip mechanics. Only damage and effect differ.
 
 ### Dependencies
 
@@ -214,22 +169,13 @@ If both a mode and an ammo override are present (theoretically possible but no c
 
 ---
 
-## 6. Skill Subskills
+## 5. Skill Subskills
 
 **Status:** Partial. Schema supports subskill references; UI is minimal.
 
 ### Context
 
-Several skills have subskills per the rules:
-- Medical: Activate Freeze Field, Administer Drugs, Control Infection, Cure Disease, Diagnosis, First Aid, Major Surgery, Minor Surgery, Neutralize Toxin
-- Robotics: Activate/Deactivate, Add Equipment, Alter Functions, List Functions, Remove Security Lock, Repair Robot, etc.
-- Demolitions: Set Charge, Defuse Charge
-- Technician: Operate Machinery, Repair, Detect Alarm/Defense, Deactivate Alarm/Defense, Open Locks
-- Environmental: Analyze Ecosystems, Analyze Samples, Concealment, Find Directions, Make Tools/Weapons, Naming, Stealth, Survival, Tracking
-- Psycho-Social: Communication, Empathy, Hypnosis, Persuasion, Psycho-Pathology
-- Computer: Bypass Security, Defeat Security, Display Information, Interface Computers, Manipulate Programs, Operate Computers, Repair Computers, Write Programs
-
-Each subskill has its own success rate formula, often involving the skill level and sometimes a target's level (e.g. computer level, robot level, alarm level).
+Several skills have subskills per the rules across the three skill categories (Military, Technological, Biosocial). Each subskill has its own success rate formula, often involving the skill level and sometimes a target's level (e.g. computer level, robot level, alarm level).
 
 ### Work
 
@@ -249,32 +195,25 @@ Each subskill has its own success rate formula, often involving the skill level 
 
 ---
 
-## 7. Equipment Rendering on Character Sheet
+## 6. Equipment Row Enrichment — Further Polish
 
-**Status:** Equipment rows exist but kit contents, weapon mode selector, and SEU readouts could be richer.
+**Status:** The Round 4 expanded-details work covers the major linked-item summaries. This item tracks finer polish.
 
 ### Context
 
-The equipment section currently shows each item as a row with quantity and carry state. Several stateful behaviors deserve better surfacing:
-
-- Kits show count of items inside / depleted status (post-0.2.7).
-- PowerSources show remaining/capacity.
-- Weapons with multiple modes show the active mode in the row label.
-- Linked weapons show their linked clip/PowerSource with remaining SEU.
-- Computers show installed-programs count and FP usage.
+After the expanded-details work landed, equipment rows now show: Computer installed programs, Kit contents (with Use buttons for consumables), PowerSource linked items, and Weapon linked source with remaining SEU/shots. A few small refinements remain.
 
 ### Work
 
-- Expand each equipment row's secondary line with type-specific summary info.
-- For kits: "Stimdose 9/10, Biocort 20/20, ..." (truncated if long).
-- For PowerSources: "Beltpack — 47/50 SEU".
-- For weapons: "Laser Pistol [Stun] — Powerclip 14/20".
-- For computers: "Level 3 — 14/40 FP, 3 programs installed".
+- Visual treatment for depleted kits / dead PowerSources (red/grey tint based on derived `isDepleted` / `isFullyStocked` flags).
+- Compact one-liner in the collapsed row that summarizes state (e.g. "Medkit (1 item depleted)" or "Beltpack (low)").
+- Tooltip on collapsed rows showing the same details that appear when expanded, for quicker reference without expanding.
+- Roll-mode variants (public/blind/GM-whisper) on the Kit Use button. Currently posts public only.
+- A "Refill" button per kit content row, GM-only, that resets `remaining` to `quantity`. Future enhancement could charge credits per the rules' refill cost table.
 
 ### Open questions
 
-- How much detail before the row gets too tall? Maybe a compact one-liner with a tooltip for full detail.
-- Should depleted kits / dead PowerSources have a visual cue (red/grey)? Probably yes.
+- How much detail in the collapsed row before it gets too tall? Probably keep collapsed compact and rely on tooltips for previews.
 
 ### Dependencies
 
@@ -282,7 +221,7 @@ The equipment section currently shows each item as a row with quantity and carry
 
 ---
 
-## 8. Vehicle Actor
+## 7. Vehicle Actor
 
 **Status:** Vehicle ITEM exists (template + ownership reference). Vehicle ACTOR doesn't.
 
@@ -294,7 +233,7 @@ Per the original equipment expansion discussion, Vehicle Item is the template/ca
 
 - Define `StarFrontiersVehicleActorData` with: structural points current/max, current speed, current direction, accumulated damage, occupants (driver, gunner, passengers as actor refs), linked PowerSource (inherited from item or independent on the actor).
 - Vehicle Actor sheet: similar layout to the Vehicle Item sheet but with combat state (current speed, accumulated damage table results, etc.).
-- Vehicle Damage Table (rules): 2d10 + damage rolled per hit, applied to the vehicle's `accumulatedDamage`; specific results (steering jammed, vehicle burning, etc.) become AEs on the vehicle.
+- Vehicle Damage Table (rules): roll per hit, applied to the vehicle's `accumulatedDamage`; specific results (steering jammed, vehicle burning, etc.) become AEs on the vehicle.
 - Drag Vehicle Item to scene → create Vehicle Actor pre-filled.
 
 ### Open questions
@@ -308,25 +247,20 @@ Per the original equipment expansion discussion, Vehicle Item is the template/ca
 
 ---
 
-## 9. SEU Drain Automation for Active Screens
+## 8. SEU Drain Automation for Active Screens
 
 **Status:** Screen has `active` boolean; linked PowerSource (post-Round 4); no time-based drain.
 
 ### Context
 
-Per rules, certain screens drain SEU continuously while active:
-- Albedo Screen: 1 SEU/minute while on, plus damage absorption costs.
-- Sonic Screen: 1 SEU/minute while on, plus 2 SEU per absorbed hit.
-- Inertia Screen: 2 SEU per absorbed hit (no idle drain).
-- Gauss Screen: 2 SEU per absorbed hit (no idle drain).
-- Holo Screen: 1 SEU/minute while on.
+Per rules, certain screens drain SEU continuously while active (some per-minute idle drain plus per-hit absorption costs). Different screen types have different drain profiles.
 
 ### Work
 
 - Hook into the Foundry combat tracker's turn/round events.
 - For each active screen on a character at the start of a round, compute the SEU drain based on turn length (round = 6 seconds; 1 minute = 10 rounds).
-- Decrement `powerSource.remaining` accordingly. If insufficient, mark the screen as inactive and post a chat message: "X's Albedo Screen has run out of power."
-- For per-hit drains (Sonic, Inertia, Gauss): integrate with the damage application pipeline (item 2). When a screen absorbs a hit, deduct `seuPerHit` from its linked PowerSource.
+- Decrement `powerSource.remaining` accordingly. If insufficient, mark the screen as inactive and post a chat message: "X's screen has run out of power."
+- For per-hit drains: integrate with the damage application pipeline (item 2). When a screen absorbs a hit, deduct `seuPerHit` from its linked PowerSource.
 
 ### Open questions
 
@@ -339,7 +273,7 @@ Per rules, certain screens drain SEU continuously while active:
 
 ---
 
-## 10. Sustained Compendium Content
+## 9. Compendium Content Packs
 
 **Status:** No compendium ships with the system.
 
@@ -349,16 +283,16 @@ The system is currently bring-your-own-data. World-builders create every weapon,
 
 ### Work
 
-- Compendium for: all Alpha Dawn weapons (with correct modes, ranges, damage), all Alpha Dawn armor and screens, all four PC races with racial abilities, all Alpha Dawn skills with their subskills, common consumables (Stimdose, Biocort, etc.), all toolkits (Medkit, Techkit, Robcomkit, Envirokit) pre-populated with their rules-mandated contents, common vehicles, sample programs.
-- Knight Hawks compendium: spaceships, space weapons, etc.
+- Compendium for: standard weapons (with correct modes, ranges, damage), standard armor and screens, the four PC races with racial abilities, standard skills with their subskills, common consumables, toolkits pre-populated with their rules-mandated contents, common vehicles, sample programs.
+- Companion-rules content: spaceships, space weapons, etc.
 - Bestiary compendium: NPCs and creatures from the rules.
 
 ### Open questions
 
-- Licensing — the Star Frontiers rules and content are owned by WotC (formerly TSR). The system code is fine to publish; the compendium content may or may not be. Worth investigating before any public release.
+- Licensing — the original rules and content are owned by a third party. The system code is fine to publish; the compendium content may or may not be. Worth investigating before any public release.
 - Translation infrastructure for non-English compendiums.
 
 ### Dependencies
 
-- Item 4 (Electrostunner / mode-bearing weapon seeding) becomes trivially part of this.
-- Item 6 (Skill subskills) infrastructure should land first.
+- Item 3 (mode-bearing weapon seeding) becomes trivially part of this.
+- Item 5 (Skill subskills) infrastructure should land first.

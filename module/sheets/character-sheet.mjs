@@ -78,6 +78,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       toggleAddItemMenu: StarFrontiersCharacterSheet.#onToggleAddItemMenu,
       toggleEquipmentRow: StarFrontiersCharacterSheet.#onToggleEquipmentRow,
       useConsumable: StarFrontiersCharacterSheet.#onUseConsumable,
+      useKitContent: StarFrontiersCharacterSheet.#onUseKitContent,
       placeholder: StarFrontiersCharacterSheet.#onPlaceholderAction
     }
   };
@@ -115,7 +116,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     context.wornScreen = screenId ? actor.items.get(screenId) ?? null : null;
     context.skillRows = context.expandedRules ? this.#prepareSkillRows(actor) : [];
     context.racialAbilityRows = this.#prepareRacialAbilityRows(actor);
-    const { inventoryRows, assetRows, hasAssets } = StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
+    const { inventoryRows, assetRows, hasAssets } = await StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
     context.inventoryRows = inventoryRows;
     context.assetRows = assetRows;
     context.hasAssets = hasAssets;
@@ -206,6 +207,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }));
       const activeMode = modeList.find((mode) => mode.isActive) ?? modeList[0] ?? null;
       const effectiveDamage = StarFrontiersCharacterSheet.#buildEffectiveDamageFormula(item, "");
+      const linkedSourceDisplay = hasAmmo
+        ? await StarFrontiersCharacterSheet.#prepareWeaponLinkedSourceDisplay(actor, item)
+        : "";
       return {
         key: item.id,
         item,
@@ -238,7 +242,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           linkedClipId,
           seuCurrent: isSEU ? (item.system.ammo.variableSetting?.current || 1) : 1,
           seuMin: isSEU ? (item.system.ammo.variableSetting?.min || 1) : 1,
-          seuMax: isSEU ? (item.system.ammo.variableSetting?.max || null) : null
+          seuMax: isSEU ? (item.system.ammo.variableSetting?.max || null) : null,
+          linkedSourceDisplay
         }
       };
     }));
@@ -265,7 +270,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return String(band.max);
   }
 
-  static #prepareEquipmentRows(actor) {
+  static async #prepareEquipmentRows(actor) {
     const portabilityThreshold = game.settings.get(SYSTEM_ID, "computerPortabilityLevel") ?? 4;
     const inventoryItems = [];
     const assetItems = [];
@@ -287,7 +292,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       inventoryItems.push(item);
     }
 
-    const buildRow = (item) => {
+    const buildRow = async (item) => {
       const sys = item.system ?? {};
       const quantity = Number(sys.quantity ?? 1);
       const mass = Number(sys.mass ?? 0);
@@ -334,15 +339,136 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         linkedRequiredSkillName: item.type === "consumable"
           ? StarFrontiersCharacterSheet.#resolveLinkedSkillName(actor, sys.requiredSkillRef ?? "")
           : "",
-        portabilityLocked: item.type === "computer" && !isPortableComputer
+        portabilityLocked: item.type === "computer" && !isPortableComputer,
+        details: await StarFrontiersCharacterSheet.#prepareEquipmentDetails(actor, item)
       };
     };
 
+    const inventoryRows = await Promise.all(inventoryItems.map(buildRow));
+    const assetRows = await Promise.all(assetItems.map(buildRow));
     return {
-      inventoryRows: inventoryItems.map(buildRow),
-      assetRows: assetItems.map(buildRow),
+      inventoryRows,
+      assetRows,
       hasAssets: assetItems.length > 0
     };
+  }
+
+  static async #resolveItemRef(actor, ref) {
+    if (!ref) return null;
+    const owned = actor.items?.get(ref);
+    if (owned) return owned;
+    const world = game.items?.get(ref);
+    if (world) return world;
+    if (globalThis.fromUuid) {
+      try {
+        const doc = await globalThis.fromUuid(ref);
+        return doc?.documentName === "Item" ? doc : null;
+      } catch { return null; }
+    }
+    return null;
+  }
+
+  static async #prepareEquipmentDetails(actor, item) {
+    if (item.type === "computer") return await StarFrontiersCharacterSheet.#prepareComputerDetails(actor, item);
+    if (item.type === "gear" && item.system.isKit) return await StarFrontiersCharacterSheet.#prepareKitDetails(actor, item);
+    if (item.type === "powerSource") return await StarFrontiersCharacterSheet.#preparePowerSourceDetails(actor, item);
+    return [];
+  }
+
+  static async #prepareComputerDetails(actor, item) {
+    const details = [];
+    const programRows = [];
+    for (const ref of item.system.installedPrograms ?? []) {
+      const program = await StarFrontiersCharacterSheet.#resolveItemRef(actor, ref);
+      if (!program || program.type !== "program") continue;
+      const level = Number(program.system.level ?? 0);
+      const fp = Number(program.system.functionPoints ?? 0);
+      const programType = program.system.programType
+        ? game.i18n.localize(`STARFRONTIERS.ProgramType.${program.system.programType}`)
+        : "";
+      const typeSuffix = programType ? ` (${programType})` : "";
+      programRows.push(`${program.name}${typeSuffix} — ${game.i18n.localize("STARFRONTIERS.Item.Level")} ${level}, ${fp} ${game.i18n.localize("STARFRONTIERS.Item.FP")}`);
+    }
+    if (programRows.length) {
+      details.push({
+        label: game.i18n.localize("STARFRONTIERS.Item.InstalledPrograms"),
+        items: programRows
+      });
+    }
+    return details;
+  }
+
+  static async #prepareKitDetails(actor, item) {
+    const details = [];
+    const entries = item.system.contents ?? [];
+    if (!entries.length) return details;
+    const rows = [];
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const linked = entry.ref ? await StarFrontiersCharacterSheet.#resolveItemRef(actor, entry.ref) : null;
+      const liveName = linked?.name ?? entry.name ?? game.i18n.localize("STARFRONTIERS.Item.UnknownItem");
+      const quantity = Number(entry.quantity ?? 0);
+      const remaining = Number(entry.remaining ?? quantity);
+      const consumeOnUse = entry.consumeOnUse ?? false;
+      const canUse = consumeOnUse && remaining > 0;
+      rows.push({
+        index: i,
+        ref: entry.ref ?? "",
+        name: liveName,
+        quantity,
+        remaining,
+        consumeOnUse,
+        canUse,
+        display: `${liveName} — ${remaining} / ${quantity}`
+      });
+    }
+    details.push({
+      label: game.i18n.localize("STARFRONTIERS.Item.KitContents"),
+      kitRows: rows,
+      kitItemId: item.id
+    });
+    return details;
+  }
+
+  static async #preparePowerSourceDetails(actor, item) {
+    const details = [];
+    const linkedRows = [];
+    for (const ref of item.system.linkedWeaponRefs ?? []) {
+      const linked = await StarFrontiersCharacterSheet.#resolveItemRef(actor, ref);
+      if (linked?.type === "weapon") linkedRows.push(linked.name);
+    }
+    for (const ref of item.system.linkedScreenRefs ?? []) {
+      const linked = await StarFrontiersCharacterSheet.#resolveItemRef(actor, ref);
+      if (linked?.type === "screen") linkedRows.push(linked.name);
+    }
+    for (const ref of item.system.linkedVehicleRefs ?? []) {
+      const linked = await StarFrontiersCharacterSheet.#resolveItemRef(actor, ref);
+      if (linked?.type === "vehicle") linkedRows.push(linked.name);
+    }
+    if (linkedRows.length) {
+      details.push({
+        label: game.i18n.localize("STARFRONTIERS.Item.LinkedTo"),
+        items: linkedRows
+      });
+    }
+    return details;
+  }
+
+  static async #prepareWeaponLinkedSourceDisplay(actor, item) {
+    const clipRef = item.system.ammo?.clipItem;
+    if (!clipRef) return "";
+    const linked = await StarFrontiersCharacterSheet.#resolveItemRef(actor, clipRef);
+    if (!linked) return "";
+    if (linked.type === "powerSource") {
+      const remaining = Number(linked.system.remaining ?? 0);
+      const capacity = Number(linked.system.capacity ?? 0);
+      return `${linked.name} — ${remaining} / ${capacity} SEU`;
+    }
+    if (linked.type === "ammo") {
+      const shots = Number(linked.system.shots ?? 0);
+      return `${linked.name} — ${shots} ${game.i18n.localize("STARFRONTIERS.Item.Shots").toLowerCase()}`;
+    }
+    return linked.name;
   }
 
   static #prepareEncumbranceContext(actor) {
@@ -1009,6 +1135,67 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
 
     await item.update({ "system.uses.value": newUsesValue });
+  }
+
+  static async #onUseKitContent(event, target) {
+    target ??= event.currentTarget;
+    const actor = this.document;
+    const kitItemId = target.dataset.kitItemId ?? "";
+    const index = Number(target.dataset.kitIndex ?? -1);
+    if (!kitItemId || index < 0) return;
+    this._rememberScrollPosition();
+
+    const kit = actor.items.get(kitItemId);
+    if (!kit || kit.type !== "gear" || !kit.system.isKit) return;
+
+    const contents = Array.from(kit.system.contents ?? []).map((e) => ({
+      ref: e.ref,
+      name: e.name,
+      quantity: Number(e.quantity ?? 0),
+      remaining: Number(e.remaining ?? 0),
+      consumeOnUse: Boolean(e.consumeOnUse)
+    }));
+    if (index >= contents.length) return;
+
+    const entry = contents[index];
+    const remaining = Number(entry.remaining ?? 0);
+    if (remaining <= 0) {
+      ui.notifications.warn(game.i18n.format("STARFRONTIERS.Item.KitContentDepleted", { name: entry.name }));
+      return;
+    }
+
+    const linked = entry.ref ? await StarFrontiersCharacterSheet.#resolveItemRef(actor, entry.ref) : null;
+    const displayName = linked?.name ?? entry.name ?? game.i18n.localize("STARFRONTIERS.Item.UnknownItem");
+
+    const warnedSkills = new Set();
+    const checkSkill = (skillRef) => {
+      if (!skillRef || warnedSkills.has(skillRef)) return;
+      const hasSkill = actor.items.some((i) => i.type === "skill" && (i.id === skillRef || i.uuid === skillRef));
+      if (!hasSkill) {
+        warnedSkills.add(skillRef);
+        ui.notifications.warn(game.i18n.format("STARFRONTIERS.Item.MissingRequiredSkillForKitContent", {
+          actor: actor.name,
+          item: displayName,
+          kit: kit.name
+        }));
+      }
+    };
+    checkSkill(kit.system.requiredSkillRef);
+    if (linked?.system?.requiredSkillRef) checkSkill(linked.system.requiredSkillRef);
+
+    contents[index] = { ...entry, remaining: remaining - 1 };
+    await kit.update({ "system.contents": contents });
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: game.i18n.format("STARFRONTIERS.Item.UsedKitContent", {
+        actor: actor.name,
+        item: displayName,
+        kit: kit.name,
+        remaining: remaining - 1,
+        quantity: Number(entry.quantity ?? 0)
+      })
+    });
   }
 
   static async #onToggleRacialAbilityEffect(event, target) {

@@ -1640,6 +1640,63 @@ button.roll-label-main:focus-visible {
   text-transform: uppercase;
 }
 
+.equipment-row__details {
+  border-top: 1px solid var(--sf-row-line);
+  padding-top: 0.4rem;
+  width: 100%;
+}
+
+.equipment-detail {
+  margin-top: 0.35rem;
+}
+
+.equipment-detail__label {
+  color: var(--sf-muted);
+  display: block;
+  font-size: 0.75em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.equipment-detail__list {
+  margin: 0.15rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.kit-content-row {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.kit-content-row__name {
+  flex: 1;
+}
+
+.kit-content-row__use {
+  flex: 0 0 auto;
+  padding: 0.1rem 0.5rem;
+}
+
+.weapon-gear-panel__linked-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.weapon-gear-panel__linked-source-label {
+  color: var(--sf-muted);
+  font-size: 0.75em;
+  text-transform: uppercase;
+}
+
+.weapon-gear-panel__linked-source-value {
+  font-family: var(--input);
+  font-size: 0.85em;
+}
+
 .equipment-expanded__consumable,
 .equipment-expanded__powersource,
 .equipment-expanded__computer,

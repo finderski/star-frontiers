@@ -269,6 +269,12 @@
                   <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
                     <i class="fa-solid fa-pen-to-square"></i>
                   </button>
+                  {{#if row.data.linkedSourceDisplay}}
+                    <div class="weapon-gear-panel__linked-source">
+                      <span class="weapon-gear-panel__linked-source-label">{{localize "STARFRONTIERS.Item.LinkedSource"}}:</span>
+                      <span class="weapon-gear-panel__linked-source-value">{{row.data.linkedSourceDisplay}}</span>
+                    </div>
+                  {{/if}}
                   {{#if row.data.hasModes}}
                     <label class="seu-dial-label weapon-mode-selector">
                       <span>{{localize "STARFRONTIERS.Weapon.Mode.Label"}}</span>
@@ -658,6 +664,37 @@
                         <span>{{localize "STARFRONTIERS.Item.ShotsPerClip"}}</span>
                         <span>{{row.shots}}</span>
                       </label>
+                    </div>
+                  {{/if}}
+
+                  {{#if row.details.length}}
+                    <div class="equipment-row__details">
+                      {{#each row.details as |detail|}}
+                        <div class="equipment-detail">
+                          <span class="equipment-detail__label">{{detail.label}}</span>
+                          {{#if detail.items.length}}
+                            <ul class="equipment-detail__list">
+                              {{#each detail.items as |entry|}}
+                                <li>{{entry}}</li>
+                              {{/each}}
+                            </ul>
+                          {{/if}}
+                          {{#if detail.kitRows.length}}
+                            <ul class="equipment-detail__list equipment-detail__list--kit">
+                              {{#each detail.kitRows as |kitEntry|}}
+                                <li class="kit-content-row">
+                                  <span class="kit-content-row__name">{{kitEntry.display}}</span>
+                                  {{#if kitEntry.canUse}}
+                                    <button type="button" class="kit-content-row__use" data-action="useKitContent" data-kit-item-id="{{../detail.kitItemId}}" data-kit-index="{{kitEntry.index}}" title="{{localize "STARFRONTIERS.Item.UseKitContent"}}">
+                                      {{localize "STARFRONTIERS.Item.Use"}}
+                                    </button>
+                                  {{/if}}
+                                </li>
+                              {{/each}}
+                            </ul>
+                          {{/if}}
+                        </div>
+                      {{/each}}
                     </div>
                   {{/if}}
                 </div>
