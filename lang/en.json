@@ -37,6 +37,7 @@
       "ExperienceAvailable": "Available",
       "ExperienceSpent": "Spent",
       "Failure": "Failure",
+      "ForcedResult": "Forced Result",
       "GenerateStats": "Roll for Stats",
       "Handedness": "Handedness:",
       "Hourly": "Hourly:",
@@ -89,6 +90,8 @@
       "RollAbilityModifierPrompt": "Enter a modifier to apply to {ability}. The current target is {target}.",
       "RollAbilityModifierSubmit": "Roll Check",
       "RollAbilityModifierTitle": "{ability} Modifier",
+      "TestingForcedRoll": "Forced d100 result",
+      "TestingForcedRollHint": "GM testing helper. Leave blank to roll normally; enter 1-100 to force the roll result.",
       "RollAbilityPublic": "Roll in the open",
       "RollAbilityWhisper": "Whisper to GM",
       "Active-abbr": "Active",
@@ -547,6 +550,10 @@
       "ChargenWizardOnNew": {
         "Hint": "Open the character generation wizard for new characters once that workflow is implemented.",
         "Name": "Character Wizard on New Character"
+      },
+      "EnableGmRollOverrides": {
+        "Hint": "Show a GM-only testing field on modifier prompts so a specific d100 result can be forced instead of rolled normally.",
+        "Name": "Enable GM Roll Overrides"
       },
       "ComputerPortabilityLevel": {
         "Hint": "Computers with a level above this value are treated as installed assets. They will not count toward encumbrance and will appear in the Assets section of the Equipment list.",

@@ -1464,15 +1464,16 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const target = StarFrontiersCharacterSheet.#getAbilityCheckTarget(actor, ability);
     const encumbranceMod = StarFrontiersCharacterSheet.#getAbilityEncumbranceMod(actor, ability);
     const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
-    const modifier = await StarFrontiersCharacterSheet.#promptModifier(abilityLabel, target.target + encumbranceMod);
-    if (modifier === null) return;
+    const prompt = await StarFrontiersCharacterSheet.#promptModifier(abilityLabel, target.target + encumbranceMod);
+    if (prompt === null) return;
+    const modifier = prompt.modifier ?? 0;
 
     const adjustedTarget = target.target + modifier + encumbranceMod;
-    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
-    const success = roll.total <= adjustedTarget;
-    const rollHtml = await roll.render({
+    const { total: rollTotal, rollHtml, forcedTotal } = await StarFrontiersCharacterSheet.#evaluatePercentileRoll({
+      forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Character.AbilityCheckFlavor", { ability: abilityLabel })
     });
+    const success = rollTotal <= adjustedTarget;
 
     const rows = [
       { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(target.target) }
@@ -1486,7 +1487,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     rows.push(
       { label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: modifier >= 0 ? `+${modifier}` : String(modifier) },
       { label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(adjustedTarget) },
-      { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(roll.total).padStart(2, "0") }
+      ...(forcedTotal !== null ? [{ label: game.i18n.localize("STARFRONTIERS.Character.ForcedResult"), value: String(forcedTotal).padStart(2, "0") }] : []),
+      { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(rollTotal).padStart(2, "0") }
     );
 
     if (target.sourceLabel) {
@@ -1604,6 +1606,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       });
     }
     rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: prompt.modifier >= 0 ? `+${prompt.modifier}` : String(prompt.modifier) });
+    if (prompt.forcedRoll !== null && prompt.forcedRoll !== undefined) {
+      rows.push({
+        label: game.i18n.localize("STARFRONTIERS.Character.ForcedResult"),
+        value: String(prompt.forcedRoll).padStart(2, "0")
+      });
+    }
 
     const allRollHtmls = [];
     let hitCount = 0;
@@ -1612,22 +1620,23 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const shotTarget = StarFrontiersCharacterSheet.#clampAttackTarget(
         profile.baseTarget + combatProfileBonus + rangeMod + prompt.modifier + shotPenalty + encumbrance.attackerMod + encumbrance.targetMod
       );
-      const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
-      const hit = StarFrontiersCharacterSheet.#isHit(roll.total, shotTarget, profile.rulesEdition);
+      const { total: rollTotal, rollHtml } = await StarFrontiersCharacterSheet.#evaluatePercentileRoll({
+        forcedTotal: prompt.forcedRoll,
+        flavor: game.i18n.format("STARFRONTIERS.Weapon.AttackFlavor", { weapon: weapon.name })
+      });
+      const hit = StarFrontiersCharacterSheet.#isHit(rollTotal, shotTarget, profile.rulesEdition);
       if (hit) hitCount++;
-
-      const flavor = game.i18n.format("STARFRONTIERS.Weapon.AttackFlavor", { weapon: weapon.name });
-      allRollHtmls.push(await roll.render({ flavor }));
+      allRollHtmls.push(rollHtml);
 
       if (shots > 1) {
         const shotLabel = shotPenalty
           ? `${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")} ${i + 1} (${shotPenalty})`
           : `${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")} ${i + 1}`;
         rows.push({ label: `${shotLabel} — ${game.i18n.localize("STARFRONTIERS.Character.Target")}`, value: String(shotTarget) });
-        rows.push({ label: `${shotLabel} — ${game.i18n.localize("STARFRONTIERS.Character.Rolled")}`, value: String(roll.total).padStart(2, "0") });
+        rows.push({ label: `${shotLabel} — ${game.i18n.localize("STARFRONTIERS.Character.Rolled")}`, value: String(rollTotal).padStart(2, "0") });
       } else {
         rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(shotTarget) });
-        rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(roll.total).padStart(2, "0") });
+        rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(rollTotal).padStart(2, "0") });
       }
     }
 
@@ -1793,6 +1802,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     titleData = {},
     promptData = {}
   } = {}) {
+    const forcedField = StarFrontiersCharacterSheet.#getForcedRollOverrideField();
     return foundry.applications.api.DialogV2.prompt({
       window: {
         title: game.i18n.format(titleKey, { ability: label, name: label, target: targetValue, ...titleData })
@@ -1800,14 +1810,68 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       content: `
         <p>${game.i18n.format(promptKey, { ability: label, name: label, target: targetValue, ...promptData })}</p>
         <input name="modifier" type="number" step="1" value="0" autofocus>
+        ${forcedField}
       `,
       ok: {
         label: game.i18n.localize("STARFRONTIERS.Character.RollAbilityModifierSubmit"),
-        callback: (event, button) => button.form.elements.modifier.valueAsNumber || 0
+        callback: (event, button) => ({
+          modifier: button.form.elements.modifier.valueAsNumber || 0,
+          forcedRoll: StarFrontiersCharacterSheet.#readForcedRollOverride(button.form.elements.forcedRoll)
+        })
       },
       modal: true,
       rejectClose: false
     });
+  }
+
+  static #canUseForcedRollOverride() {
+    return Boolean(game.user?.isGM && game.settings.get(SYSTEM_ID, "enableGmRollOverrides"));
+  }
+
+  static #getForcedRollOverrideField() {
+    if (!StarFrontiersCharacterSheet.#canUseForcedRollOverride()) return "";
+
+    return `
+      <label class="dialog-field">
+        <span>${game.i18n.localize("STARFRONTIERS.Character.TestingForcedRoll")}</span>
+        <input name="forcedRoll" type="number" step="1" min="1" max="100" value="">
+        <small>${game.i18n.localize("STARFRONTIERS.Character.TestingForcedRollHint")}</small>
+      </label>
+    `;
+  }
+
+  static #readForcedRollOverride(input, { min = 1, max = 100 } = {}) {
+    if (!input) return null;
+    const raw = Number(input.valueAsNumber);
+    if (!Number.isFinite(raw)) return null;
+    return Math.min(Math.max(Math.trunc(raw), min), max);
+  }
+
+  static async #evaluatePercentileRoll({ forcedTotal = null, flavor = "" } = {}) {
+    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
+    const forced = Number.isFinite(forcedTotal);
+    const finalTotal = forced
+      ? Math.min(Math.max(Math.trunc(Number(forcedTotal)), 1), 100)
+      : roll.total;
+
+    if (forced) {
+      const die = roll.dice?.[0];
+      if (die?.results?.length) {
+        die.results = die.results.map((result, index) => index === 0
+          ? { ...result, result: finalTotal, active: true }
+          : result);
+      }
+      roll._total = finalTotal;
+    }
+
+    const rollHtml = await roll.render({ flavor });
+    return {
+      roll,
+      total: finalTotal,
+      forced,
+      forcedTotal: forced ? finalTotal : null,
+      rollHtml
+    };
   }
 
   static async #rollInitiative(actor, rollMode = "public") {
@@ -1837,15 +1901,16 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (item.system.rollType !== "active") return;
 
     const chance = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
-    const modifier = await StarFrontiersCharacterSheet.#promptModifier(item.name, chance);
-    if (modifier === null) return;
+    const prompt = await StarFrontiersCharacterSheet.#promptModifier(item.name, chance);
+    if (prompt === null) return;
+    const modifier = prompt.modifier ?? 0;
 
     const adjustedTarget = chance + modifier;
-    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
-    const success = roll.total <= adjustedTarget;
-    const rollHtml = await roll.render({
+    const { total: rollTotal, rollHtml, forcedTotal } = await StarFrontiersCharacterSheet.#evaluatePercentileRoll({
+      forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Character.RacialAbilityRollFlavor", { name: item.name })
     });
+    const success = rollTotal <= adjustedTarget;
 
     if (success && game.settings.get(SYSTEM_ID, "automateActiveEffects")) {
       const effect = StarFrontiersCharacterSheet.#getRacialAbilityEffect(item);
@@ -1867,7 +1932,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           value: modifier >= 0 ? `+${modifier}` : String(modifier)
         }] : []),
         { label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(adjustedTarget) },
-        { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(roll.total).padStart(2, "0") }
+        ...(forcedTotal !== null ? [{
+          label: game.i18n.localize("STARFRONTIERS.Character.ForcedResult"),
+          value: String(forcedTotal).padStart(2, "0")
+        }] : []),
+        { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(rollTotal).padStart(2, "0") }
       ],
       rollMode,
       outcome: success
@@ -1973,18 +2042,19 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     await baseTargetRoll.evaluate({ allowInteractive: false });
     const baseTarget = Math.floor(baseTargetRoll.total);
 
-    const modifier = await StarFrontiersCharacterSheet.#promptModifier(skill.name, baseTarget, {
+    const prompt = await StarFrontiersCharacterSheet.#promptModifier(skill.name, baseTarget, {
       titleKey: "STARFRONTIERS.Character.SkillModifierTitle",
       promptKey: "STARFRONTIERS.Character.SkillModifierPrompt"
     });
-    if (modifier === null) return;
+    if (prompt === null) return;
+    const modifier = prompt.modifier ?? 0;
 
     const adjustedTarget = baseTarget + modifier;
-    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
-    const success = roll.total <= adjustedTarget;
-    const rollHtml = await roll.render({
+    const { total: rollTotal, rollHtml, forcedTotal } = await StarFrontiersCharacterSheet.#evaluatePercentileRoll({
+      forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Character.SkillCheckFlavor", { name: skill.name })
     });
+    const success = rollTotal <= adjustedTarget;
 
     await StarFrontiersCharacterSheet.#createCheckChatMessage(actor, {
       title: game.i18n.format("STARFRONTIERS.Character.SkillCheckTitle", {
@@ -1996,7 +2066,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(baseTarget) },
         { label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: modifier >= 0 ? `+${modifier}` : String(modifier) },
         { label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(adjustedTarget) },
-        { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(roll.total).padStart(2, "0") }
+        ...(forcedTotal !== null ? [{ label: game.i18n.localize("STARFRONTIERS.Character.ForcedResult"), value: String(forcedTotal).padStart(2, "0") }] : []),
+        { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(rollTotal).padStart(2, "0") }
       ],
       rollMode,
       outcome: success ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure"),
@@ -2501,6 +2572,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static async #promptWeaponAttack(actor, weapon, profile, autoRangeBand = null) {
     const rangeBands = autoRangeBand ? [] : StarFrontiersCharacterSheet.#getAvailableWeaponRangeBands(weapon);
+    const forcedField = StarFrontiersCharacterSheet.#getForcedRollOverrideField();
     const options = rangeBands.map((band) => {
       const mod = band.modifier >= 0 ? `+${band.modifier}` : `${band.modifier}`;
       return `<option value="${band.key}">${band.label} (${mod})</option>`;
@@ -2542,6 +2614,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
           <span>${game.i18n.localize("STARFRONTIERS.Character.Modifier")}</span>
           <input name="modifier" type="number" step="1" value="0" autofocus>
         </label>
+        ${forcedField}
       `,
       buttons: [
         {
@@ -2560,6 +2633,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
             return {
               modifier: Number.isFinite(modifierInput?.valueAsNumber) ? modifierInput.valueAsNumber : 0,
+              forcedRoll: StarFrontiersCharacterSheet.#readForcedRollOverride(root.querySelector("[name='forcedRoll']")),
               rangeBand,
               rangeLabel,
               shots: rof > 1 ? Math.min(Math.max(shotsValue || 1, 1), rof) : 1

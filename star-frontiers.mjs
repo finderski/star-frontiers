@@ -192,6 +192,15 @@ Hooks.once("init", () => {
     default: true
   });
 
+  game.settings.register(SYSTEM_ID, "enableGmRollOverrides", {
+    name: "STARFRONTIERS.Settings.EnableGmRollOverrides.Name",
+    hint: "STARFRONTIERS.Settings.EnableGmRollOverrides.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
   game.settings.register(SYSTEM_ID, "chargenWizardOnNew", {
     name: "STARFRONTIERS.Settings.ChargenWizardOnNew.Name",
     hint: "STARFRONTIERS.Settings.ChargenWizardOnNew.Hint",
