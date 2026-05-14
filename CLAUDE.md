@@ -88,12 +88,13 @@ Doze grenade hit = `unconscious-doze` Active Effect (1 hour). Miss = 1d10 bounce
 - A character can carry up to **STR kg** total. **Encumbered when carried mass > STR/2** kg.
 - Encumbered effects:
   - Movement (walking/running/hourly) **halved** (applied in `Character.prepareDerivedData`).
-  - **Attacker encumbered: −10 to attack roll.**
+  - **Attacker encumbered: −10 to melee attack rolls only.**
   - **Target encumbered: +10 to attacker's roll.**
 - Combat modifiers above are **always applied** in Expanded; not configurable.
 - Two world settings extend the −10 penalty to ability/skill checks:
   - `encumbranceAffectsPhysical` (default off) — applies to STR, STA, DEX, RS rolls.
   - `encumbranceAffectsNonPhysical` (default off) — applies to INT, LOG, PER, LDR rolls.
+- Those same world settings also extend the attacker-side `−10` penalty to attacks whose resolved `attackAbilityKey` falls in the matching physical/non-physical set. This is an extension, not a second stack on top of the melee penalty.
 - In **Basic** rules: encumbered status is computed and displayed (UI indicator) but applies **no penalty and no movement halving**. Display-only.
 
 ---
@@ -221,7 +222,7 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - Range band cells on character sheet weapon rows show max distance only (not min–max)
   - **Equipment section** — restructured grid showing per-item Name | Quantity | Mass | Carry State | Actions; same 3-state cycle button as weapons (`cycleCarryState` action, generic for any item type)
   - **Encumbrance** — `Character.prepareDerivedData` computes `derived.totalMass` (sum of `mass × quantity` across all items where `carryState ∈ {ready, carried}`), `derived.encumbranceThreshold` (STR/2), `derived.encumbered`. Movement halved when encumbered. Indicator badge in Equipment section header.
-  - **Combat encumbrance modifiers (Expanded)** — `#getCombatEncumbranceMods` adds −10 if attacker encumbered, +10 if target token's actor encumbered. Shown as separate rows in attack chat card.
+  - **Combat encumbrance modifiers (Expanded)** — `#getCombatEncumbranceMods` adds −10 if the attacker is encumbered and the attack is melee, or if the relevant `encumbranceAffectsPhysical/NonPhysical` world setting extends that penalty to the attack's resolved `attackAbilityKey`. Encumbered targets still add +10 to the attacker. Shown as separate rows in attack chat card.
   - **Optional encumbrance penalty on ability checks** — `#getAbilityEncumbranceMod` reads the two world settings and applies −10 to the relevant check target (split by physical vs non-physical).
   - **Skills section** — visible only in Expanded rules; "Add Skill" button likewise hidden in Basic. Section legend reads "Equipment" in Basic, "Skills and Equipment" in Expanded.
   - **Reload behavior — split by weapon type:**
@@ -265,6 +266,8 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
   - **0.2.7 — Computer quantity/mass sheet cleanup.** Portable computers now show their `quantity` in the character-sheet Equipment list, because quantity is actor-context inventory state just like gear/consumables/ammo/power sources. The Computer item sheet no longer exposes `quantity`, and no longer duplicates `cost` or `mass` inside the Computer section; those shared fields now live only in Common.
   - **0.2.7 — Portable-vs-asset computer quantity split.** Computer quantity is only meaningful for portable machines shown in the Equipment list. Once `computer.system.level` exceeds the `computerPortabilityLevel` setting, the row moves to Vehicles & Assets and behaves like an asset (`quantity`/`mass` suppressed, `totalMass` forced to 0) instead of carried inventory.
   - **0.2.7 — GM forced-roll testing hook.** Added world setting `enableGmRollOverrides` (default `true`) and a GM-only “Forced d100 result” field on the ability/skill/racial-ability modifier prompts plus the weapon-attack prompt. All of those paths now flow through `#evaluatePercentileRoll()` so a typed override replaces the rolled d100 result consistently while keeping the rest of the chat-card logic unchanged.
+  - **0.2.7 — Encumbrance combat fix.** The Expanded-rules attacker-side encumbrance penalty is now melee-only. `#getCombatEncumbranceMods(actor, rulesEdition, { isMelee })` no longer applies the −10 penalty to ranged weapon attacks, while the target-side +10 modifier still applies normally.
+  - **0.2.7 — Encumbrance combat/settings reconciliation.** `#getCombatEncumbranceMods(actor, rulesEdition, { isMelee, attackAbilityKey })` now keeps the core melee-only penalty while still honoring the custom `encumbranceAffectsPhysical` / `encumbranceAffectsNonPhysical` world settings for attacks. Ranged attacks no longer get the penalty by default, but they do when the matching extension setting is enabled.
   - **Character Equipment expanded details + Kit Use.** Expanded equipment rows now surface a generic read-only `details` block built by `#prepareEquipmentDetails`: Computer rows list installed programs (name, type, level, FP); Gear-kit rows list contents (`name — remaining / quantity`) with a `Use` button on consumeOnUse rows that have `remaining > 0`; PowerSource rows list every linked weapon/screen/vehicle. The `useKitContent` action decrements `kit.system.contents[i].remaining` only — it never touches the actor's standalone inventory — and posts a public chat message. Required-skill warnings fire (deduplicated by ref) for both the kit's `requiredSkillRef` and the resolved content's `requiredSkillRef`. AE application on use is deferred to a future effects pipeline. Weapons surface a `Linked Source: <name> — N/M SEU|shots` row inside their gear panel via a new `linkedSourceDisplay` field on weapon rows.
   - **0.2.7 — Item-link audit.** Four item-link patterns standardized to the drop-zone + bidirectional-link model used by PowerSource/Weapon:
     - **Computer ↔ Programs.** `installedPrograms` stores program ids/uuids; `functionPoints.used` derived from sum of installed; `functionPoints.max` derived from level (10/20/40/80/160/320 per Alpha Dawn) in `StarFrontiersComputerData.prepareDerivedData`.

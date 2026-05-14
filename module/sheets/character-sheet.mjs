@@ -1552,7 +1552,10 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     const rangeMod = activeBandKey ? (RANGE_BAND_MODS[activeBandKey] ?? 0) : 0;
     const shots = prompt.shots ?? 1;
     const totalAmmo = ammoCheck.amount * shots;
-    const encumbrance = StarFrontiersCharacterSheet.#getCombatEncumbranceMods(actor, profile.rulesEdition);
+    const encumbrance = StarFrontiersCharacterSheet.#getCombatEncumbranceMods(actor, profile.rulesEdition, {
+      isMelee,
+      attackAbilityKey: profile.attackAbilityKey
+    });
 
     if (ammoCheck.amount > 0) {
       const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity, linkedAmmo);
@@ -2481,6 +2484,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
 
     return {
+      attackAbilityKey: isStr ? "str" : "dex",
       baseTarget: StarFrontiersCharacterSheet.#clampAttackTarget(baseTarget),
       rulesEdition,
       skill,
@@ -2514,9 +2518,16 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     return game.settings.get(SYSTEM_ID, setting) ? -10 : 0;
   }
 
-  static #getCombatEncumbranceMods(actor, rulesEdition) {
+  static #getCombatEncumbranceMods(actor, rulesEdition, { isMelee = false, attackAbilityKey = "" } = {}) {
     if (rulesEdition !== "expanded") return { attackerMod: 0, targetMod: 0 };
-    const attackerMod = actor.system.derived?.encumbered ? -10 : 0;
+    const physical = new Set(["str", "sta", "dex", "rs"]);
+    const nonPhysical = new Set(["int", "log", "per", "ldr"]);
+    const attackerEncumbered = Boolean(actor.system.derived?.encumbered);
+    const extendedAttackPenalty = (
+      (game.settings.get(SYSTEM_ID, "encumbranceAffectsPhysical") && physical.has(attackAbilityKey))
+      || (game.settings.get(SYSTEM_ID, "encumbranceAffectsNonPhysical") && nonPhysical.has(attackAbilityKey))
+    );
+    const attackerMod = attackerEncumbered && (isMelee || extendedAttackPenalty) ? -10 : 0;
 
     let targetMod = 0;
     const target = [...(game.user?.targets ?? [])][0];
