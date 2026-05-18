@@ -343,3 +343,116 @@ The compute-on-the-fly approach is cleaner (no new schema). The cap check then b
 ### Dependencies
 
 - None.
+
+---
+
+## 11. Ammo Management — Partial-Clip Preservation & Reload Workflow
+
+**Status:** Concept only. Current reload behavior is binary: a weapon either has its loaded clip or it doesn't. Swapping a partially-used clip for a fresh one loses the old one's remaining state.
+
+### Context
+
+In play, characters don't throw away partially-used clips between firefights. A character who finishes combat with 5 SEU left in a powerclip and 6 fresh powerclips in their pack will swap the depleted clip for a fresh one but keep the partial — it's a backup for emergencies, or to top off later if the clip type is rechargeable.
+
+The current model doesn't represent this. When a character reloads, the existing `linkedPowerSource` is essentially abandoned, and a new one takes its place. There's no tracked partial-clip in inventory that the player can swap back to.
+
+Related concern: when a new powerclip is dropped onto a character sheet, the system could auto-link it to any compatible weapon that has no current power source. That's a usability win but needs care — auto-linking one powerclip to multiple weapons would conflict with port limits (from the 0.2.8 work).
+
+### Work — partial-clip preservation
+
+When a player swaps a clip on a weapon:
+
+1. The weapon's currently-linked PowerSource (the depleted clip) becomes a standalone inventory item on the actor. Its `remaining` SEU is preserved as-is. Its bidirectional link to the weapon clears.
+2. The new clip (which the player selects from their inventory of compatible clips) becomes the weapon's `clipItem`. Its bidirectional link to the weapon establishes.
+3. If the depleted clip was already a standalone owned inventory item (i.e. not embedded in the weapon's data), step 1 is just "clear the link" — the item already exists.
+
+The UX flow:
+
+- Click "Reload" on a weapon row → dialog or popover lists all compatible PowerSource items in actor inventory (matching sourceType, with `remaining > 0`).
+- Each option shows the clip's name and current SEU (e.g. "Powerclip — 20/20", "Powerclip — 14/20", "Beltpack — 47/50").
+- Player picks one. The swap executes: old clip becomes/stays inventory, new clip becomes linked.
+
+This implies clips should be **first-class inventory items**, always — never just nested inside the weapon's data. The current schema supports this (powerclip is a `powerSource` item type), but the implementation may shortcut to embedded data in some paths. Audit before implementing.
+
+### Work — clip-type discrimination
+
+The dialog needs to know what counts as "compatible." Two axes:
+
+- **sourceType match.** A weapon's `clipItem` typically expects a specific source type (powerclip, beltpack, etc.) determined by what fits the weapon. Per rules, powerclips fit any weapon that takes powerclips; beltpacks and backpacks have ports for weapons that accept them.
+- **Ammo type match for non-SEU weapons.** Bulletclips, needleclips, jetclips, etc. — each weapon takes a specific ammo type. Pistol bulletclips ≠ rifle bulletclips. Barbed needleclips ≠ anesthetic needleclips (relevant once item 4 lands).
+
+The weapon's data needs a way to express which clip types it accepts. Currently `ammo.uses` (`"seu"`, `"rounds"`, etc.) is a hint but doesn't strictly enforce compatibility. A `compatibleSourceTypes` array on the weapon, or a `clipType` discriminator on the ammo/powerSource, would make the filter clean.
+
+### Work — auto-link on drop (with soft-link semantics)
+
+When a PowerSource is dropped onto a character sheet:
+
+1. Find all compatible weapons on the actor that have NO current `clipItem` link and that are within the dropped PowerSource's port caps (typically `ports.weapon` from the 0.2.8 fix).
+2. **Auto-link softly to every compatible weapon up to the port cap.** If a powerclip has 1 weapon port and the actor has two gyrojet pistols, both pistols show the powerclip as a soft-linked option, but only one consumes the port for hard-linked purposes. Soft links are non-exclusive and informational — they show the player "this clip fits these weapons." Hard links are exclusive and consume ports.
+3. The weapon's clip slot UI shows a checkbox or radio next to each soft-linked option: "Use this clip when firing." Checking it promotes that soft link to a hard link and clears any prior hard link on that weapon.
+4. Soft links are visually distinguished in the UI (dashed border on the link chip, "(auto)" label, or similar).
+5. Auto-link respects port caps for the *hard* link only. Soft links are unbounded — they're just "this clip is compatible with this weapon."
+
+This handles your two-gyrojet-pistols case cleanly: both pistols show the new clip as available, you pick which one actually consumes it when you fire.
+
+**Port-cap awareness.** Auto-link respects `ports.weapon` for hard links only. Soft links never consume ports.
+
+### Work — recharge hierarchy
+
+Spent clips and depleted power sources are never discarded — they can be recharged by attaching to a larger power source via an auxiliary port. Recharge transfers SEU from the larger source to the smaller, with the larger source absorbing the cost.
+
+**Hierarchy** (smaller can recharge from larger; same-tier cannot recharge same-tier):
+
+| Source | Can be recharged by |
+|---|---|
+| powerclip / ammoClip | beltpack, powerpack, parabattery (any tier), generator |
+| beltpack | powerpack, parabattery (any tier), generator |
+| powerpack | parabattery (any tier), generator |
+| parabattery | generator |
+| generator | — (not rechargeable; refueled differently per rules) |
+
+**UX flow:**
+
+1. Drag a depleted powerclip onto a beltpack/powerpack/parabattery/generator's auxiliary port drop zone (or use a "Recharge from..." button on the depleted source's row).
+2. System computes the recharge amount: `min(targetCapacity - targetRemaining, sourceRemaining)`.
+3. Confirm dialog shows: "Transfer X SEU from <source> (Y remaining) to <target> (Z/W → W/W)?"
+4. On confirm, both sources update: source loses X SEU, target gains X SEU.
+5. Chat message posts: "Character X recharged <small source> from <large source> (+X SEU)."
+
+**Auxiliary ports.** The rules describe beltpacks/powerpacks as having auxiliary ports for "scanners or radios." We can reuse those slots for the recharge connection, since plugging a powerclip into a beltpack's auxiliary port is essentially what's happening. Add an `auxiliaryPorts` field to PowerSource (parallel to `ports.weapon/screen/vehicle`) with rules-correct defaults:
+
+- beltpack: 3 auxiliary ports
+- powerpack: 3 auxiliary ports
+- parabattery (any tier): unbounded (treat as effectively unlimited)
+- generator: unbounded
+- powerclip / ammoClip: 0 auxiliary ports (they're the recipients, not the source)
+
+**Schema additions for recharge:**
+
+- `powerSource.system.ports.auxiliary`: numberField, defaulted per the table above.
+- `powerSource.system.rechargeable`: already exists. The recharge UI gates on this — non-rechargeable sources (most powerclips per the rules? — verify which clips can/can't be recharged in the rulebook) don't accept charge transfer.
+
+**Time and recharge rate (optional).** The rules state recharging is instantaneous in narrative terms but costs the larger source. If desired, add a recharge rate per turn for combat-relevant recharge (e.g. medic-style support actions), but for standard play instantaneous transfer is fine.
+
+### Open questions
+
+- Which clip types are rechargeable per RAW? The rules say powerclips are recyclable but not rechargeable in some passages and recharge-at-5-Cr-per-SEU in others. Reconcile before implementing. The current schema has a `rechargeable` boolField on every PowerSource which is the right control point regardless.
+- Does using an auxiliary port for recharging temporarily occupy that port? The rules don't say. Probably yes during the transfer; instant if transfer is instant.
+- Cross-character recharge: can character A's powerclip be recharged from character B's beltpack? Rules-correct: yes, if the items are physically adjacent. System-correct: require both items to be on the same actor or in a shared location. For now, simplest is "same actor only" and let GM hand-wave the rest.
+
+### Schema additions (full)
+
+- `weapon.system.ammo.compatibleSourceTypes`: arrayField of textField — which source types this weapon's clip slot accepts.
+- `powerSource.system.linkType` (or restructured `linkedWeaponRefs`): soft/hard discrimination per the auto-link work above.
+- `powerSource.system.ports.auxiliary`: numberField — number of auxiliary ports for recharge connections.
+
+### Open questions (overall)
+
+- Should "swap clip" be a button on the weapon row, or always go through the dialog? Recommend dialog because it surfaces all options and partial-state info at a glance.
+- How does this interact with the kit Use workflow for ammo? If a character uses an ammo clip from inside a tactical-kit Gear, does that decrement the kit's count AND establish a clip in the weapon? Probably yes — the ammo move is "out of kit, into weapon."
+- Auto-link on drop: should it be a setting (some players want manual control, others want zero clicks)? Default ON with a "Auto-link compatible power sources" world setting is a reasonable balance.
+
+### Dependencies
+
+- 0.2.8 PowerSource Port Limits (already landed) — auto-link must honor `ports.weapon` and related caps.
+- Item 4 (Needler Ammo-Type Variants) — clip-type discrimination becomes meaningful when ammo can vary the weapon's behavior.
