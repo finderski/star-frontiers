@@ -296,3 +296,50 @@ The system is currently bring-your-own-data. World-builders create every weapon,
 
 - Item 3 (mode-bearing weapon seeding) becomes trivially part of this.
 - Item 5 (Skill subskills) infrastructure should land first.
+
+---
+
+## 10. Paired-Ability Point Shift Control
+
+**Status:** Concept only. Currently players manually overwrite ability values to shift points within a pair.
+
+### Context
+
+Per the Expanded rules, after generating stats a player can subtract points from one ability and add them to the other ability in that pair (STR↔STA, DEX↔RS, INT↔LOG, PER↔LDR), up to 10 points shifted. Today this requires editing both fields manually and counting in your head — easy to typo, no enforcement of the ±10 cap or the pair's preserved sum.
+
+A point-shift control would make this a one-click operation, visible only when the pair's two values diverge from their generated baseline (so it doesn't add visual clutter for the 99% case where the pair is balanced).
+
+### Work
+
+For each ability pair on the character sheet, render two small affordances next to the pair when (and only when) the two values are not equal:
+
+- **Arrow buttons** between the pair to shift one point at a time: `STR 50 ← → STA 50` becomes interactive showing `STR 51 ← STA 49` after one click of the right-pointing arrow. Each click moves one point from the side opposite the arrow to the side the arrow points toward.
+- **Swap button** to flip the two values entirely — useful when the player shifted points the wrong direction and wants to fix it without clicking back ten times.
+
+Enforce two invariants on every click:
+
+1. **Sum preservation.** The pair's sum stays constant (point shifting redistributes, never creates or destroys points). Initialize this expected sum on first stat generation; persist it on the actor so the system always knows the baseline.
+2. **±10 shift cap.** Track how far the pair has drifted from balanced (`abs(current - sum/2)`). Disable the shift buttons in the direction that would exceed 10. The swap button is always available because it doesn't change the magnitude of the drift.
+
+### Display logic
+
+- When `pair.first === pair.second`: hide the shift control entirely (the pair is balanced; no need to show it).
+- When `pair.first !== pair.second`: show both arrow buttons and the swap button. Grey out whichever arrow would exceed the ±10 cap. Tooltip on the swap button: "Swap values."
+
+### Schema considerations
+
+Storing the baseline sum requires either:
+- A new field per ability pair on the character data (`system.abilities.<pair>.baseline` or similar), populated on stat generation.
+- Computing it on the fly from `base + raceModifier + bonusPicks` — this works as long as those inputs are stable, which they are once stats are generated.
+
+The compute-on-the-fly approach is cleaner (no new schema). The cap check then becomes: `|currentFirst - expectedBalanced|` and `|currentSecond - expectedBalanced|` must each stay ≤ 5 (since shifting 5 points one way means the other side gains 5, total drift = 10).
+
+### Open questions
+
+- Should the cap reset if the player invokes Replace Stats? Probably yes — new generation, fresh ±10 budget.
+- What about Basic edition, where the rules don't mention point shifting? Hide the control in Basic.
+- Direct edits (bypassing the control) should probably reset the baseline silently OR warn the player they're outside the ±10 envelope. The current direct-edit behavior is unconstrained; this control adds the rules-correct path without removing the escape hatch.
+
+### Dependencies
+
+- None.
