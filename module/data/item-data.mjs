@@ -275,6 +275,11 @@ export class StarFrontiersPowerSourceData extends StarFrontiersItemData {
       }),
       capacity: numberField({ initial: 0, min: 0 }),
       remaining: numberField({ initial: 0, min: 0 }),
+      ports: schemaField({
+        weapon: numberField({ initial: 1, min: 0, integer: true }),
+        screen: numberField({ initial: 0, min: 0, integer: true }),
+        vehicle: numberField({ initial: 0, min: 0, integer: true })
+      }),
       linkedWeaponRefs: arrayField(textField()),
       linkedScreenRefs: arrayField(textField()),
       linkedVehicleRefs: arrayField(textField()),

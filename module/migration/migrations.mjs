@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.2.7";
+export const CURRENT_SCHEMA_VERSION = "0.2.8";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -348,6 +348,97 @@ const MIGRATIONS = [
           });
         }
         await item.update({ "system.contents": newContents });
+      }
+    }
+  },
+  {
+    version: "0.2.8",
+    description: "PowerSource items gain `ports` configuration with rules-correct defaults based on sourceType.",
+    async migrate() {
+      const PORT_DEFAULTS = {
+        powerclip: { weapon: 1, screen: 0, vehicle: 0 },
+        ammoClip: { weapon: 1, screen: 0, vehicle: 0 },
+        beltpack: { weapon: 1, screen: 1, vehicle: 0 },
+        powerpack: { weapon: 2, screen: 1, vehicle: 0 },
+        parabatteryT1: { weapon: 0, screen: 0, vehicle: 1 },
+        parabatteryT2: { weapon: 0, screen: 0, vehicle: 1 },
+        parabatteryT3: { weapon: 0, screen: 0, vehicle: 1 },
+        parabatteryT4: { weapon: 0, screen: 0, vehicle: 1 },
+        "": { weapon: 1, screen: 0, vehicle: 0 }
+      };
+
+      const buildPorts = (sourceType = "") => foundry.utils.deepClone(PORT_DEFAULTS[sourceType] ?? PORT_DEFAULTS[""]);
+
+      const logOverflow = (item, ports, ownerName = "") => {
+        const weaponLinks = Array.from(item.system?.linkedWeaponRefs ?? []).length;
+        const screenLinks = Array.from(item.system?.linkedScreenRefs ?? []).length;
+        const vehicleLinks = Array.from(item.system?.linkedVehicleRefs ?? []).length;
+        const overflow = [];
+        if (weaponLinks > ports.weapon) overflow.push(`${weaponLinks} weapons (max ${ports.weapon})`);
+        if (screenLinks > ports.screen) overflow.push(`${screenLinks} screens (max ${ports.screen})`);
+        if (vehicleLinks > ports.vehicle) overflow.push(`${vehicleLinks} vehicles (max ${ports.vehicle})`);
+        if (!overflow.length) return;
+        const ownerSuffix = ownerName ? ` (owned by ${ownerName})` : "";
+        console.warn(
+          `[Star Frontiers] PowerSource "${item.name}"${ownerSuffix} has links that exceed rules-correct ports: ${overflow.join(", ")}. Existing links preserved. Adjust ports or disconnect manually.`
+        );
+      };
+
+      const migrateItem = async (item, systemSource, ownerName = "") => {
+        if (item.type !== "powerSource") return;
+        if (systemSource?.ports?.weapon !== undefined && systemSource?.ports?.weapon !== null) return;
+        const ports = buildPorts(systemSource?.sourceType ?? "");
+        logOverflow(item, ports, ownerName);
+        await item.update({ "system.ports": ports });
+      };
+
+      const migrateInvalidCollection = async (collection, ownerName = "") => {
+        for (const id of collection.invalidDocumentIds ?? new Set()) {
+          const item = collection.get(id, { invalid: true });
+          if (item?.type !== "powerSource") continue;
+          await migrateItem(item, item._source?.system, ownerName);
+        }
+      };
+
+      for (const item of game.items) {
+        await migrateItem(item, item._source?.system, "");
+      }
+      await migrateInvalidCollection(game.items);
+
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          await migrateItem(item, item._source?.system, actor.name);
+        }
+        await migrateInvalidCollection(actor.items, actor.name);
+      }
+
+      for (const scene of game.scenes ?? []) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor) continue;
+          const rawItems = tokenDoc.delta?._source?.items ?? [];
+          const updates = [];
+          for (const itemSrc of rawItems) {
+            if (itemSrc?.type !== "powerSource") continue;
+            if (itemSrc?.system?.ports?.weapon !== undefined && itemSrc?.system?.ports?.weapon !== null) continue;
+            const ports = buildPorts(itemSrc?.system?.sourceType ?? "");
+            const overflow = [];
+            const weaponLinks = Array.from(itemSrc?.system?.linkedWeaponRefs ?? []).length;
+            const screenLinks = Array.from(itemSrc?.system?.linkedScreenRefs ?? []).length;
+            const vehicleLinks = Array.from(itemSrc?.system?.linkedVehicleRefs ?? []).length;
+            if (weaponLinks > ports.weapon) overflow.push(`${weaponLinks} weapons (max ${ports.weapon})`);
+            if (screenLinks > ports.screen) overflow.push(`${screenLinks} screens (max ${ports.screen})`);
+            if (vehicleLinks > ports.vehicle) overflow.push(`${vehicleLinks} vehicles (max ${ports.vehicle})`);
+            if (overflow.length) {
+              console.warn(
+                `[Star Frontiers] PowerSource "${itemSrc.name}" (unlinked token in scene "${scene.name}") has links that exceed rules-correct ports: ${overflow.join(", ")}. Existing links preserved. Adjust ports or disconnect manually.`
+              );
+            }
+            updates.push({ _id: itemSrc._id, "system.ports": ports });
+          }
+          if (updates.length) {
+            await tokenDoc.actor.updateEmbeddedDocuments("Item", updates);
+          }
+        }
       }
     }
   }

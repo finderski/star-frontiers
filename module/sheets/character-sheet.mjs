@@ -544,6 +544,22 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   static async #syncWeaponPowerSourceLink(actor, weapon, nextRef = "") {
     const currentRef = weapon.system.ammo?.clipItem ?? "";
+    const nextSource = nextRef ? (actor.items.get(nextRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(nextRef).catch(() => null) : null)) : null;
+
+    if (nextSource?.type === "powerSource") {
+      const maxPorts = Number(nextSource.system.ports?.weapon ?? 0);
+      const refs = Array.from(nextSource.system.linkedWeaponRefs ?? []);
+      const alreadyLinked = refs.includes(weapon.id) || refs.includes(weapon.uuid);
+      if (maxPorts <= 0) {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.NoPortsForType.weapon"));
+        return false;
+      }
+      if (!alreadyLinked && refs.length >= maxPorts) {
+        ui.notifications.warn(game.i18n.format("STARFRONTIERS.Item.PortsFull.weapon", { max: maxPorts }));
+        return false;
+      }
+    }
+
     if (currentRef) {
       const currentSource = actor.items.get(currentRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(currentRef).catch(() => null) : null);
       if (currentSource?.type === "powerSource") {
@@ -556,10 +572,8 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       }
     }
 
-    if (!nextRef) return;
-
-    const nextSource = actor.items.get(nextRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(nextRef).catch(() => null) : null);
-    if (nextSource?.type !== "powerSource") return;
+    if (!nextRef) return true;
+    if (nextSource?.type !== "powerSource") return true;
 
     const refs = Array.from(nextSource.system.linkedWeaponRefs ?? []);
     if (!refs.includes(weapon.id)) {
@@ -567,6 +581,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         "system.linkedWeaponRefs": [...refs, weapon.id]
       });
     }
+    return true;
   }
 
   static #getBatteryIcon(loaded, capacity) {
@@ -2110,7 +2125,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     if (target.dataset.itemField === "system.ammo.clipItem" && item.type === "weapon") {
       const nextRef = String(target.value ?? "");
-      await StarFrontiersCharacterSheet.#syncWeaponPowerSourceLink(this.document, item, nextRef);
+      const synced = await StarFrontiersCharacterSheet.#syncWeaponPowerSourceLink(this.document, item, nextRef);
+      if (synced === false) {
+        target.value = item.system.ammo?.clipItem ?? "";
+        return;
+      }
       const nextSource = nextRef ? (this.document.items.get(nextRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(nextRef).catch(() => null) : null)) : null;
       const updateData = { "system.ammo.clipItem": nextRef };
       if (nextSource?.type === "ammo") updateData["system.ammo.capacity"] = Number(nextSource.system.shots ?? 0);

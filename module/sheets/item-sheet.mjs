@@ -3,6 +3,18 @@ import { ITEM_TYPE_LABELS, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mj
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
+const POWER_SOURCE_PORT_DEFAULTS = {
+  powerclip: { weapon: 1, screen: 0, vehicle: 0 },
+  ammoClip: { weapon: 1, screen: 0, vehicle: 0 },
+  beltpack: { weapon: 1, screen: 1, vehicle: 0 },
+  powerpack: { weapon: 2, screen: 1, vehicle: 0 },
+  parabatteryT1: { weapon: 0, screen: 0, vehicle: 1 },
+  parabatteryT2: { weapon: 0, screen: 0, vehicle: 1 },
+  parabatteryT3: { weapon: 0, screen: 0, vehicle: 1 },
+  parabatteryT4: { weapon: 0, screen: 0, vehicle: 1 },
+  "": { weapon: 1, screen: 0, vehicle: 0 }
+};
+
 export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   static DEFAULT_OPTIONS = {
     tag: "form",
@@ -225,12 +237,31 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
         }
       });
     }
+    const sourceTypeEl = this.element.querySelector('select[name="system.sourceType"]');
+    if (sourceTypeEl && this.item.type === "powerSource") {
+      const previousType = this.item.system.sourceType ?? "";
+      sourceTypeEl.addEventListener("change", async () => {
+        const ports = StarFrontiersItemSheet.#defaultPortsForSourceType(sourceTypeEl.value);
+        const previousDefaults = StarFrontiersItemSheet.#defaultPortsForSourceType(previousType);
+        const currentPorts = this.item.system.ports ?? {};
+        const portsMatchPreviousDefaults = ["weapon", "screen", "vehicle"].every((key) =>
+          Number(currentPorts[key] ?? previousDefaults[key] ?? 0) === Number(previousDefaults[key] ?? 0)
+        );
+        if (portsMatchPreviousDefaults) {
+          await this.item.update({ "system.ports": ports });
+        }
+      });
+    }
   }
 
   static #defaultAmmoUses(weaponType) {
     if (weaponType === "melee" || weaponType === "grenade") return "none";
     if (weaponType === "beam") return "seu";
     return "rounds";
+  }
+
+  static #defaultPortsForSourceType(sourceType = "") {
+    return foundry.utils.deepClone(POWER_SOURCE_PORT_DEFAULTS[sourceType] ?? POWER_SOURCE_PORT_DEFAULTS[""]);
   }
 
   #choices(values, prefix) {
@@ -347,6 +378,11 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
         return null;
       }
       await this.#linkPowerSourceVehicle(document);
+      return document;
+    }
+
+    if (this.item.type === "weapon" && document.documentName === "Item" && document.type === "powerSource") {
+      await this.#linkWeaponPowerSource(document);
       return document;
     }
 
@@ -557,24 +593,72 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     return docs;
   }
 
+  static #powerSourcePortConfig(portKey) {
+    return {
+      weapon: {
+        field: "linkedWeaponRefs",
+        forwardNoPortsKey: "STARFRONTIERS.Item.NoWeaponPorts",
+        forwardFullKey: "STARFRONTIERS.Item.WeaponPortsFull",
+        reverseNoPortsKey: "STARFRONTIERS.Item.NoPortsForType.weapon",
+        reverseFullKey: "STARFRONTIERS.Item.PortsFull.weapon"
+      },
+      screen: {
+        field: "linkedScreenRefs",
+        forwardNoPortsKey: "STARFRONTIERS.Item.NoScreenPorts",
+        forwardFullKey: "STARFRONTIERS.Item.ScreenPortsFull",
+        reverseNoPortsKey: "STARFRONTIERS.Item.NoPortsForType.screen",
+        reverseFullKey: "STARFRONTIERS.Item.PortsFull.screen"
+      },
+      vehicle: {
+        field: "linkedVehicleRefs",
+        forwardNoPortsKey: "STARFRONTIERS.Item.NoVehiclePorts",
+        forwardFullKey: "STARFRONTIERS.Item.VehiclePortsFull",
+        reverseNoPortsKey: "STARFRONTIERS.Item.NoPortsForType.vehicle",
+        reverseFullKey: "STARFRONTIERS.Item.PortsFull.vehicle"
+      }
+    }[portKey] ?? null;
+  }
+
+  async #ensurePowerSourcePortAvailable(powerSource, portKey, incomingRef, { reverse = false } = {}) {
+    const config = StarFrontiersItemSheet.#powerSourcePortConfig(portKey);
+    if (!config) return false;
+
+    const maxPorts = Number(powerSource.system.ports?.[portKey] ?? 0);
+    if (maxPorts <= 0) {
+      ui.notifications.warn(game.i18n.localize(reverse ? config.reverseNoPortsKey : config.forwardNoPortsKey));
+      return false;
+    }
+
+    const currentLinks = Array.from(powerSource.system?.[config.field] ?? []);
+    const alreadyLinked = currentLinks.includes(incomingRef);
+    if (!alreadyLinked && currentLinks.length >= maxPorts) {
+      ui.notifications.warn(game.i18n.format(reverse ? config.reverseFullKey : config.forwardFullKey, { max: maxPorts }));
+      return false;
+    }
+
+    return true;
+  }
+
   async #linkPowerSourceWeapon(document) {
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
+    if (!(await this.#ensurePowerSourcePortAvailable(this.item, "weapon", ref))) return;
     const current = Array.from(this.item.system.linkedWeaponRefs ?? []);
     if (!current.includes(ref)) current.push(ref);
+    const psRef = sameActor ? this.item.id : this.item.uuid;
 
-    const sourceType = this.item.system.sourceType || "";
-    const limit = sourceType === "beltpack" ? 1 : sourceType === "powerpack" ? 2 : null;
-    if (limit && current.length > limit) {
-      ui.notifications.warn(game.i18n.format("STARFRONTIERS.Item.PowerSourceLinkLimit", {
-        name: this.item.name,
-        limit
-      }));
+    const prevPsRef = document.system?.ammo?.clipItem ?? "";
+    if (prevPsRef && prevPsRef !== this.item.id && prevPsRef !== this.item.uuid) {
+      const prev = this.#resolveItemRef(prevPsRef, "powerSource");
+      if (prev) {
+        const prevRefs = Array.from(prev.system.linkedWeaponRefs ?? []).filter((r) => r !== document.id && r !== document.uuid);
+        await prev.update({ "system.linkedWeaponRefs": prevRefs });
+      }
     }
 
     await this.item.update({ "system.linkedWeaponRefs": current });
     await document.update({
-      "system.ammo.clipItem": sameActor ? this.item.id : this.item.uuid
+      "system.ammo.clipItem": psRef
     });
   }
 
@@ -582,6 +666,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
     const psRef = sameActor ? this.item.id : this.item.uuid;
+    if (!(await this.#ensurePowerSourcePortAvailable(this.item, "screen", ref))) return;
     const current = Array.from(this.item.system.linkedScreenRefs ?? []);
     if (!current.includes(ref)) current.push(ref);
 
@@ -602,6 +687,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
     const psRef = sameActor ? this.item.id : this.item.uuid;
+    if (!(await this.#ensurePowerSourcePortAvailable(this.item, "vehicle", ref))) return;
     const current = Array.from(this.item.system.linkedVehicleRefs ?? []);
     if (!current.includes(ref)) current.push(ref);
 
@@ -622,6 +708,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     const sameActor = document.parent && document.parent === this.item.parent;
     const psRef = sameActor ? document.id : document.uuid;
     const vehRef = sameActor ? this.item.id : this.item.uuid;
+    if (!(await this.#ensurePowerSourcePortAvailable(document, "vehicle", vehRef, { reverse: true }))) return;
 
     const prevRef = this.item.system.powerSourceRef ?? "";
     if (prevRef && prevRef !== psRef) {
@@ -642,6 +729,7 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     const sameActor = document.parent && document.parent === this.item.parent;
     const psRef = sameActor ? document.id : document.uuid;
     const screenRef = sameActor ? this.item.id : this.item.uuid;
+    if (!(await this.#ensurePowerSourcePortAvailable(document, "screen", screenRef, { reverse: true }))) return;
 
     const prevRef = this.item.system.powerSourceRef ?? "";
     if (prevRef && prevRef !== psRef) {
@@ -656,6 +744,27 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     const refs = Array.from(document.system.linkedScreenRefs ?? []);
     if (!refs.includes(screenRef)) refs.push(screenRef);
     await document.update({ "system.linkedScreenRefs": refs });
+  }
+
+  async #linkWeaponPowerSource(document) {
+    const sameActor = document.parent && document.parent === this.item.parent;
+    const psRef = sameActor ? document.id : document.uuid;
+    const weaponRef = sameActor ? this.item.id : this.item.uuid;
+    if (!(await this.#ensurePowerSourcePortAvailable(document, "weapon", weaponRef, { reverse: true }))) return;
+
+    const prevRef = this.item.system.ammo?.clipItem ?? "";
+    if (prevRef && prevRef !== psRef) {
+      const prev = this.#resolveItemRef(prevRef, "powerSource");
+      if (prev) {
+        const refs = Array.from(prev.system.linkedWeaponRefs ?? []).filter((r) => r !== this.item.id && r !== this.item.uuid);
+        await prev.update({ "system.linkedWeaponRefs": refs });
+      }
+    }
+
+    await this.item.update({ "system.ammo.clipItem": psRef });
+    const refs = Array.from(document.system.linkedWeaponRefs ?? []);
+    if (!refs.includes(weaponRef)) refs.push(weaponRef);
+    await document.update({ "system.linkedWeaponRefs": refs });
   }
 
   async #installComputerProgram(document) {

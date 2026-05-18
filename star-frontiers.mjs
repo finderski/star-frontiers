@@ -40,6 +40,7 @@ function applySheetTheme(theme = game.settings.get(SYSTEM_ID, "sheetTheme")) {
 Hooks.once("init", () => {
   registerMigrationSettings();
   Handlebars.registerHelper("eq", (a, b) => a === b);
+  Handlebars.registerHelper("gt", (a, b) => Number(a) > Number(b));
 
   CONFIG.SF = {
     ...(CONFIG.SF ?? {}),

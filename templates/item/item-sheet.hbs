@@ -359,9 +359,29 @@
           <label><span>{{localize "STARFRONTIERS.Item.Remaining"}}</span><input type="number" name="system.remaining" value="{{system.remaining}}" min="0" /></label>
           <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Rechargeable"}}</span><input type="checkbox" name="system.rechargeable" {{checked system.rechargeable}} /></label>
         </div>
+        <fieldset class="paper-box full-width">
+          <legend>{{localize "STARFRONTIERS.Item.Ports"}}</legend>
+          <div class="compact-grid three-columns">
+            <label>
+              <span>{{localize "STARFRONTIERS.Item.WeaponPorts"}}</span>
+              <input type="number" name="system.ports.weapon" value="{{system.ports.weapon}}" min="0" step="1" />
+            </label>
+            <label>
+              <span>{{localize "STARFRONTIERS.Item.ScreenPorts"}}</span>
+              <input type="number" name="system.ports.screen" value="{{system.ports.screen}}" min="0" step="1" />
+            </label>
+            <label>
+              <span>{{localize "STARFRONTIERS.Item.VehiclePorts"}}</span>
+              <input type="number" name="system.ports.vehicle" value="{{system.ports.vehicle}}" min="0" step="1" />
+            </label>
+          </div>
+          <p class="form-hint">{{localize "STARFRONTIERS.Item.PortsHint"}}</p>
+        </fieldset>
+        {{#if (gt system.ports.weapon 0)}}
         <div class="race-editor-block">
           <div class="race-editor-block__header">
             <span>{{localize "STARFRONTIERS.Item.LinkedWeapons"}}</span>
+            <span class="race-editor-block__meta">{{linkedPowerSourceWeapons.length}} / {{system.ports.weapon}}</span>
           </div>
           <div class="linked-ability-drop-zone" data-drop-type="weapon">
             <span>{{localize "STARFRONTIERS.Item.DropWeapon"}}</span>
@@ -381,9 +401,12 @@
             </div>
           {{/if}}
         </div>
+        {{/if}}
+        {{#if (gt system.ports.screen 0)}}
         <div class="race-editor-block">
           <div class="race-editor-block__header">
             <span>{{localize "STARFRONTIERS.Item.LinkedScreens"}}</span>
+            <span class="race-editor-block__meta">{{linkedPowerSourceScreens.length}} / {{system.ports.screen}}</span>
           </div>
           <div class="linked-ability-drop-zone" data-drop-type="screen">
             <span>{{localize "STARFRONTIERS.Item.DropScreen"}}</span>
@@ -403,9 +426,12 @@
             </div>
           {{/if}}
         </div>
+        {{/if}}
+        {{#if (gt system.ports.vehicle 0)}}
         <div class="race-editor-block">
           <div class="race-editor-block__header">
             <span>{{localize "STARFRONTIERS.Item.LinkedVehicles"}}</span>
+            <span class="race-editor-block__meta">{{linkedPowerSourceVehicles.length}} / {{system.ports.vehicle}}</span>
           </div>
           <div class="linked-ability-drop-zone" data-drop-type="vehicle">
             <span>{{localize "STARFRONTIERS.Item.DropVehicle"}}</span>
@@ -425,6 +451,7 @@
             </div>
           {{/if}}
         </div>
+        {{/if}}
       </fieldset>
     {{/if}}
 
