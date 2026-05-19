@@ -1,4 +1,5 @@
 import { ITEM_TYPE_LABELS, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
+import { ScrollPreservingSheetMixin } from "./scroll-preserving-sheet-mixin.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -15,7 +16,7 @@ const POWER_SOURCE_PORT_DEFAULTS = {
   "": { weapon: 1, screen: 0, vehicle: 0 }
 };
 
-export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
+export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(HandlebarsApplicationMixin(ItemSheetV2)) {
   static DEFAULT_OPTIONS = {
     tag: "form",
     classes: ["star-frontiers", "sheet", "item"],
@@ -33,6 +34,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     actions: {
       addBonusPick: StarFrontiersItemSheet.#onAddBonusPick,
       addEffect: StarFrontiersItemSheet.#onAddEffect,
+      addWeaponMode: StarFrontiersItemSheet.#onAddWeaponMode,
+      addWeaponModeEffect: StarFrontiersItemSheet.#onAddWeaponModeEffect,
       clearAmmo: StarFrontiersItemSheet.#onClearAmmo,
       clearRequiredSkill: StarFrontiersItemSheet.#onClearRequiredSkill,
       deleteEffect: StarFrontiersItemSheet.#onDeleteEffect,
@@ -40,6 +43,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       openEffect: StarFrontiersItemSheet.#onOpenEffect,
       removeBonusPick: StarFrontiersItemSheet.#onRemoveBonusPick,
       removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility,
+      removeWeaponMode: StarFrontiersItemSheet.#onRemoveWeaponMode,
+      removeWeaponModeEffect: StarFrontiersItemSheet.#onRemoveWeaponModeEffect,
       removeSubskill: StarFrontiersItemSheet.#onRemoveSubskill,
       toggleLinkedRaceAbilityExpanded: StarFrontiersItemSheet.#onToggleLinkedRaceAbilityExpanded,
       clearGearRequiredSkill: StarFrontiersItemSheet.#onClearGearRequiredSkill,
@@ -76,15 +81,33 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
         : "STARFRONTIERS.Item.Name";
     context.showCost = !["race", "skill", "trainedAbility"].includes(item.type);
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
+    context.choices = this.#prepareChoices();
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
     context.weaponUsesSeu = item.type === "weapon" && item.system.ammo?.uses === "seu";
+    context.weaponUsesAmmo = item.type === "weapon" && item.system.ammo?.uses !== "none";
     if (item.type === "weapon") {
       const setting = item.system.ammo?.variableSetting ?? {};
       context.hasVariableSeuDial = item.system.ammo?.uses === "seu"
         && Number(setting.max ?? 0) > Number(setting.min ?? 0)
         && Number(setting.min ?? 0) >= 1;
+      context.weaponModeRows = await this.#prepareWeaponModeRows(item);
+      context.avoidanceAbilityChoices = StarFrontiersItemSheet.#prepareAvoidanceAbilityChoices();
+      context.modeDefenseTypeChoices = Object.fromEntries(
+        Object.entries(context.choices.damageType ?? {}).filter(([value]) => Boolean(value))
+      );
+      context.weaponAmmoPerShotLabel = item.system.ammo?.uses === "rounds"
+        ? "STARFRONTIERS.Item.RoundsPerShot"
+        : "STARFRONTIERS.Item.SEUPerHit";
+      context.weaponModeAmmoPerShotLabel = item.system.ammo?.uses === "rounds"
+        ? "STARFRONTIERS.Weapon.ModeRoundsPerShot"
+        : "STARFRONTIERS.Weapon.ModeSeuPerShot";
     } else {
       context.hasVariableSeuDial = false;
+      context.weaponModeRows = [];
+      context.avoidanceAbilityChoices = {};
+      context.modeDefenseTypeChoices = {};
+      context.weaponAmmoPerShotLabel = "";
+      context.weaponModeAmmoPerShotLabel = "";
     }
     context.linkedRacialAbilities = item.type === "race" ? await this.#resolveLinkedRacialAbilities(item) : [];
     context.bonusPickRows = item.type === "race" ? Array.from(item.system.bonusPicks ?? []) : [];
@@ -170,7 +193,6 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     context.imageUsesMask = (item.img ?? "").startsWith("icons/svg/");
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
-    context.choices = this.#prepareChoices();
     context.rangeRows = this.#prepareRangeRows(item);
     context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
       item.system.description ?? "",
@@ -182,6 +204,12 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       }
     );
     return context;
+  }
+
+  _processFormData(event, form, formData) {
+    const data = super._processFormData(event, form, formData);
+    this.#prepareItemSubmitData(data);
+    return data;
   }
 
   #prepareRangeRows(item) {
@@ -215,6 +243,124 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       weaponSkill: this.#choices(["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"], "STARFRONTIERS.Choice.WeaponSkill"),
       weaponType: this.#choices(["melee", "beam", "projectile", "gyrojet", "grenade"], "STARFRONTIERS.Choice.WeaponType")
     };
+  }
+
+  async #prepareWeaponModeRows(item) {
+    if (item.type !== "weapon") return [];
+
+    const rows = [];
+    const modes = Array.from(item.system.mechanics?.modes ?? []);
+    for (let index = 0; index < modes.length; index++) {
+      const mode = modes[index];
+      const onHitEffectRows = [];
+
+      for (const effectRef of mode.onHitEffectIds ?? []) {
+        const effect = await this.#resolveEffectRef(effectRef);
+        onHitEffectRows.push({
+          id: effectRef,
+          name: effect?.name ?? game.i18n.localize("STARFRONTIERS.Item.UnknownEffect"),
+          effectId: effect?.id ?? "",
+          sourceName: effect?.parent && effect.parent !== item ? (effect.parent.name ?? "") : ""
+        });
+      }
+
+      rows.push({
+        index,
+        displayIndex: index + 1,
+        key: mode.key ?? "",
+        label: mode.label ?? "",
+        damageFormula: mode.damageFormula ?? "",
+        seuPerShot: Number(mode.seuPerShot ?? 0),
+        defenseTypes: Array.from(mode.defenseTypes ?? []),
+        avoidance: {
+          enabled: mode.avoidance?.enabled ?? false,
+          ability: mode.avoidance?.ability ?? "",
+          onSuccessEffect: mode.avoidance?.onSuccessEffect ?? "",
+          failNote: mode.avoidance?.failNote ?? ""
+        },
+        onHitEffectRows
+      });
+    }
+
+    return rows;
+  }
+
+  static #prepareAvoidanceAbilityChoices() {
+    return {
+      "": game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceAbilityNone"),
+      sta: game.i18n.localize("STARFRONTIERS.Ability.sta"),
+      rs: game.i18n.localize("STARFRONTIERS.Ability.rs"),
+      dex: game.i18n.localize("STARFRONTIERS.Ability.dex"),
+      str: game.i18n.localize("STARFRONTIERS.Ability.str"),
+      int: game.i18n.localize("STARFRONTIERS.Ability.int"),
+      log: game.i18n.localize("STARFRONTIERS.Ability.log"),
+      per: game.i18n.localize("STARFRONTIERS.Ability.per"),
+      ldr: game.i18n.localize("STARFRONTIERS.Ability.ldr"),
+      im: game.i18n.localize("STARFRONTIERS.Ability.im")
+    };
+  }
+
+  static #copyWeaponModes(modes = []) {
+    return Array.from(modes ?? []).map((mode) => ({
+      key: mode.key ?? "",
+      label: mode.label ?? "",
+      damageFormula: mode.damageFormula ?? "",
+      seuPerShot: Number(mode.seuPerShot ?? 0),
+      avoidance: {
+        enabled: mode.avoidance?.enabled ?? false,
+        ability: mode.avoidance?.ability ?? "",
+        comparison: mode.avoidance?.comparison ?? "currentOrLess",
+        onSuccessEffect: mode.avoidance?.onSuccessEffect ?? "",
+        failNote: mode.avoidance?.failNote ?? ""
+      },
+      defenseTypes: Array.from(mode.defenseTypes ?? []),
+      onHitEffectIds: Array.from(mode.onHitEffectIds ?? [])
+    }));
+  }
+
+  #prepareItemSubmitData(data) {
+    if (this.item.type !== "weapon") return;
+
+    const rawModes = foundry.utils.getProperty(data, "system.mechanics.modes");
+    if (!rawModes) return;
+
+    const modes = Array.isArray(rawModes)
+      ? rawModes
+      : Object.keys(rawModes)
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => rawModes[key]);
+    const existingModes = Array.from(this.item.system.mechanics?.modes ?? []);
+
+    for (let index = 0; index < modes.length; index++) {
+      const mode = modes[index] ?? {};
+      const existing = existingModes[index] ?? {};
+      const submittedDefenseTypes = mode.defenseTypes;
+      const defenseTypes = Array.isArray(submittedDefenseTypes)
+        ? submittedDefenseTypes.map((value) => String(value).trim()).filter(Boolean)
+        : submittedDefenseTypes
+          ? [String(submittedDefenseTypes).trim()].filter(Boolean)
+          : [];
+
+      mode.defenseTypes = defenseTypes;
+      mode.onHitEffectIds = Array.from(existing.onHitEffectIds ?? []);
+      mode.avoidance = {
+        comparison: existing.avoidance?.comparison ?? "currentOrLess",
+        enabled: Boolean(mode.avoidance?.enabled),
+        ability: String(mode.avoidance?.ability ?? ""),
+        onSuccessEffect: String(mode.avoidance?.onSuccessEffect ?? ""),
+        failNote: String(mode.avoidance?.failNote ?? "")
+      };
+    }
+
+    foundry.utils.setProperty(data, "system.mechanics.modes", modes);
+
+    const activeModeKey = String(this.item.system.activeModeKey ?? "");
+    if (!activeModeKey) return;
+
+    const activeModeIndex = existingModes.findIndex((mode) => String(mode?.key ?? "") === activeModeKey);
+    if (activeModeIndex < 0 || activeModeIndex >= modes.length) return;
+
+    foundry.utils.setProperty(data, "system.activeModeKey", String(modes[activeModeIndex]?.key ?? ""));
   }
 
   async _onRender(context, options) {
@@ -273,6 +419,8 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
   }
 
   async _onDropDocument(event, document) {
+    const dropType = event.target?.closest?.("[data-drop-type]")?.dataset.dropType ?? "";
+
     if (this.item.type === "skill" && this.item.system.category === "main"
         && document.documentName === "Item" && document.type === "skill"
         && document.system.category === "subskill") {
@@ -351,8 +499,6 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
       ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.AmmoLinked", { name: document.name }));
       return document;
     }
-
-    const dropType = event.target?.closest?.("[data-drop-type]")?.dataset.dropType ?? "";
 
     if (this.item.type === "powerSource" && document.documentName === "Item" && document.type === "weapon") {
       if (dropType && dropType !== "weapon") {
@@ -448,6 +594,34 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     return null;
   }
 
+  async #resolveEffectRef(ref) {
+    if (!ref) return null;
+
+    const localEffect = this.item?.effects?.get(ref);
+    if (localEffect) return localEffect;
+
+    const actorEffect = this.item?.parent?.effects?.get?.(ref);
+    if (actorEffect) return actorEffect;
+
+    if (globalThis.fromUuid) {
+      try {
+        const resolved = await globalThis.fromUuid(ref);
+        if (resolved?.documentName === "ActiveEffect") return resolved;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    try {
+      const resolved = globalThis.fromUuidSync?.(ref);
+      if (resolved?.documentName === "ActiveEffect") return resolved;
+    } catch {
+      /* ignore */
+    }
+
+    return null;
+  }
+
   async #resolveLinkedAmmo(item) {
     if (item.type !== "weapon") return null;
     const ref = item.system.ammo?.clipItem;
@@ -539,6 +713,45 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     await this.item.update({ "system.bonusPicks": current });
   }
 
+  static async #onAddWeaponMode(event, target) {
+    const modes = StarFrontiersItemSheet.#copyWeaponModes(this.item.system.mechanics?.modes ?? []);
+    modes.push({
+      key: "",
+      label: "",
+      damageFormula: "",
+      seuPerShot: 0,
+      avoidance: {
+        enabled: false,
+        ability: "",
+        comparison: "currentOrLess",
+        onSuccessEffect: "",
+        failNote: ""
+      },
+      defenseTypes: [],
+      onHitEffectIds: []
+    });
+    await this.item.update({ "system.mechanics.modes": modes });
+  }
+
+  static async #onAddWeaponModeEffect(event, target) {
+    target ??= event.currentTarget;
+    const modeIndex = Number(target.dataset.modeIndex ?? -1);
+    if (modeIndex < 0) return;
+
+    const modes = StarFrontiersItemSheet.#copyWeaponModes(this.item.system.mechanics?.modes ?? []);
+    if (modeIndex >= modes.length) return;
+
+    const [effect] = await this.item.createEmbeddedDocuments("ActiveEffect", [{
+      name: game.i18n.localize("STARFRONTIERS.Item.NewEffect"),
+      transfer: false
+    }]);
+    if (!effect) return;
+
+    modes[modeIndex].onHitEffectIds = [...Array.from(modes[modeIndex].onHitEffectIds ?? []), effect.id];
+    await this.item.update({ "system.mechanics.modes": modes });
+    effect.sheet?.render(true);
+  }
+
   static async #onRemoveBonusPick(event, target) {
     target ??= event.currentTarget;
     const index = Number(target.dataset.index ?? -1);
@@ -546,6 +759,46 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
     if (index < 0 || index >= current.length) return;
     current.splice(index, 1);
     await this.item.update({ "system.bonusPicks": current });
+  }
+
+  static async #onRemoveWeaponMode(event, target) {
+    target ??= event.currentTarget;
+    const index = Number(target.dataset.index ?? -1);
+    const modes = StarFrontiersItemSheet.#copyWeaponModes(this.item.system.mechanics?.modes ?? []);
+    if (index < 0 || index >= modes.length) return;
+
+    const [removed] = modes.splice(index, 1);
+    const activeModeKey = String(this.item.system.activeModeKey ?? "");
+    const updateData = { "system.mechanics.modes": modes };
+    if (!modes.length || removed?.key === activeModeKey) {
+      updateData["system.activeModeKey"] = modes[0]?.key ?? "";
+    }
+    await this.item.update(updateData);
+
+    const embeddedEffectIds = Array.from(removed?.onHitEffectIds ?? [])
+      .filter((effectId) => Boolean(this.item.effects.get(effectId)))
+      .filter((effectId) => !modes.some((mode) => Array.from(mode.onHitEffectIds ?? []).includes(effectId)));
+    if (embeddedEffectIds.length) {
+      await this.item.deleteEmbeddedDocuments("ActiveEffect", embeddedEffectIds);
+    }
+  }
+
+  static async #onRemoveWeaponModeEffect(event, target) {
+    target ??= event.currentTarget;
+    const modeIndex = Number(target.dataset.modeIndex ?? target.closest?.("[data-mode-index]")?.dataset.modeIndex ?? -1);
+    const effectId = String(target.dataset.effectId ?? "");
+    if (modeIndex < 0 || !effectId) return;
+
+    const modes = StarFrontiersItemSheet.#copyWeaponModes(this.item.system.mechanics?.modes ?? []);
+    if (modeIndex >= modes.length) return;
+
+    modes[modeIndex].onHitEffectIds = Array.from(modes[modeIndex].onHitEffectIds ?? [])
+      .filter((entry) => entry !== effectId);
+    await this.item.update({ "system.mechanics.modes": modes });
+
+    if (this.item.effects.get(effectId) && !modes.some((mode) => Array.from(mode.onHitEffectIds ?? []).includes(effectId))) {
+      await this.item.deleteEmbeddedDocuments("ActiveEffect", [effectId]);
+    }
   }
 
   static #onToggleLinkedRaceAbilityExpanded(event, target) {
@@ -932,7 +1185,13 @@ export class StarFrontiersItemSheet extends HandlebarsApplicationMixin(ItemSheet
 
   static async #onOpenEffect(event, target) {
     target ??= event.currentTarget;
-    const effect = this.item.effects.get(target.dataset.effectId ?? "");
+    let effect = this.item.effects.get(target.dataset.effectId ?? "");
+    if (!effect) {
+      const ref = target.dataset.effectRef ?? "";
+      if (ref && globalThis.fromUuid) {
+        try { effect = await globalThis.fromUuid(ref); } catch { effect = null; }
+      }
+    }
     effect?.sheet?.render(true);
   }
 

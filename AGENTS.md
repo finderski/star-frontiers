@@ -35,6 +35,7 @@
 - [module/data/item-data.mjs](./module/data/item-data.mjs): item data models for race/skill/weapon/etc.
 - [module/sheets/character-sheet.mjs](./module/sheets/character-sheet.mjs): character sheet behavior, drag/drop, stat generation, ability rolls, weapon rolls.
 - [module/sheets/item-sheet.mjs](./module/sheets/item-sheet.mjs): generic item sheet behavior and weapon ammo linking.
+- [module/sheets/scroll-preserving-sheet-mixin.mjs](./module/sheets/scroll-preserving-sheet-mixin.mjs): shared V2 sheet helper that preserves scroll position across `submitOnChange` rerenders; future sheet classes should use this instead of rolling their own scroll hooks.
 - [templates/chat/check-roll-card.hbs](./templates/chat/check-roll-card.hbs): generic check chat card.
 - [templates/chat/stat-roll-card.hbs](./templates/chat/stat-roll-card.hbs): stat generation chat card.
 - [templates/chat/weapon-attack-card.hbs](./templates/chat/weapon-attack-card.hbs): weapon attack chat card with damage follow-up button.
@@ -48,6 +49,7 @@
 - Keep logic in sheet classes and schemas; keep templates mostly declarative.
 - Prefer nested localization keys and add labels to `lang/en.json` rather than hardcoding display text.
 - Use existing `STARFRONTIERS.*` naming patterns for i18n and config.
+- Any Foundry sheet class that uses `submitOnChange: true` should inherit the shared scroll-preserving mixin so field edits do not snap the sheet back to the top.
 - Use `apply_patch` for edits when working manually.
 - Rules-specific UI should usually be driven by `system.rulesEdition` or world `rulesEdition`, not forked templates.
 - Styling is centralized in one stylesheet and theme-aware through CSS variables.
@@ -191,7 +193,12 @@
 - **Variable SEU dial**: `system.ammo.variableSetting.current` is editable on the character sheet via the weapon gear panel. The attack roll reads it for SEU consumption, and damage previews / damage rolls scale through `#buildEffectiveDamageFormula` when the weapon has a true variable dial.
 - **Variable SEU damage scaling**: `weapon.system.damageFormula` is treated as the **per-SEU unit** only when the weapon has a real variable dial (`ammo.uses === "seu"`, `variableSetting.max > variableSetting.min`, `variableSetting.min >= 1`, and `current >= 1`). Every display/roll path must call `#buildEffectiveDamageFormula(weapon, bandKey)` instead of reading `weapon.system.damageFormula` directly.
 - **Weapon firing modes (Phase 1)**: weapons may define `system.mechanics.modes[]` and `system.activeModeKey`. The active mode overrides top-level `damageFormula`, `ammo.seuPerShot`, `mechanics.defenseTypes`, and `mechanics.onHitEffectIds` when present. An active mode with an empty `damageFormula` explicitly means "no damage" and must suppress the damage button.
+- `weapon.system.mechanics.hasModes` is the Weapon item sheet's authoring gate for the Modes editor only. It does NOT control runtime mode availability; the character sheet and attack flow still read `mechanics.modes[]` directly so toggling the checkbox off hides the editor without deleting or disabling the authored modes.
 - **Active weapon mode resolution**: `#getActiveWeaponMode(weapon)` in `character-sheet.mjs` is the single source of truth. If a weapon has modes but no `activeModeKey`, the first mode is treated as active for display, ammo use, and chat-card context.
+- Weapon-mode defense types are now edited on the item sheet as a multi-select using the same defense choices as the top-level weapon defense field. Save logic must normalize the submitted value back into `mode.defenseTypes[]`, including the empty-selection case.
+- Mode on-hit effects are authored as embedded Active Effects on the weapon item via the mode editor's `Add Effect` button, then linked by embedded effect ID in `mode.onHitEffectIds`. Removing a mode effect should also delete the embedded AE when no other mode still references it.
+- `mode.avoidance.onSuccessEffect` is now authored as a human-readable failure-effect label. Runtime display should localize it only when it happens to match an i18n key; plain text is the primary authoring model.
+- `weapon.system.ammo.seuPerShot` and `mode.seuPerShot` now function as the generic **ammo-per-shot** fields for both `ammo.uses === "seu"` and `ammo.uses === "rounds"`. The path name stays for schema compatibility, but runtime ammo consumption is no longer hardcoded to 1 round for every non-SEU weapon.
 - **Avoidance target capture**: when an attack is rolled, the first currently-targeted token is captured into the attack chat card as `targetTokenUuid` / `targetActorUuid`. Avoidance resolution must read those UUIDs from the card dataset, not from `game.user.targets` at click time.
 - **Avoidance checks**: `#rollAvoidanceCheck` rolls against `target.system.abilities[ability].value` (current score, not base) and posts the result as the **target's** speaker, not the attacker's. Failed rolls attach `flags["star-frontiers"].avoidanceFailure` for future Active Effect application.
 - **Combat-profile attack bonuses**: `actor.system.combatProfile.meleeBonus` and `.rangedBonus` are the canonical persistent to-hit bonus fields. `#getWeaponAttackProfile` adds the relevant one to `baseTarget` before clamping, and attack chat cards show the consolidated value as `Melee Bonus` or `Ranged Bonus` when non-zero.
@@ -284,12 +291,14 @@
   - expose `attributeKey` dropdown (DEX / STR) — the base ability for attack rolls; replaces the old `weaponSkillKey` dropdown in the UI
   - expose `requiredSkillRef` as a drop zone accepting skill items — sets `system.requiredSkillRef` (ID or UUID)
   - expose `mechanics.isHeavy` checkbox inline with the ammo controls
+  - expose `mechanics.hasModes` as a **Has Firing Modes** checkbox; it gates the item-sheet editor only and must not delete `mechanics.modes[]` when toggled off
+  - when `mechanics.hasModes` is on, hide the normal top-level Damage / Defense fields and expose a per-mode editor for `key`, `label`, `damageFormula`, ammo-per-shot, multi-select defense types, avoidance config, and embedded on-hit Active Effect authoring
   - do **not** expose `weaponSkillKey` on the sheet — it remains in the schema for backward compat with the existing attack roll code only
   - support linked ammo drop onto the ammo drop zone (`system.ammo.clipItem` is set; `uses` is NOT forced by the drop — the GM sets it via the dropdown)
   - do **not** expose `carryState` (carry state is controlled on the actor sheet, not the item sheet)
   - expose `weaponType` (`melee` · `beam` · `projectile` · `gyrojet` · `grenade`), changing it auto-sets a default `ammo.uses` in the sheet's `_onRender` listener
   - expose `ammo.uses` (`seu` · `rounds` · `none`); default `none`
-  - expose `ammo.seuPerShot` and `ammo.variableSetting.min/.max` for SEU weapons (any `ammo.uses === “seu”`, not beam-only)
+  - expose the generic ammo-per-shot field (`system.ammo.seuPerShot`) for any weapon that uses ammo; label it dynamically for SEU vs rounds. `ammo.variableSetting.min/.max` remain SEU-only
   - expose `mechanics.rateOfFire` in Expanded mode
   - do **not** expose `capacity` or `consumed` (runtime values managed on the character sheet)
   - expose `variableSetting.min` / `.max` in Expanded mode for any SEU weapon; `.current` is on the character sheet gear panel
@@ -397,9 +406,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
   - **Note:** skill roll checks (`rollSkill` action) are implemented; the rework is for weapon attack rolls specifically
 - Weapons:
   - Avoidance Phase 3 — consume `flags["star-frontiers"].avoidanceFailure` to actually apply the configured effect/AE to the target on failure, and decide how re-rolls should interact with existing effects
-  - decide whether mode authoring needs first-class item-sheet UI or stays data-driven / compendium-authored for now
   - confirm attack formulas against the actual rules PDFs
   - decide how needler ammo-type variants and other future mode-bearing weapons should layer onto the new `mechanics.modes[]` model
+  - Foundry smoke-test the new Weapon item-sheet Modes editor end-to-end: add/remove mode, preserve `activeModeKey` when a mode key is renamed, verify embedded Active Effect create/open/remove flow, and confirm rounds-mode ammo-per-shot values consume correctly
 - Equipment expansion follow-through:
   - Foundry smoke-test the new inventory/assets split, add-item hover menu, consumable use flow, and power-source link/unlink UX
   - specifically verify PowerSource port limits and hidden drop zones across both item sheets and the character-sheet weapon selector
@@ -440,6 +449,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not read `weapon.system.damageFormula` directly in roll or preview code anymore. Variable-SEU scaling and mode overrides live behind `#buildEffectiveDamageFormula(weapon, bandKey)`, and bypassing that helper will silently reintroduce wrong laser damage.
 - Do not treat every `ammo.uses === "seu"` weapon as variable-damage. Sonic melee weapons, sonic disruptors, electrostunners, and powertorches can all consume SEU while still using a fixed damage/effect profile. The dial only counts when `variableSetting.max > variableSetting.min` and `variableSetting.min >= 1`.
 - Do not collapse mode-bearing weapons back into top-level single-mode assumptions. When `mechanics.modes[]` is present, `activeModeKey` + `#getActiveWeaponMode()` must stay authoritative for damage, SEU cost, defense labels, and future on-hit/avoidance behavior.
+- Do not treat `weapon.system.mechanics.hasModes` as the runtime switch for firing modes. It is an item-sheet UI gate only. Toggling it off must hide the editor without deleting `mechanics.modes[]`, and the character sheet must keep honoring the authored modes.
+- Do not reintroduce the old comma-separated `defenseTypesText` proxy field for mode defense types. The current modes editor intentionally uses a multi-select and normalizes the submitted single/multi/empty values back into `mode.defenseTypes[]`.
+- Do not assume `mode.avoidance.onSuccessEffect` is an i18n key. Treat it as user-authored label text first; localization is only a backward-compat convenience when the string happens to match a key.
 - Avoidance rolls are spoken by the **target**, not the attacker. `#rollAvoidanceCheck` sets the chat speaker from the target actor, and permission is gated on `target.testUserPermission(game.user, "OWNER") || game.user.isGM`. The attacker's player must not be able to roll the target's avoidance check.
 - Avoidance uses the target's **current** ability value (`system.abilities[ability].value`), not `base`. Current stamina/ability damage and any live modifiers must affect the avoidance threshold.
 - The avoidance target is captured **at attack time** and embedded in the chat-card dataset via UUID. Avoidance resolution must not look at `game.user.targets` when the button is clicked.
@@ -456,6 +468,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not count `program`, `vehicle`, or non-portable `computer` items in `computeCarriedMass`.
 - Use modern Foundry namespaced APIs for UI primitives: `foundry.applications.handlebars.renderTemplate` (not the global `renderTemplate`), `foundry.applications.api.DialogV2` (not V1 `Dialog`), and `foundry.applications.apps.FilePicker.implementation` (not the global `FilePicker`). The deprecated globals/classes are scheduled for removal in Foundry v15-v16.
 - The character sheet uses `submitOnChange: true`, which re-renders on every form field change. `_onChangeForm` is intentionally overridden to call `_rememberScrollPosition()` before delegating to `super`; plain top-level fields depend on this hook for scroll preservation.
+- All `submitOnChange` sheet classes should inherit `ScrollPreservingSheetMixin`, which owns `_onChangeForm`, `_rememberScrollPosition()`, and `_restoreScrollPosition()` based on the class's `PARTS.sheet.scrollable` selector. Do not reintroduce one-off per-sheet scroll hacks unless the shared mixin proves insufficient.
 - All player-initiated d100 target-vs-roll checks from the character sheet must prompt for a misc. modifier through `#promptModifier(label, targetValue)`. That includes ability checks, skill checks, and active racial ability rolls. Weapon attacks intentionally use their own range-band-plus-modifier prompt.
 - The GM forced-roll testing hook must stay GM-only and setting-gated. If future d100 roll flows gain prompt dialogs, route them through `#evaluatePercentileRoll()` instead of hand-rolling `new Roll("1d100")`, or the override path will silently stop applying there.
 - Racial Ability XP adjustments must honor `item.system.xpPerPoint` and must be serialized per actor via the `_racialAbilityAdjustQueue` promise chain stored on the sheet instance. Do not replace this with a simple in-flight flag; that drops user clicks and reintroduces XP/chance desync.

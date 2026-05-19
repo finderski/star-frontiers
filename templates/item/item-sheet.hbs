@@ -133,17 +133,21 @@
             <span>{{localize "STARFRONTIERS.Item.AttributeKey"}}</span>
             <select name="system.attributeKey">{{selectOptions choices.attributeKey selected=system.attributeKey}}</select>
           </label>
-          <label>
-            <span>{{localize "STARFRONTIERS.Item.DamageFormula"}}</span>
-            <input type="text" name="system.damageFormula" value="{{system.damageFormula}}" />
-          </label>
-          <label>
-            <span>{{localize "STARFRONTIERS.Item.Defense"}}</span>
-            <select name="system.damageType">{{selectOptions choices.damageType selected=system.damageType}}</select>
-          </label>
+          {{#unless system.mechanics.hasModes}}
+            <label>
+              <span>{{localize "STARFRONTIERS.Item.DamageFormula"}}</span>
+              <input type="text" name="system.damageFormula" value="{{system.damageFormula}}" />
+            </label>
+            <label>
+              <span>{{localize "STARFRONTIERS.Item.Defense"}}</span>
+              <select name="system.damageType">{{selectOptions choices.damageType selected=system.damageType}}</select>
+            </label>
+          {{/unless}}
         </div>
         {{#if hasVariableSeuDial}}
+          {{#unless system.mechanics.hasModes}}
           <p class="form-hint">{{localize "STARFRONTIERS.Item.WeaponDamageFormulaSeuHint"}}</p>
+          {{/unless}}
         {{/if}}
 
         <div class="range-editor">
@@ -192,8 +196,8 @@
             <span>{{localize "STARFRONTIERS.Item.AmmoUse"}}</span>
             <select name="system.ammo.uses">{{selectOptions choices.ammoUse selected=system.ammo.uses}}</select>
           </label>
-          {{#if weaponUsesSeu}}
-            <label><span>{{localize "STARFRONTIERS.Item.SEUPerHit"}}</span><input type="number" name="system.ammo.seuPerShot" value="{{system.ammo.seuPerShot}}" min="0" /></label>
+          {{#if weaponUsesAmmo}}
+            <label><span>{{localize weaponAmmoPerShotLabel}}</span><input type="number" name="system.ammo.seuPerShot" value="{{system.ammo.seuPerShot}}" min="0" /></label>
           {{/if}}
           <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HeavyWeapon"}}</span><input type="checkbox" name="system.mechanics.isHeavy" {{checked system.mechanics.isHeavy}} /></label>
           {{#if expandedRules}}
@@ -204,6 +208,142 @@
             {{/if}}
           {{/if}}
         </div>
+
+        <div class="compact-grid two-columns">
+          <label class="checkbox-line">
+            <span>{{localize "STARFRONTIERS.Weapon.HasModes"}}</span>
+            <input type="checkbox" name="system.mechanics.hasModes" {{checked system.mechanics.hasModes}} />
+          </label>
+        </div>
+
+        {{#if system.mechanics.hasModes}}
+          <fieldset class="paper-box full-width weapon-modes-editor">
+            <legend>{{localize "STARFRONTIERS.Weapon.Modes"}}</legend>
+            <p class="weapon-modes-editor__hint">{{localize "STARFRONTIERS.Weapon.ModesHint"}}</p>
+
+            {{#if weaponModeRows.length}}
+              <div class="weapon-mode-list">
+                {{#each weaponModeRows as |mode|}}
+                  <div class="weapon-mode-row">
+                    <div class="weapon-mode-row__header">
+                      <span class="weapon-mode-row__title">{{localize "STARFRONTIERS.Weapon.Mode.Label"}} {{mode.displayIndex}}</span>
+                      <button
+                        type="button"
+                        data-action="removeWeaponMode"
+                        data-index="{{mode.index}}"
+                        title="{{localize "STARFRONTIERS.Weapon.RemoveMode"}}"
+                      >
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+
+                    <div class="compact-grid two-columns">
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Weapon.ModeKey"}}</span>
+                        <input type="text" name="system.mechanics.modes.{{mode.index}}.key" value="{{mode.key}}" placeholder="stun" />
+                      </label>
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Weapon.ModeLabel"}}</span>
+                        <input type="text" name="system.mechanics.modes.{{mode.index}}.label" value="{{mode.label}}" placeholder="Stun" />
+                      </label>
+                    </div>
+
+                    <div class="compact-grid three-columns">
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Weapon.ModeDamage"}}</span>
+                        <input type="text" name="system.mechanics.modes.{{mode.index}}.damageFormula" value="{{mode.damageFormula}}" placeholder="4d10" />
+                      </label>
+                      <label>
+                        <span>{{localize @root.weaponModeAmmoPerShotLabel}}</span>
+                        <input type="number" name="system.mechanics.modes.{{mode.index}}.seuPerShot" value="{{mode.seuPerShot}}" min="0" />
+                      </label>
+                      <label>
+                        <span>{{localize "STARFRONTIERS.Weapon.ModeDefenseTypes"}}</span>
+                        <select class="multiSelect" name="system.mechanics.modes.{{mode.index}}.defenseTypes" multiple size="4">
+                          {{selectOptions @root.modeDefenseTypeChoices selected=mode.defenseTypes}}
+                        </select>
+                      </label>
+                    </div>
+
+                    <fieldset class="paper-box">
+                      <legend>{{localize "STARFRONTIERS.Weapon.ModeAvoidance"}}</legend>
+                      <div class="compact-grid two-columns">
+                        <label class="checkbox-line">
+                          <span>{{localize "STARFRONTIERS.Weapon.AvoidanceEnabled"}}</span>
+                          <input type="checkbox" name="system.mechanics.modes.{{mode.index}}.avoidance.enabled" {{checked mode.avoidance.enabled}} />
+                        </label>
+                        <label>
+                          <span>{{localize "STARFRONTIERS.Weapon.AvoidanceAbility"}}</span>
+                          <select name="system.mechanics.modes.{{mode.index}}.avoidance.ability">
+                            {{selectOptions @root.avoidanceAbilityChoices selected=mode.avoidance.ability}}
+                          </select>
+                        </label>
+                      </div>
+                      <div class="compact-grid two-columns">
+                        <label>
+                          <span>{{localize "STARFRONTIERS.Weapon.AvoidanceOnSuccessEffect"}}</span>
+                          <input type="text" name="system.mechanics.modes.{{mode.index}}.avoidance.onSuccessEffect" value="{{mode.avoidance.onSuccessEffect}}" placeholder="Knocked unconscious" />
+                        </label>
+                        <label>
+                          <span>{{localize "STARFRONTIERS.Weapon.AvoidanceFailNote"}}</span>
+                          <input type="text" name="system.mechanics.modes.{{mode.index}}.avoidance.failNote" value="{{mode.avoidance.failNote}}" placeholder="Target is knocked unconscious." />
+                        </label>
+                      </div>
+                    </fieldset>
+
+                    <div class="weapon-mode-row__effects">
+                      <div class="weapon-mode-row__effects-header">
+                        <span class="weapon-mode-row__effects-title">{{localize "STARFRONTIERS.Weapon.ModeOnHitEffects"}}</span>
+                        <button type="button" data-action="addWeaponModeEffect" data-mode-index="{{mode.index}}">
+                          <i class="fa-solid fa-plus"></i>
+                          <span>{{localize "STARFRONTIERS.Item.AddEffect"}}</span>
+                        </button>
+                      </div>
+                      {{#if mode.onHitEffectRows.length}}
+                        <div class="linked-ability-list" data-mode-index="{{mode.index}}">
+                          {{#each mode.onHitEffectRows as |effectRow|}}
+                            <div class="linked-ability-row">
+                              <div class="linked-ability-row__body">
+                                <button
+                                  type="button"
+                                  class="linked-ability-row__toggle"
+                                  data-action="openEffect"
+                                  data-effect-id="{{effectRow.effectId}}"
+                                  data-effect-ref="{{effectRow.id}}"
+                                >{{effectRow.name}}</button>
+                                {{#if effectRow.sourceName}}
+                                  <span class="linked-ability-row__meta">{{effectRow.sourceName}}</span>
+                                {{/if}}
+                              </div>
+                              <button
+                                type="button"
+                                data-action="removeWeaponModeEffect"
+                                data-mode-index="{{mode.index}}"
+                                data-effect-id="{{effectRow.id}}"
+                                title="{{localize "STARFRONTIERS.Weapon.RemoveOnHitEffect"}}"
+                              >
+                                <i class="fa-solid fa-trash"></i>
+                              </button>
+                            </div>
+                          {{/each}}
+                        </div>
+                      {{else}}
+                        <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Weapon.NoOnHitEffects"}}</p>
+                      {{/if}}
+                    </div>
+                  </div>
+                {{/each}}
+              </div>
+            {{else}}
+              <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Weapon.NoModes"}}</p>
+            {{/if}}
+
+            <button type="button" data-action="addWeaponMode">
+              <i class="fa-solid fa-plus"></i>
+              <span>{{localize "STARFRONTIERS.Weapon.AddMode"}}</span>
+            </button>
+          </fieldset>
+        {{/if}}
       </fieldset>
     {{/if}}
 

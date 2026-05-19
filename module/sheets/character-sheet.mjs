@@ -1,4 +1,5 @@
 import { DEFAULT_CHARACTER_TOKEN_IMAGE, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
+import { ScrollPreservingSheetMixin } from "./scroll-preserving-sheet-mixin.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -84,7 +85,7 @@ export function getRangePreviewData(sourceToken, targetToken) {
   };
 }
 
-export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
+export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(HandlebarsApplicationMixin(ActorSheetV2)) {
   static DEFAULT_OPTIONS = {
     tag: "form",
     classes: ["star-frontiers", "sheet", "actor", "character"],
@@ -647,7 +648,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
   async _onRender(context, options) {
     await super._onRender(context, options);
-    this._restoreScrollPosition();
     for (const input of this.element.querySelectorAll("[data-item-field], [data-item-ammo-loaded], [data-item-seu-dial]")) {
       input.addEventListener("change", this.#onItemFieldChange.bind(this));
     }
@@ -685,11 +685,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     }
   }
 
-  _onChangeForm(formConfig, event) {
-    this._rememberScrollPosition();
-    return super._onChangeForm(formConfig, event);
-  }
-
   #applyActiveTab() {
     const root = this.element;
     if (!root) return;
@@ -702,38 +697,6 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       const isActive = panel.dataset.tabPanel === this._activeTab;
       panel.classList.toggle("sheet-tab-panel--active", isActive);
     }
-  }
-
-  _getScrollElement() {
-    if (!this.element) return null;
-    if (this.element.matches?.(".star-frontiers-sheet")) return this.element;
-    return this.element.querySelector(".star-frontiers-sheet");
-  }
-
-  _rememberScrollPosition(renders = 3) {
-    const scrollEl = this._getScrollElement();
-    this._pendingScrollTop = scrollEl?.scrollTop ?? null;
-    this._pendingScrollRenders = this._pendingScrollTop === null ? 0 : Math.max(Number(renders) || 0, 1);
-  }
-
-  _restoreScrollPosition() {
-    if (
-      this._pendingScrollTop === null
-      || this._pendingScrollTop === undefined
-      || !this._pendingScrollRenders
-    ) return;
-
-    const scrollTop = this._pendingScrollTop;
-    const scrollEl = this._getScrollElement();
-    if (!scrollEl) return;
-
-    requestAnimationFrame(() => {
-      scrollEl.scrollTop = scrollTop;
-      this._pendingScrollRenders = Math.max((this._pendingScrollRenders ?? 1) - 1, 0);
-      if (!this._pendingScrollRenders) {
-        this._pendingScrollTop = null;
-      }
-    });
   }
 
   async _onDropDocument(event, document) {
@@ -1813,9 +1776,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
     const modeLabel = StarFrontiersCharacterSheet.#getWeaponModeLabel(activeMode);
-    const effectLabel = activeMode.avoidance.onSuccessEffect
-      ? game.i18n.localize(activeMode.avoidance.onSuccessEffect)
-      : "";
+    const effectLabel = StarFrontiersCharacterSheet.#getAvoidanceEffectLabel(activeMode.avoidance.onSuccessEffect);
 
     const rollHtml = await roll.render({
       flavor: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceFlavor", {
@@ -1826,7 +1787,9 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
 
     const outcome = success
       ? game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceSuccess")
-      : game.i18n.format("STARFRONTIERS.Weapon.AvoidanceFailure", { effect: effectLabel });
+      : effectLabel
+        ? game.i18n.format("STARFRONTIERS.Weapon.AvoidanceFailure", { effect: effectLabel })
+        : game.i18n.localize("STARFRONTIERS.Character.Failure");
     const outcomeClass = success ? "success" : "failure";
 
     const rows = [
@@ -2775,13 +2738,14 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static #getAmmoConsumption(weapon) {
     const uses = weapon.system.ammo?.uses ?? "none";
     if (uses === "none") return { amount: 0 };
-    if (uses === "rounds") return { amount: 1 };
 
     const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
     const modePerShot = activeMode ? Number(activeMode.seuPerShot ?? 0) : 0;
+    const perShot = modePerShot || Number(weapon.system.ammo?.seuPerShot ?? 0) || 1;
+    if (uses === "rounds") return { amount: Math.max(perShot, 0) };
+
     const variable = Number(weapon.system.ammo?.variableSetting?.current ?? 0);
-    const perShot = modePerShot || Number(weapon.system.ammo?.seuPerShot ?? 0);
-    return { amount: Math.max(variable || perShot || 1, 0) };
+    return { amount: Math.max(variable || perShot, 0) };
   }
 
   static #getActiveWeaponMode(weapon) {
@@ -2826,6 +2790,12 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   static #getWeaponModeLabel(mode) {
     const label = String(mode?.label ?? "");
     if (!label) return String(mode?.key ?? "");
+    return game.i18n.has(label) ? game.i18n.localize(label) : label;
+  }
+
+  static #getAvoidanceEffectLabel(value) {
+    const label = String(value ?? "").trim();
+    if (!label) return "";
     return game.i18n.has(label) ? game.i18n.localize(label) : label;
   }
 
@@ -3139,9 +3109,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
         ? game.i18n.localize(`STARFRONTIERS.Ability.${activeMode.avoidance.ability}`)
         : "",
       onSuccessEffect: activeMode.avoidance.onSuccessEffect ?? "",
-      effectLabel: activeMode.avoidance.onSuccessEffect
-        ? game.i18n.localize(activeMode.avoidance.onSuccessEffect)
-        : ""
+      effectLabel: StarFrontiersCharacterSheet.#getAvoidanceEffectLabel(activeMode.avoidance.onSuccessEffect)
     } : null;
 
     const canRollAvoidance = Boolean(

@@ -175,6 +175,7 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
         onHitEffectIds: arrayField(textField()),
         isHeavy: boolField(),
         rateOfFire: numberField({ initial: 1, min: 0 }),
+        hasModes: boolField(),
         modes: arrayField(schemaField({
           key: textField(),
           label: textField(),
