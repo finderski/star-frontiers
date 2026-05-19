@@ -21,7 +21,10 @@ import {
   StarFrontiersVehicleData,
   StarFrontiersWeaponData
 } from "./module/data/item-data.mjs";
-import { StarFrontiersCharacterSheet } from "./module/sheets/character-sheet.mjs";
+import {
+  getRangePreviewData,
+  StarFrontiersCharacterSheet
+} from "./module/sheets/character-sheet.mjs";
 import { StarFrontiersItemSheet } from "./module/sheets/item-sheet.mjs";
 import {
   registerMigrationSettings,
@@ -31,6 +34,130 @@ import {
 export const STAR_FRONTIERS = {
   id: SYSTEM_ID
 };
+
+const RANGE_PREVIEW_STATE = {
+  container: null,
+  hoveredToken: null
+};
+
+function destroyRangePreview() {
+  RANGE_PREVIEW_STATE.hoveredToken = null;
+  if (!RANGE_PREVIEW_STATE.container) return;
+  RANGE_PREVIEW_STATE.container.parent?.removeChild(RANGE_PREVIEW_STATE.container);
+  RANGE_PREVIEW_STATE.container.destroy({ children: true });
+  RANGE_PREVIEW_STATE.container = null;
+}
+
+function getRangePreviewSourceToken(hoveredToken) {
+  const controlled = canvas?.tokens?.controlled ?? [];
+  if (!controlled.length) return null;
+  const sourceToken = controlled[0];
+  if (!sourceToken?.actor || sourceToken === hoveredToken) return null;
+  return sourceToken;
+}
+
+function createRangePreviewContainer(preview) {
+  const container = new PIXI.Container();
+  container.eventMode = "none";
+
+  const titleStyle = new PIXI.TextStyle({
+    fontFamily: "Signika, sans-serif",
+    fontSize: 24,
+    fontWeight: "700",
+    fill: 0xeaf8ff,
+    align: "center",
+    stroke: 0x06111d,
+    strokeThickness: 4
+  });
+  const bodyStyle = new PIXI.TextStyle({
+    fontFamily: "Signika, sans-serif",
+    fontSize: 20,
+    fontWeight: "600",
+    fill: 0xb8edff,
+    align: "center",
+    stroke: 0x06111d,
+    strokeThickness: 4
+  });
+
+  const modifier = preview.band
+    ? (preview.band.mod >= 0 ? `+${preview.band.mod}` : String(preview.band.mod))
+    : "";
+  const bodyLine = preview.band
+    ? `${preview.distance} ${preview.units} • ${preview.band.label} (${modifier})`
+    : `${preview.distance} ${preview.units} • ${game.i18n.localize("STARFRONTIERS.Weapon.OutOfRange")}`;
+
+  const titleText = new PIXI.Text(preview.weapon.name, titleStyle);
+  const bodyText = new PIXI.Text(bodyLine, bodyStyle);
+  titleText.anchor.set(0.5, 0);
+  bodyText.anchor.set(0.5, 0);
+
+  const width = Math.max(titleText.width, bodyText.width) + 28;
+  const height = titleText.height + bodyText.height + 20;
+
+  const background = new PIXI.Graphics();
+  background.lineStyle(2, 0x53dcff, 0.95);
+  background.beginFill(0x071521, 0.9);
+  background.drawRoundedRect(-width / 2, 0, width, height, 10);
+  background.endFill();
+
+  titleText.position.set(0, 8);
+  bodyText.position.set(0, 10 + titleText.height);
+
+  container.addChild(background, titleText, bodyText);
+  return container;
+}
+
+function showRangePreview(hoveredToken) {
+  if (!canvas?.ready || !hoveredToken) {
+    destroyRangePreview();
+    return;
+  }
+
+  const sourceToken = getRangePreviewSourceToken(hoveredToken);
+  if (!sourceToken) {
+    destroyRangePreview();
+    return;
+  }
+
+  const preview = getRangePreviewData(sourceToken, hoveredToken);
+  if (!preview) {
+    destroyRangePreview();
+    return;
+  }
+
+  destroyRangePreview();
+  const container = createRangePreviewContainer(preview);
+  container.position.set(
+    hoveredToken.x + (hoveredToken.w / 2),
+    hoveredToken.y - container.height - 14
+  );
+  (canvas.controls ?? canvas.stage)?.addChild(container);
+  RANGE_PREVIEW_STATE.container = container;
+  RANGE_PREVIEW_STATE.hoveredToken = hoveredToken;
+}
+
+function handleTokenDoubleRightClickTarget(token, event) {
+  if (!token?.visible || !game.user) return;
+  const releaseOthers = !event?.shiftKey;
+  token.setTarget(true, {
+    releaseOthers,
+    groupSelection: !releaseOthers
+  });
+}
+
+function installTokenDoubleRightClickTargeting() {
+  const TokenClass = CONFIG.Token?.objectClass ?? foundry.canvas.placeables.Token;
+  if (!TokenClass?.prototype || TokenClass.prototype._sfDoubleRightClickTargetingInstalled) return;
+  const original = TokenClass.prototype._onClickRight2;
+  TokenClass.prototype._sfOriginalOnClickRight2 = original;
+  TokenClass.prototype._onClickRight2 = function(event) {
+    handleTokenDoubleRightClickTarget(this, event);
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    return false;
+  };
+  TokenClass.prototype._sfDoubleRightClickTargetingInstalled = true;
+}
 
 function applySheetTheme(theme = game.settings.get(SYSTEM_ID, "sheetTheme")) {
   const safeTheme = SHEET_THEMES.includes(theme) ? theme : "paper";
@@ -224,6 +351,8 @@ Hooks.once("init", () => {
     makeDefault: true,
     label: "STARFRONTIERS.Sheet.Item"
   });
+
+  installTokenDoubleRightClickTargeting();
 });
 
 Hooks.once("ready", async () => {
@@ -260,4 +389,24 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
       StarFrontiersCharacterSheet.handleChatCardAction(button);
     });
   }
+});
+
+Hooks.on("hoverToken", (token, hovered) => {
+  if (!hovered) {
+    if (RANGE_PREVIEW_STATE.hoveredToken === token) destroyRangePreview();
+    return;
+  }
+  showRangePreview(token);
+});
+
+Hooks.on("controlToken", (token, controlled) => {
+  if (RANGE_PREVIEW_STATE.hoveredToken) {
+    showRangePreview(RANGE_PREVIEW_STATE.hoveredToken);
+    return;
+  }
+  if (!controlled) destroyRangePreview();
+});
+
+Hooks.on("canvasReady", () => {
+  destroyRangePreview();
 });

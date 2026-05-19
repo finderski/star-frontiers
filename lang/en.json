@@ -659,6 +659,7 @@
       "Configure": "Configure",
       "AutoRangeDetected": "Range auto-detected from target: {range} ({mod})",
       "Distance": "Distance",
+      "OutOfRange": "Out of Range",
       "Range": "Range",
       "RangeModifier": "Range Mod",
       "RateOfFireLabel": "Rate of Fire",

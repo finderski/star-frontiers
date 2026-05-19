@@ -181,6 +181,8 @@
 - A range band with both `min === null` and `max === null` is treated as **unavailable** for that weapon (e.g. Gyrojet has no PB or Short range). Both the attack dialog and auto-detection from token distance skip null/null bands.
 - Per-band damage formulas: each `rangeBands[key]` now has an optional `damageFormula` text field. When non-empty it overrides the weapon's base `damageFormula` for that range. The active band key is passed from the attack roll → chat card button (`data-band-key`) → damage roll. This supports sonic weapons whose damage scales with range.
 - **Token targeting**: when the player has a target selected, `#getTargetDistance` measures distance via `canvas.grid.measurePath` and `#getRangeBandFromDistance` walks the weapon's band min/max to resolve the band automatically. The attack dialog skips the range selector and shows the auto-detected band as info text instead. Falls back to manual selection when no target.
+- **Canvas hover range preview**: when exactly one source token is effectively chosen by `canvas.tokens.controlled[0]` and the user hovers another token, the canvas preview uses the actor's first `carryState === "ready"` weapon, falling back to the first owned weapon if none are ready. It reuses the same exported distance/range helpers as the attack flow (`getTokenDistance`, `getWeaponRangeBandFromDistance`) so hover preview and attack auto-range cannot drift.
+- **Canvas token targeting shortcut**: double-right-clicking a token targets it. Holding `Shift` while double-right-clicking preserves existing targets so the shortcut still supports multi-target workflows.
 - **Rate of Fire** (Expanded only): `weapon.system.mechanics.rateOfFire`. When > 1, the attack dialog shows a shot-count field. Each shot beyond the first gets −20 cumulative penalty. Total ammo is checked and consumed for all shots at once.
 - **Weapon skill keys**: `weaponSkillKey` now includes `str` and `dex` as explicit choices. In Basic rules: `str` → use STR score; `dex` → use DEX; `melee` → max(STR, DEX) (no halving in Basic). In Expanded: same but halved + skill level/bonus.
 - **Variable SEU dial**: `system.ammo.variableSetting.current` is editable on the character sheet via the weapon gear panel. The attack roll reads it for SEU consumption, and damage previews / damage rolls scale through `#buildEffectiveDamageFormula` when the weapon has a true variable dial.
@@ -399,6 +401,8 @@ This reflects the current local notes and implemented work, not a live Asana syn
   - Foundry smoke-test the new inventory/assets split, add-item hover menu, consumable use flow, and power-source link/unlink UX
   - specifically verify PowerSource port limits and hidden drop zones across both item sheets and the character-sheet weapon selector
   - decide whether consumables need first-class Active Effect authoring UI (the use flow already supports `effectIds`, but the sheet does not yet expose a dedicated editor)
+- Canvas UX:
+  - smoke-test the token-hover range preview with single selected tokens, multiple ready weapons, out-of-range targets, and non-weapon actors
 - Damage application:
   - "Apply damage to target" workflow — read target's `defenses.suit` / `.screen` refs, inspect `armor.system.reductions[]` and `screen.system.defends` / `.reduction` against the weapon's `damageType`, consume `screen.system.seuPerHit` per absorbed strike. Defense slot data is already in place.
 - Races:
@@ -421,6 +425,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not treat race secondary modifiers (`sta`, `rs`, `log`, `ldr`) as active authoring fields anymore. The supported race-authoring model is paired modifiers plus optional `im`; human/special-case single-stat tweaks belong in bonus-pick handling.
 - Do not move ammo depletion to the ammo item itself; current logic tracks per-shot depletion on the weapon via `system.ammo.consumed`. Ammo `system.quantity` tracks **spare containers**, which is a different concept.
 - Do not store range band modifiers on weapon items; they are the `RANGE_BAND_MODS` constant in `character-sheet.mjs` and must not be stored in the database or on weapon documents.
+- Do not fork the hover range preview into its own distance/band math. It intentionally reuses the exported character-sheet helpers so the canvas preview and attack auto-range stay in lockstep.
+- Do not repurpose token double-right-click casually. It is now reserved for the targeting shortcut; preserve `Shift` as the multi-target modifier if this interaction is touched later.
+- Do not move the token double-right-click targeting shortcut back to a plain `clickRight2Token` hook. Foundry fires that too late to stop the config window; the working implementation patches `Token.prototype._onClickRight2`.
 - Do not treat the current weapon attack formulas as permanently settled; verify them before broadening automation.
 - Do not change Basic-rules encumbrance from "display only, no penalty, no movement halving." Basic intentionally has no encumbrance enforcement — only Expanded does.
 - Do not gate the attacker/target combat encumbrance modifiers behind the two `encumbranceAffectsPhysical/NonPhysical` world settings alone. Core Expanded combat mods still apply (melee attacker `−10`, encumbered target `+10`), and the world settings only **extend** the attacker-side `−10` to other attacks that use a matching physical/non-physical ability. They do not stack a second penalty on top of melee.

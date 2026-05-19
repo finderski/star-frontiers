@@ -37,6 +37,53 @@ const CARRY_STATE_CHOICES = {
 const SHEET_TABS = ["profile", "skills-equipment", "notes"];
 const DEFAULT_SHEET_TAB = "profile";
 
+export function getPreferredWeaponForRangePreview(actor) {
+  const weapons = actor?.items?.filter((item) => item.type === "weapon") ?? [];
+  if (!weapons.length) return null;
+  const readyWeapons = weapons.filter((item) => (item.system?.carryState ?? "ready") === "ready");
+  return readyWeapons[0] ?? weapons[0];
+}
+
+export function getTokenDistance(sourceToken, targetToken) {
+  if (!canvas?.ready || !sourceToken || !targetToken) return null;
+  const measurement = canvas.grid.measurePath([sourceToken.center, targetToken.center]);
+  return measurement.distance ?? null;
+}
+
+export function getWeaponRangeBandFromDistance(weapon, distance) {
+  if (distance === null || distance === undefined || !weapon) return null;
+  for (const key of RANGE_BAND_ORDER) {
+    const band = weapon.system.rangeBands?.[key];
+    if (!band) continue;
+    if (band.min === null && band.max === null) continue;
+    const min = band.min ?? 0;
+    if (distance < min) continue;
+    if (band.max !== null && distance > band.max) continue;
+    return {
+      key,
+      label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
+      mod: RANGE_BAND_MODS[key] ?? 0
+    };
+  }
+  return null;
+}
+
+export function getRangePreviewData(sourceToken, targetToken) {
+  const actor = sourceToken?.actor;
+  if (!actor) return null;
+  const weapon = getPreferredWeaponForRangePreview(actor);
+  if (!weapon) return null;
+  const distance = getTokenDistance(sourceToken, targetToken);
+  if (distance === null) return null;
+  const band = getWeaponRangeBandFromDistance(weapon, distance);
+  return {
+    weapon,
+    distance,
+    band,
+    units: canvas?.grid?.units || game.i18n.localize("STARFRONTIERS.Character.meter-abbr")
+  };
+}
+
 export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static DEFAULT_OPTIONS = {
     tag: "form",
@@ -2561,26 +2608,11 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     if (!token) return null;
     const targets = [...game.user.targets];
     if (!targets.length) return null;
-    const measurement = canvas.grid.measurePath([token.center, targets[0].center]);
-    return measurement.distance ?? null;
+    return getTokenDistance(token, targets[0]);
   }
 
   static #getRangeBandFromDistance(weapon, distance) {
-    if (distance === null || distance === undefined) return null;
-    for (const key of RANGE_BAND_ORDER) {
-      const band = weapon.system.rangeBands?.[key];
-      if (!band) continue;
-      if (band.min === null && band.max === null) continue;
-      const min = band.min ?? 0;
-      if (distance < min) continue;
-      if (band.max !== null && distance > band.max) continue;
-      return {
-        key,
-        label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
-        mod: RANGE_BAND_MODS[key] ?? 0
-      };
-    }
-    return null;
+    return getWeaponRangeBandFromDistance(weapon, distance);
   }
 
   static #getAvailableWeaponRangeBands(weapon) {
