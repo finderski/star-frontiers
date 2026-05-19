@@ -1,4 +1,10 @@
-import { ITEM_TYPE_LABELS, SHEET_THEMES, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "./module/config.mjs";
+import {
+  DEFAULT_CHARACTER_TOKEN_IMAGE,
+  ITEM_TYPE_LABELS,
+  SHEET_THEMES,
+  STAR_FRONTIERS_CONFIG,
+  SYSTEM_ID
+} from "./module/config.mjs";
 import {
   StarFrontiersCharacterData,
   StarFrontiersCreatureData,
@@ -380,6 +386,13 @@ Hooks.on("preCreateItem", (document, data, options, userId) => {
   if (data.img && data.img !== "icons/svg/item-bag.svg") return;
   const icon = ITEM_TYPE_ICONS[document.type];
   if (icon) document.updateSource({ img: icon });
+});
+
+Hooks.on("preCreateActor", (document, data, options, userId) => {
+  if (document.type !== "character") return;
+  const tokenSrc = String(data.prototypeToken?.texture?.src ?? "").trim();
+  if (tokenSrc && tokenSrc !== "icons/svg/mystery-man.svg") return;
+  document.updateSource({ "prototypeToken.texture.src": DEFAULT_CHARACTER_TOKEN_IMAGE });
 });
 
 Hooks.on("renderChatMessageHTML", (message, html) => {

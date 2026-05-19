@@ -124,6 +124,8 @@
 - `system.psa` is the character’s Expanded Rules Career PSA. Do not add a separate `careerPsa` field; use `system.psa` for Military, Technological, and Biosocial.
 
 ### Character abilities and stamina
+- Character actor portraits are edited from the Player Name row profile image button (`editProfileImage`). The action updates `actor.img` and only mirrors the new path to `prototypeToken.texture.src` when the token image is blank or still default (`DEFAULT_CHARACTER_TOKEN_IMAGE` or Foundry's old `icons/svg/mystery-man.svg`). Do not overwrite custom token art during portrait edits.
+- New character actors default their prototype token image to `systems/star-frontiers/assets/images/sheet-icons/robber-mask.svg` via `preCreateActor`; this is a token default, not a schema field.
 - Character abilities are stored as:
   - `system.abilities.<key>.base`: pre-racial/base score
   - `system.abilities.<key>.value`: current racial-adjusted/final score
@@ -185,6 +187,7 @@
 - **Canvas token targeting shortcut**: double-right-clicking a token targets it. Holding `Shift` while double-right-clicking preserves existing targets so the shortcut still supports multi-target workflows.
 - **Rate of Fire** (Expanded only): `weapon.system.mechanics.rateOfFire`. When > 1, the attack dialog shows a shot-count field. Each shot beyond the first gets −20 cumulative penalty. Total ammo is checked and consumed for all shots at once.
 - **Weapon skill keys**: `weaponSkillKey` now includes `str` and `dex` as explicit choices. In Basic rules: `str` → use STR score; `dex` → use DEX; `melee` → max(STR, DEX) (no halving in Basic). In Expanded: same but halved + skill level/bonus.
+- `#getWeaponSkill` resolves a weapon's actor skill by preferring `weapon.system.requiredSkillRef` (the canonical link set by the Required Skill drop zone), then falling back to legacy `weapon.system.weaponSkillKey` matching. Do not require the drop handler to copy `weaponSkillKey` from the dropped skill onto the weapon.
 - **Variable SEU dial**: `system.ammo.variableSetting.current` is editable on the character sheet via the weapon gear panel. The attack roll reads it for SEU consumption, and damage previews / damage rolls scale through `#buildEffectiveDamageFormula` when the weapon has a true variable dial.
 - **Variable SEU damage scaling**: `weapon.system.damageFormula` is treated as the **per-SEU unit** only when the weapon has a real variable dial (`ammo.uses === "seu"`, `variableSetting.max > variableSetting.min`, `variableSetting.min >= 1`, and `current >= 1`). Every display/roll path must call `#buildEffectiveDamageFormula(weapon, bandKey)` instead of reading `weapon.system.damageFormula` directly.
 - **Weapon firing modes (Phase 1)**: weapons may define `system.mechanics.modes[]` and `system.activeModeKey`. The active mode overrides top-level `damageFormula`, `ammo.seuPerShot`, `mechanics.defenseTypes`, and `mechanics.onHitEffectIds` when present. An active mode with an empty `damageFormula` explicitly means "no damage" and must suppress the damage button.
@@ -388,7 +391,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Battle Rage follow-through:
   - Verify the AE `transfer: true` / `disabled` toggle cycle works end-to-end in Foundry (set `disabled: false` on success → AE propagates to actor → bonus applies; fire button sets `disabled: true` → bonus removed)
 - Attack roll rework:
-  - Replace `weaponSkillKey` string lookup with `weapon.system.requiredSkillRef` + `weapon.system.attributeKey`
+  - Finish replacing legacy attack base-ability/category assumptions with `weapon.system.attributeKey`; skill-level lookup already prefers `weapon.system.requiredSkillRef` and falls back to `weaponSkillKey`
   - Use `attributeKey` (dex/str) as the base ability for the Expanded-rules formula: `½ attr + (skill.system.level * 10)`
   - Pre-populate modifier dialog with an unskilled penalty when the character does not own the required skill
   - **Note:** skill roll checks (`rollSkill` action) are implemented; the rework is for weapon attack rolls specifically
@@ -431,7 +434,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not treat the current weapon attack formulas as permanently settled; verify them before broadening automation.
 - Do not change Basic-rules encumbrance from "display only, no penalty, no movement halving." Basic intentionally has no encumbrance enforcement — only Expanded does.
 - Do not gate the attacker/target combat encumbrance modifiers behind the two `encumbranceAffectsPhysical/NonPhysical` world settings alone. Core Expanded combat mods still apply (melee attacker `−10`, encumbered target `+10`), and the world settings only **extend** the attacker-side `−10` to other attacks that use a matching physical/non-physical ability. They do not stack a second penalty on top of melee.
+- Do not overwrite a character actor's custom `prototypeToken.texture.src` when changing `actor.img`; portrait edits only sync the token image while it is blank or default.
 - Do not expose `weapon.system.quantity` on the weapon item sheet — it lives on the gear panel slide-up on the character sheet by design (character-tied data, not item-template data).
+- Do not make the Required Skill drop handler copy `weaponSkillKey` from the dropped skill onto the weapon. `requiredSkillRef` is the modern attack skill link; `weaponSkillKey` remains a fallback for legacy/authored data.
 - Do not read `weapon.system.damageFormula` directly in roll or preview code anymore. Variable-SEU scaling and mode overrides live behind `#buildEffectiveDamageFormula(weapon, bandKey)`, and bypassing that helper will silently reintroduce wrong laser damage.
 - Do not treat every `ammo.uses === "seu"` weapon as variable-damage. Sonic melee weapons, sonic disruptors, electrostunners, and powertorches can all consume SEU while still using a fixed damage/effect profile. The dial only counts when `variableSetting.max > variableSetting.min` and `variableSetting.min >= 1`.
 - Do not collapse mode-bearing weapons back into top-level single-mode assumptions. When `mechanics.modes[]` is present, `activeModeKey` + `#getActiveWeaponMode()` must stay authoritative for damage, SEU cost, defense labels, and future on-hit/avoidance behavior.

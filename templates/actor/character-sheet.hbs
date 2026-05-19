@@ -5,13 +5,11 @@
         <span>{{localize "STARFRONTIERS.Character.PlayerName"}}</span>
         <input type="text" name="system.playerName" value="{{system.playerName}}" />
       </label>
-      <button type="button" data-action="generateStats" title="{{localize generateStatsLabel}}">
-        <i class="fa-solid fa-dice-d10"></i>
-        <span>{{localize generateStatsLabel}}</span>
+      <button type="button" class="actor-profile-image" data-action="editProfileImage" title="{{localize "STARFRONTIERS.Character.ChangeProfileImage"}}" aria-label="{{localize "STARFRONTIERS.Character.ChangeProfileImage"}}">
+        <img src="{{actor.img}}" alt="" />
       </button>
     </div>
     <div class="identity-block">
-      <!-- Player Name Row was here -->
       <label class="field-line">
         <span>{{localize "STARFRONTIERS.Character.CharacterName"}}</span>
         <input type="text" name="name" value="{{actor.name}}" />
@@ -59,17 +57,23 @@
     </div>
   </header>
 
-  <nav class="sheet-tabs" role="tablist" aria-label="{{localize "STARFRONTIERS.Character.PhysicalData"}}">
-    <button type="button" class="sheet-tab" role="tab" data-tab="profile" title="{{localize "STARFRONTIERS.Character.TabProfile"}}" aria-label="{{localize "STARFRONTIERS.Character.TabProfile"}}">
-      <span class="sheet-tab-icon" style="-webkit-mask-image: url('systems/star-frontiers/assets/images/sheet-icons/profile.svg'); mask-image: url('systems/star-frontiers/assets/images/sheet-icons/profile.svg');"></span>
+  <div class="sheet-tab-bar">
+    <nav class="sheet-tabs" role="tablist" aria-label="{{localize "STARFRONTIERS.Character.PhysicalData"}}">
+      <button type="button" class="sheet-tab" role="tab" data-tab="profile" title="{{localize "STARFRONTIERS.Character.TabProfile"}}" aria-label="{{localize "STARFRONTIERS.Character.TabProfile"}}">
+        <span class="sheet-tab-icon" style="-webkit-mask-image: url('systems/star-frontiers/assets/images/sheet-icons/profile.svg'); mask-image: url('systems/star-frontiers/assets/images/sheet-icons/profile.svg');"></span>
+      </button>
+      <button type="button" class="sheet-tab" role="tab" data-tab="skills-equipment" title="{{localize "STARFRONTIERS.Character.TabSkillsEquipment"}}" aria-label="{{localize "STARFRONTIERS.Character.TabSkillsEquipment"}}">
+        <span class="sheet-tab-icon" style="-webkit-mask-image: url('systems/star-frontiers/assets/images/sheet-icons/skill_tree.svg'); mask-image: url('systems/star-frontiers/assets/images/sheet-icons/skill_tree.svg');"></span>
+      </button>
+      <button type="button" class="sheet-tab" role="tab" data-tab="notes" title="{{localize "STARFRONTIERS.Character.TabNotes"}}" aria-label="{{localize "STARFRONTIERS.Character.TabNotes"}}">
+        <span class="sheet-tab-icon" style="-webkit-mask-image: url('systems/star-frontiers/assets/images/sheet-icons/memory.svg'); mask-image: url('systems/star-frontiers/assets/images/sheet-icons/memory.svg');"></span>
+      </button>
+    </nav>
+    <button type="button" class="generate-stats-button" data-action="generateStats" title="{{localize generateStatsLabel}}">
+      <i class="fa-solid fa-dice-d10"></i>
+      <span>{{localize generateStatsLabel}}</span>
     </button>
-    <button type="button" class="sheet-tab" role="tab" data-tab="skills-equipment" title="{{localize "STARFRONTIERS.Character.TabSkillsEquipment"}}" aria-label="{{localize "STARFRONTIERS.Character.TabSkillsEquipment"}}">
-      <span class="sheet-tab-icon" style="-webkit-mask-image: url('systems/star-frontiers/assets/images/sheet-icons/skill_tree.svg'); mask-image: url('systems/star-frontiers/assets/images/sheet-icons/skill_tree.svg');"></span>
-    </button>
-    <button type="button" class="sheet-tab" role="tab" data-tab="notes" title="{{localize "STARFRONTIERS.Character.TabNotes"}}" aria-label="{{localize "STARFRONTIERS.Character.TabNotes"}}">
-      <span class="sheet-tab-icon" style="-webkit-mask-image: url('systems/star-frontiers/assets/images/sheet-icons/memory.svg'); mask-image: url('systems/star-frontiers/assets/images/sheet-icons/memory.svg');"></span>
-    </button>
-  </nav>
+  </div>
 
   <main class="sheet-tabs-content">
     <div class="sheet-tab-panel" data-tab-panel="profile" role="tabpanel">

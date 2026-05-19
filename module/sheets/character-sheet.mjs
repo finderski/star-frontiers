@@ -1,4 +1,4 @@
-import { STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
+import { DEFAULT_CHARACTER_TOKEN_IMAGE, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -104,6 +104,7 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
       createItem: StarFrontiersCharacterSheet.#onCreateItem,
       deleteItem: StarFrontiersCharacterSheet.#onDeleteItem,
       duplicateItem: StarFrontiersCharacterSheet.#onDuplicateItem,
+      editProfileImage: StarFrontiersCharacterSheet.#onEditProfileImage,
       generateStats: StarFrontiersCharacterSheet.#onGenerateStats,
       openItem: StarFrontiersCharacterSheet.#onOpenItem,
       rollAbility: StarFrontiersCharacterSheet.#onRollAbility,
@@ -889,6 +890,23 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     source.name = game.i18n.format("STARFRONTIERS.Item.CopyName", { name: item.name });
     const [copy] = await this.document.createEmbeddedDocuments("Item", [source]);
     copy?.sheet?.render(true);
+  }
+
+  static async #onEditProfileImage(event, target) {
+    const actor = this.document;
+    const current = actor.img ?? "";
+    const FilePickerImpl = foundry.applications.apps.FilePicker.implementation;
+    const fp = new FilePickerImpl({
+      type: "image",
+      current,
+      callback: async (path) => {
+        this._rememberScrollPosition();
+        await actor.update(StarFrontiersCharacterSheet.#buildProfileImageUpdates(actor, path));
+      },
+      top: this.position.top + 40,
+      left: this.position.left + 10
+    });
+    fp.browse(current);
   }
 
   static async #onGenerateStats(event, target) {
@@ -2527,6 +2545,23 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
     };
   }
 
+  static #buildProfileImageUpdates(actor, path) {
+    const updates = { img: path };
+    const tokenSrc = actor.prototypeToken?.texture?.src ?? "";
+    if (StarFrontiersCharacterSheet.#isDefaultTokenImage(tokenSrc)) {
+      updates["prototypeToken.texture.src"] = path;
+    }
+    return updates;
+  }
+
+  static #isDefaultTokenImage(src) {
+    const normalized = String(src ?? "").trim();
+    return !normalized
+      || normalized === DEFAULT_CHARACTER_TOKEN_IMAGE
+      || normalized === "icons/svg/mystery-man.svg"
+      || normalized === "icons/svg/mystery-man-black.svg";
+  }
+
   static #getWeaponAttackProfile(actor, weapon) {
     const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
     const skill = StarFrontiersCharacterSheet.#getWeaponSkill(actor, weapon);
@@ -2560,8 +2595,33 @@ export class StarFrontiersCharacterSheet extends HandlebarsApplicationMixin(Acto
   }
 
   static #getWeaponSkill(actor, weapon) {
+    const ref = weapon.system.requiredSkillRef;
+    if (ref) {
+      const owned = actor.items.get(ref);
+      if (owned?.type === "skill") return owned;
+
+      try {
+        const resolved = globalThis.fromUuidSync?.(ref) ?? null;
+        if (resolved?.type === "skill") {
+          if (resolved.parent === actor) return resolved;
+
+          const sourceId = resolved.uuid;
+          const ownedCopy = actor.items.find((item) =>
+            item.type === "skill"
+            && (item._stats?.compendiumSource === sourceId || item.name === resolved.name)
+          );
+          if (ownedCopy) return ownedCopy;
+        }
+      } catch {
+        /* ignore unresolved refs */
+      }
+    }
+
+    const key = weapon.system.weaponSkillKey;
+    if (!key) return null;
+
     return actor.items
-      .filter((item) => item.type === "skill" && item.system.weaponSkillKey === weapon.system.weaponSkillKey)
+      .filter((item) => item.type === "skill" && item.system.weaponSkillKey === key)
       .sort((a, b) => Number(b.system.level ?? 0) - Number(a.system.level ?? 0))[0];
   }
 
