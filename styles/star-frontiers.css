@@ -2171,6 +2171,10 @@ label.hasHint:focus-within .form-hint {
 
 /* --- 12e. Weapon modes editor --- */
 
+.fireMode-row {
+  display: flex;
+  margin: 0 0 20px 0;
+}
 .weapon-modes-editor__hint {
   color: var(--sf-muted);
   display: block;
@@ -2221,6 +2225,10 @@ select.multiSelect {
   border: 1px solid var(--sf-ink);
   padding: 5px;
   color: var(--sf-muted);
+}
+
+select.multiSelect option:checked {
+  color: var(--sf-ink);
 }
 
 .race-modifier-grid {

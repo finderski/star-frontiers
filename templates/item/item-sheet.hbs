@@ -124,6 +124,12 @@
     {{#if is.weapon}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.WeaponData"}}</legend>
+        <div class="fireMode-row">
+          <label class="checkbox-line">
+            <input type="checkbox" name="system.mechanics.hasModes" {{checked system.mechanics.hasModes}} />
+            <span>{{localize "STARFRONTIERS.Weapon.HasModes"}}</span>
+          </label>
+        </div>
         <div class="compact-grid weapon-core-grid">
           <label>
             <span>{{localize "STARFRONTIERS.Item.WeaponType"}}</span>
@@ -208,13 +214,14 @@
             {{/if}}
           {{/if}}
         </div>
-
+        <!--
         <div class="compact-grid two-columns">
           <label class="checkbox-line">
             <span>{{localize "STARFRONTIERS.Weapon.HasModes"}}</span>
             <input type="checkbox" name="system.mechanics.hasModes" {{checked system.mechanics.hasModes}} />
           </label>
         </div>
+        -->
 
         {{#if system.mechanics.hasModes}}
           <fieldset class="paper-box full-width weapon-modes-editor">
