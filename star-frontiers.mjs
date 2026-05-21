@@ -28,9 +28,9 @@ import {
   StarFrontiersWeaponData
 } from "./module/data/item-data.mjs";
 import {
-  getRangePreviewData,
   StarFrontiersCharacterSheet
 } from "./module/sheets/character-sheet.mjs";
+import { getRangePreviewData } from "./module/combat/attack-pipeline.mjs";
 import { StarFrontiersItemSheet } from "./module/sheets/item-sheet.mjs";
 import {
   registerMigrationSettings,

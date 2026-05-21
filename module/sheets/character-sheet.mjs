@@ -1,4 +1,5 @@
 import { DEFAULT_CHARACTER_TOKEN_IMAGE, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
+import * as AttackPipeline from "../combat/attack-pipeline.mjs";
 import { ScrollPreservingSheetMixin } from "./scroll-preserving-sheet-mixin.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -6,8 +7,6 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 
 const ABILITY_KEYS = STAR_FRONTIERS_CONFIG.abilities;
 const MIN_WEAPON_ROWS = 4;
-const RANGE_BAND_ORDER = ["pointBlank", "short", "medium", "long", "extreme"];
-const RANGE_BAND_MODS = { pointBlank: 0, short: -10, medium: -20, long: -40, extreme: -80 };
 const ABILITY_PAIRS = [
   ["str", "sta"],
   ["dex", "rs"],
@@ -38,52 +37,10 @@ const CARRY_STATE_CHOICES = {
 const SHEET_TABS = ["profile", "skills-equipment", "notes"];
 const DEFAULT_SHEET_TAB = "profile";
 
-export function getPreferredWeaponForRangePreview(actor) {
-  const weapons = actor?.items?.filter((item) => item.type === "weapon") ?? [];
-  if (!weapons.length) return null;
-  const readyWeapons = weapons.filter((item) => (item.system?.carryState ?? "ready") === "ready");
-  return readyWeapons[0] ?? weapons[0];
-}
-
-export function getTokenDistance(sourceToken, targetToken) {
-  if (!canvas?.ready || !sourceToken || !targetToken) return null;
-  const measurement = canvas.grid.measurePath([sourceToken.center, targetToken.center]);
-  return measurement.distance ?? null;
-}
-
-export function getWeaponRangeBandFromDistance(weapon, distance) {
-  if (distance === null || distance === undefined || !weapon) return null;
-  for (const key of RANGE_BAND_ORDER) {
-    const band = weapon.system.rangeBands?.[key];
-    if (!band) continue;
-    if (band.min === null && band.max === null) continue;
-    const min = band.min ?? 0;
-    if (distance < min) continue;
-    if (band.max !== null && distance > band.max) continue;
-    return {
-      key,
-      label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
-      mod: RANGE_BAND_MODS[key] ?? 0
-    };
-  }
-  return null;
-}
-
-export function getRangePreviewData(sourceToken, targetToken) {
-  const actor = sourceToken?.actor;
-  if (!actor) return null;
-  const weapon = getPreferredWeaponForRangePreview(actor);
-  if (!weapon) return null;
-  const distance = getTokenDistance(sourceToken, targetToken);
-  if (distance === null) return null;
-  const band = getWeaponRangeBandFromDistance(weapon, distance);
-  return {
-    weapon,
-    distance,
-    band,
-    units: canvas?.grid?.units || game.i18n.localize("STARFRONTIERS.Character.meter-abbr")
-  };
-}
+export const getPreferredWeaponForRangePreview = AttackPipeline.getPreferredWeaponForRangePreview;
+export const getTokenDistance = AttackPipeline.getTokenDistance;
+export const getWeaponRangeBandFromDistance = AttackPipeline.getWeaponRangeBandFromDistance;
+export const getRangePreviewData = AttackPipeline.getRangePreviewData;
 
 export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(HandlebarsApplicationMixin(ActorSheetV2)) {
   static DEFAULT_OPTIONS = {
@@ -238,11 +195,11 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
   async #prepareWeaponRows(actor) {
     const weapons = actor.items.filter((item) => item.type === "weapon");
     const rows = await Promise.all(weapons.map(async (item) => {
-      const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, item);
-      const liveCapacity = StarFrontiersCharacterSheet.#getLiveCapacity(item, linkedAmmo);
+      const linkedAmmo = await AttackPipeline.resolveWeaponAmmoItem(actor, item);
+      const liveCapacity = AttackPipeline.getLiveCapacity(item, linkedAmmo);
       const uses = item.system.ammo?.uses ?? "none";
       const hasAmmo = uses !== "none";
-      const ammoLoaded = StarFrontiersCharacterSheet.#getLoadedAmmo(item, liveCapacity, linkedAmmo);
+      const ammoLoaded = AttackPipeline.getLoadedAmmo(item, liveCapacity, linkedAmmo);
       const isSEU = uses === "seu";
       const canReload = StarFrontiersCharacterSheet.#canReloadWeapon(actor, item, linkedAmmo);
       const linkedClipId = linkedAmmo?.parent === actor ? linkedAmmo.id : "";
@@ -251,11 +208,11 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         : [];
       const modeList = Array.from(item.system.mechanics?.modes ?? []).map((mode) => ({
         key: mode.key,
-        label: StarFrontiersCharacterSheet.#getWeaponModeLabel(mode),
+        label: AttackPipeline.getWeaponModeLabel(mode),
         isActive: mode.key === item.system.activeModeKey
       }));
       const activeMode = modeList.find((mode) => mode.isActive) ?? modeList[0] ?? null;
-      const effectiveDamage = StarFrontiersCharacterSheet.#buildEffectiveDamageFormula(item, "");
+      const effectiveDamage = AttackPipeline.buildEffectiveDamageFormula(item, "");
       const linkedSourceDisplay = hasAmmo
         ? await StarFrontiersCharacterSheet.#prepareWeaponLinkedSourceDisplay(actor, item)
         : "";
@@ -267,9 +224,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
           name: item.name,
           damage: effectiveDamage || "—",
           hasDamage: Boolean(effectiveDamage),
-          toHit: StarFrontiersCharacterSheet.#formatAttackTarget(
-            StarFrontiersCharacterSheet.#getWeaponAttackProfile(actor, item).baseTarget
-          ),
+          toHit: AttackPipeline.formatAttackTarget(AttackPipeline.getWeaponAttackProfile(actor, item).baseTarget),
           pointBlank: this.#formatRangeBand(item.system.rangeBands.pointBlank),
           short: this.#formatRangeBand(item.system.rangeBands.short),
           medium: this.#formatRangeBand(item.system.rangeBands.medium),
@@ -536,21 +491,6 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     };
   }
 
-  static #getLiveCapacity(weapon, linkedAmmo) {
-    if (linkedAmmo?.type === "powerSource") return Number(linkedAmmo.system?.capacity ?? weapon.system.ammo?.capacity ?? 0);
-    if (linkedAmmo?.system?.shots > 0) return linkedAmmo.system.shots;
-    return weapon.system.ammo?.capacity ?? 0;
-  }
-
-  static #getLoadedAmmo(weapon, liveCapacity, linkedSource = null) {
-    if (linkedSource?.type === "powerSource") {
-      return Math.max(Number(linkedSource.system?.remaining ?? 0), 0);
-    }
-    const capacity = liveCapacity ?? weapon.system.ammo?.capacity ?? 0;
-    if (!capacity) return 0;
-    return Math.max(capacity - (weapon.system.ammo?.consumed ?? 0), 0);
-  }
-
   static #prepareAmmoLinkChoices(actor, uses, linkedRef = "") {
     const groups = [];
     const clips = actor.items
@@ -576,19 +516,6 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     }
 
     return groups;
-  }
-
-  static async #resolveWeaponAmmoItem(actor, weapon) {
-    const ref = weapon.system.ammo?.clipItem;
-    if (!ref) return null;
-    const owned = actor.items.get(ref);
-    if (owned) return owned;
-    if (!globalThis.fromUuid) return null;
-    try {
-      return await globalThis.fromUuid(ref);
-    } catch {
-      return null;
-    }
   }
 
   static async #syncWeaponPowerSourceLink(actor, weapon, nextRef = "") {
@@ -1034,14 +961,14 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     target ??= event.currentTarget;
     const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!weapon) return;
-    await StarFrontiersCharacterSheet.#rollWeaponAttack(this.document, weapon, target.dataset.rollMode ?? "public");
+    await AttackPipeline.rollWeaponAttack(this.document, weapon, target.dataset.rollMode ?? "public");
   }
 
   static async #onRollWeaponDamage(event, target) {
     target ??= event.currentTarget;
     const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!weapon) return;
-    await StarFrontiersCharacterSheet.#rollWeaponDamage(this.document, weapon, target.dataset.rollMode ?? "public");
+    await AttackPipeline.rollWeaponDamage(this.document, weapon, target.dataset.rollMode ?? "public");
   }
 
   static async #onRollRacialAbility(event, target) {
@@ -1135,7 +1062,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
           }),
           speaker: ChatMessage.getSpeaker({ actor })
         };
-        StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
+        AttackPipeline.applyChatMessageMode(chatData, rollMode);
         await ChatMessage.create(chatData);
       }
     }
@@ -1159,7 +1086,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       content: game.i18n.format(messageKey, messageData),
       speaker: ChatMessage.getSpeaker({ actor })
     };
-    StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
+    AttackPipeline.applyChatMessageMode(chatData, rollMode);
     await ChatMessage.create(chatData);
 
     if (!sys.consumeOnUse) return;
@@ -1375,7 +1302,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       && Number(item?.system?.remaining ?? 0) > 0
       && item?.system?.carryState !== "stored";
 
-    const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
+    const linkedAmmo = await AttackPipeline.resolveWeaponAmmoItem(actor, weapon);
 
     if (uses === "seu") {
       if (linkedAmmo && (
@@ -1465,7 +1392,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       if (!itemUuid) return;
       const item = await globalThis.fromUuid(itemUuid);
       if (!item?.actor || item.type !== "weapon") return;
-      await StarFrontiersCharacterSheet.#rollWeaponDamage(item.actor, item, rollMode ?? "public", bandKey ?? "");
+      await AttackPipeline.rollWeaponDamage(item.actor, item, rollMode ?? "public", bandKey ?? "");
       return;
     }
 
@@ -1485,7 +1412,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         return;
       }
 
-      await StarFrontiersCharacterSheet.#rollAvoidanceCheck({
+      await AttackPipeline.rollAvoidance({
         attacker: item.actor,
         weapon: item,
         target: targetActor,
@@ -1505,14 +1432,14 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
 
   static async #rollAbilityCheck(actor, ability, rollMode = "public") {
     const target = StarFrontiersCharacterSheet.#getAbilityCheckTarget(actor, ability);
-    const encumbranceMod = StarFrontiersCharacterSheet.#getAbilityEncumbranceMod(actor, ability);
+    const encumbranceMod = AttackPipeline.getAbilityEncumbranceMod(actor, ability);
     const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
-    const prompt = await StarFrontiersCharacterSheet.#promptModifier(abilityLabel, target.target + encumbranceMod);
+    const prompt = await AttackPipeline.promptModifier(abilityLabel, target.target + encumbranceMod);
     if (prompt === null) return;
     const modifier = prompt.modifier ?? 0;
 
     const adjustedTarget = target.target + modifier + encumbranceMod;
-    const { total: rollTotal, rollHtml, forcedTotal } = await StarFrontiersCharacterSheet.#evaluatePercentileRoll({
+    const { total: rollTotal, rollHtml, forcedTotal } = await AttackPipeline.evaluatePercentileRoll({
       forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Character.AbilityCheckFlavor", { ability: abilityLabel })
     });
@@ -1541,12 +1468,12 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       });
     }
 
-    await StarFrontiersCharacterSheet.#createCheckChatMessage(actor, {
+    await AttackPipeline.createCheckChatMessage(actor, {
       title: game.i18n.format("STARFRONTIERS.Character.AbilityCheckTitle", {
-        name: StarFrontiersCharacterSheet.#getRollTitleName(actor),
+        name: AttackPipeline.getRollTitleName(actor),
         ability: abilityLabel
       }),
-      subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
+      subtitle: AttackPipeline.getRollSubtitle(actor),
       rows,
       rollMode,
       outcome: success
@@ -1557,369 +1484,6 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     });
   }
 
-  static async #rollWeaponAttack(actor, weapon, rollMode = "public") {
-    const profile = StarFrontiersCharacterSheet.#getWeaponAttackProfile(actor, weapon);
-    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
-    const isMelee = weapon.system.weaponSkillKey === "melee" || weapon.system.weaponType === "melee";
-    const combatProfileBonus = Number(
-      isMelee
-        ? actor.system.combatProfile?.meleeBonus ?? 0
-        : actor.system.combatProfile?.rangedBonus ?? 0
-    );
-    const targetedToken = [...(game.user?.targets ?? [])][0] ?? null;
-    const targetTokenUuid = targetedToken?.document?.uuid ?? "";
-    const targetActorUuid = targetedToken?.actor?.uuid ?? "";
-
-    const ammoCheck = StarFrontiersCharacterSheet.#getAmmoConsumption(weapon);
-    const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(actor, weapon);
-    const liveCapacity = StarFrontiersCharacterSheet.#getLiveCapacity(weapon, linkedAmmo);
-
-    if (ammoCheck.amount > 0) {
-      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity, linkedAmmo);
-      if (loaded < ammoCheck.amount) {
-        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
-        return;
-      }
-    }
-
-    const targetDistance = StarFrontiersCharacterSheet.#getTargetDistance(actor);
-    const autoRangeBand = targetDistance !== null
-      ? StarFrontiersCharacterSheet.#getRangeBandFromDistance(weapon, targetDistance)
-      : null;
-
-    const prompt = await StarFrontiersCharacterSheet.#promptWeaponAttack(actor, weapon, profile, autoRangeBand);
-    if (!prompt) return;
-
-    const activeBandKey = autoRangeBand?.key ?? prompt.rangeBand;
-    const activeRangeLabel = autoRangeBand?.label ?? prompt.rangeLabel;
-    const rangeMod = activeBandKey ? (RANGE_BAND_MODS[activeBandKey] ?? 0) : 0;
-    const shots = prompt.shots ?? 1;
-    const totalAmmo = ammoCheck.amount * shots;
-    const encumbrance = StarFrontiersCharacterSheet.#getCombatEncumbranceMods(actor, profile.rulesEdition, {
-      isMelee,
-      attackAbilityKey: profile.attackAbilityKey
-    });
-
-    if (ammoCheck.amount > 0) {
-      const loaded = StarFrontiersCharacterSheet.#getLoadedAmmo(weapon, liveCapacity, linkedAmmo);
-      if (loaded < totalAmmo) {
-        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
-        return;
-      }
-    }
-
-    if (game.settings.get(SYSTEM_ID, "automateAmmo") && ammoCheck.amount > 0) {
-      const nextConsumed = Math.min((weapon.system.ammo?.consumed ?? 0) + totalAmmo, Math.max(liveCapacity, totalAmmo));
-      await weapon.update({ "system.ammo.consumed": nextConsumed });
-      if (linkedAmmo?.type === "powerSource") {
-        const nextRemaining = Math.max(Number(linkedAmmo.system?.remaining ?? 0) - totalAmmo, 0);
-        await linkedAmmo.update({ "system.remaining": nextRemaining });
-      }
-    }
-
-    const rows = [
-      { label: game.i18n.localize("STARFRONTIERS.Weapon.Skill"), value: profile.skillLabel },
-      { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(profile.baseTarget) }
-    ];
-
-    if (activeMode) {
-      rows.unshift({
-        label: game.i18n.localize("STARFRONTIERS.Weapon.Mode.Label"),
-        value: StarFrontiersCharacterSheet.#getWeaponModeLabel(activeMode)
-      });
-    }
-
-    if (autoRangeBand && targetDistance !== null) {
-      const units = canvas?.grid?.units || "m";
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.Distance"), value: `${targetDistance} ${units}` });
-    }
-    if (activeRangeLabel) {
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.Range"), value: activeRangeLabel });
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.RangeModifier"), value: rangeMod >= 0 ? `+${rangeMod}` : String(rangeMod) });
-    }
-    if (encumbrance.attackerMod) {
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.AttackerEncumbered"), value: encumbrance.attackerMod >= 0 ? `+${encumbrance.attackerMod}` : String(encumbrance.attackerMod) });
-    }
-    if (encumbrance.targetMod) {
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.TargetEncumbered"), value: encumbrance.targetMod >= 0 ? `+${encumbrance.targetMod}` : String(encumbrance.targetMod) });
-    }
-    if (combatProfileBonus) {
-      rows.push({
-        label: game.i18n.localize(isMelee
-          ? "STARFRONTIERS.Weapon.MeleeBonus"
-          : "STARFRONTIERS.Weapon.RangedBonus"),
-        value: combatProfileBonus >= 0 ? `+${combatProfileBonus}` : String(combatProfileBonus)
-      });
-    }
-    rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: prompt.modifier >= 0 ? `+${prompt.modifier}` : String(prompt.modifier) });
-    if (prompt.forcedRoll !== null && prompt.forcedRoll !== undefined) {
-      rows.push({
-        label: game.i18n.localize("STARFRONTIERS.Character.ForcedResult"),
-        value: String(prompt.forcedRoll).padStart(2, "0")
-      });
-    }
-
-    const allRollHtmls = [];
-    let hitCount = 0;
-    for (let i = 0; i < shots; i++) {
-      const shotPenalty = i * -20;
-      const shotTarget = StarFrontiersCharacterSheet.#clampAttackTarget(
-        profile.baseTarget + combatProfileBonus + rangeMod + prompt.modifier + shotPenalty + encumbrance.attackerMod + encumbrance.targetMod
-      );
-      const { total: rollTotal, rollHtml } = await StarFrontiersCharacterSheet.#evaluatePercentileRoll({
-        forcedTotal: prompt.forcedRoll,
-        flavor: game.i18n.format("STARFRONTIERS.Weapon.AttackFlavor", { weapon: weapon.name })
-      });
-      const hit = StarFrontiersCharacterSheet.#isHit(rollTotal, shotTarget, profile.rulesEdition);
-      if (hit) hitCount++;
-      allRollHtmls.push(rollHtml);
-
-      if (shots > 1) {
-        const shotLabel = shotPenalty
-          ? `${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")} ${i + 1} (${shotPenalty})`
-          : `${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")} ${i + 1}`;
-        rows.push({ label: `${shotLabel} — ${game.i18n.localize("STARFRONTIERS.Character.Target")}`, value: String(shotTarget) });
-        rows.push({ label: `${shotLabel} — ${game.i18n.localize("STARFRONTIERS.Character.Rolled")}`, value: String(rollTotal).padStart(2, "0") });
-      } else {
-        rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(shotTarget) });
-        rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(rollTotal).padStart(2, "0") });
-      }
-    }
-
-    if (ammoCheck.amount > 0) {
-      const displayRemaining = linkedAmmo?.type === "powerSource"
-        ? Math.max(Number(linkedAmmo.system?.remaining ?? 0) - (game.settings.get(SYSTEM_ID, "automateAmmo") ? totalAmmo : 0), 0)
-        : Math.max(liveCapacity - ((weapon.system.ammo?.consumed ?? 0) + (game.settings.get(SYSTEM_ID, "automateAmmo") ? totalAmmo : 0)), 0);
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.AmmoRemaining"), value: `${displayRemaining}/${liveCapacity}` });
-    }
-
-    const anyHit = hitCount > 0;
-    const outcome = shots > 1
-      ? `${hitCount}/${shots} ${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")}: ${anyHit ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure")}`
-      : anyHit ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure");
-
-    const effectiveDamageFormula = StarFrontiersCharacterSheet.#buildEffectiveDamageFormula(weapon, activeBandKey ?? "");
-
-    await StarFrontiersCharacterSheet.#createWeaponAttackChatMessage(actor, weapon, {
-      rollMode,
-      rows,
-      outcome,
-      outcomeClass: anyHit ? "success" : "failure",
-      rollHtml: allRollHtmls.join(""),
-      canRollDamage: Boolean(effectiveDamageFormula),
-      activeBandKey: activeBandKey ?? "",
-      targetTokenUuid,
-      targetActorUuid,
-      hitCount,
-      shots
-    });
-  }
-
-  static #isHit(rollTotal, adjustedTarget, rulesEdition) {
-    if (rollTotal <= 5) return true;
-    if (rulesEdition === "expanded" && rollTotal >= 96) return false;
-    return rollTotal <= adjustedTarget;
-  }
-
-  static async #rollWeaponDamage(actor, weapon, rollMode = "public", bandKey = "") {
-    const formula = StarFrontiersCharacterSheet.#buildEffectiveDamageFormula(weapon, bandKey);
-
-    if (!formula) {
-      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoDamageFormula"));
-      return;
-    }
-
-    let roll;
-    try {
-      roll = await (new Roll(formula)).evaluate({ allowInteractive: false });
-    } catch {
-      ui.notifications.error(game.i18n.localize("STARFRONTIERS.Weapon.InvalidDamageFormula"));
-      return;
-    }
-
-    const rollHtml = await roll.render({
-      flavor: game.i18n.format("STARFRONTIERS.Weapon.DamageFlavor", { weapon: weapon.name })
-    });
-
-    await StarFrontiersCharacterSheet.#createCheckChatMessage(actor, {
-      title: game.i18n.format("STARFRONTIERS.Weapon.DamageTitle", {
-        name: StarFrontiersCharacterSheet.#getRollTitleName(actor),
-        weapon: weapon.name
-      }),
-      subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
-      rows: [
-        { label: game.i18n.localize("STARFRONTIERS.Weapon.Defense"), value: StarFrontiersCharacterSheet.#getWeaponDefenseLabel(weapon) },
-        { label: game.i18n.localize("STARFRONTIERS.Weapon.DamageFormulaLabel"), value: formula }
-      ],
-      rollMode,
-      rollHtml
-    });
-  }
-
-  static async #rollAvoidanceCheck({ attacker, weapon, target, targetTokenUuid = "", rollMode = "public" }) {
-    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
-    if (!activeMode?.avoidance?.enabled) return;
-
-    const ability = String(activeMode.avoidance.ability ?? "");
-    const abilityRecord = target.system.abilities?.[ability];
-    if (!abilityRecord) {
-      ui.notifications.error(game.i18n.format(
-        "STARFRONTIERS.Weapon.AvoidanceUnknownAbility",
-        { ability }
-      ));
-      return;
-    }
-
-    const targetScore = Number(abilityRecord.value ?? 0);
-    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
-    const success = roll.total <= targetScore;
-
-    const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
-    const modeLabel = StarFrontiersCharacterSheet.#getWeaponModeLabel(activeMode);
-    const effectLabel = StarFrontiersCharacterSheet.#getAvoidanceEffectLabel(activeMode.avoidance.onSuccessEffect);
-
-    const rollHtml = await roll.render({
-      flavor: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceFlavor", {
-        target: target.name,
-        ability: abilityLabel
-      })
-    });
-
-    const outcome = success
-      ? game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceSuccess")
-      : effectLabel
-        ? game.i18n.format("STARFRONTIERS.Weapon.AvoidanceFailure", { effect: effectLabel })
-        : game.i18n.localize("STARFRONTIERS.Character.Failure");
-    const outcomeClass = success ? "success" : "failure";
-
-    const rows = [
-      {
-        label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceAttackerLabel"),
-        value: attacker.name
-      },
-      {
-        label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceWeaponLabel"),
-        value: `${weapon.name} (${modeLabel})`
-      },
-      {
-        label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceTargetLabel"),
-        value: `${abilityLabel} ${targetScore}`
-      }
-    ];
-
-    const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/check-roll-card.hbs", {
-      title: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceTitle", {
-        name: target.name,
-        ability: abilityLabel
-      }),
-      subtitle: "",
-      rows,
-      outcome,
-      outcomeClass,
-      rollHtml
-    });
-
-    const chatData = {
-      content,
-      speaker: ChatMessage.getSpeaker({ actor: target })
-    };
-
-    if (!success && activeMode.avoidance.onSuccessEffect) {
-      chatData.flags = {
-        "star-frontiers": {
-          avoidanceFailure: {
-            targetActorUuid: target.uuid,
-            targetTokenUuid,
-            weaponUuid: weapon.uuid,
-            modeKey: activeMode.key,
-            onSuccessEffect: activeMode.avoidance.onSuccessEffect
-          }
-        }
-      };
-    }
-
-    StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
-    await ChatMessage.create(chatData);
-  }
-
-  static async #promptModifier(label, targetValue, {
-    titleKey = "STARFRONTIERS.Character.RollAbilityModifierTitle",
-    promptKey = "STARFRONTIERS.Character.RollAbilityModifierPrompt",
-    titleData = {},
-    promptData = {}
-  } = {}) {
-    const forcedField = StarFrontiersCharacterSheet.#getForcedRollOverrideField();
-    return foundry.applications.api.DialogV2.prompt({
-      window: {
-        title: game.i18n.format(titleKey, { ability: label, name: label, target: targetValue, ...titleData })
-      },
-      content: `
-        <p>${game.i18n.format(promptKey, { ability: label, name: label, target: targetValue, ...promptData })}</p>
-        <input name="modifier" type="number" step="1" value="0" autofocus>
-        ${forcedField}
-      `,
-      ok: {
-        label: game.i18n.localize("STARFRONTIERS.Character.RollAbilityModifierSubmit"),
-        callback: (event, button) => ({
-          modifier: button.form.elements.modifier.valueAsNumber || 0,
-          forcedRoll: StarFrontiersCharacterSheet.#readForcedRollOverride(button.form.elements.forcedRoll)
-        })
-      },
-      modal: true,
-      rejectClose: false
-    });
-  }
-
-  static #canUseForcedRollOverride() {
-    return Boolean(game.user?.isGM && game.settings.get(SYSTEM_ID, "enableGmRollOverrides"));
-  }
-
-  static #getForcedRollOverrideField() {
-    if (!StarFrontiersCharacterSheet.#canUseForcedRollOverride()) return "";
-
-    return `
-      <label class="dialog-field">
-        <span>${game.i18n.localize("STARFRONTIERS.Character.TestingForcedRoll")}</span>
-        <input name="forcedRoll" type="number" step="1" min="1" max="100" value="">
-        <small>${game.i18n.localize("STARFRONTIERS.Character.TestingForcedRollHint")}</small>
-      </label>
-    `;
-  }
-
-  static #readForcedRollOverride(input, { min = 1, max = 100 } = {}) {
-    if (!input) return null;
-    const raw = Number(input.valueAsNumber);
-    if (!Number.isFinite(raw)) return null;
-    return Math.min(Math.max(Math.trunc(raw), min), max);
-  }
-
-  static async #evaluatePercentileRoll({ forcedTotal = null, flavor = "" } = {}) {
-    const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
-    const forced = Number.isFinite(forcedTotal);
-    const finalTotal = forced
-      ? Math.min(Math.max(Math.trunc(Number(forcedTotal)), 1), 100)
-      : roll.total;
-
-    if (forced) {
-      const die = roll.dice?.[0];
-      if (die?.results?.length) {
-        die.results = die.results.map((result, index) => index === 0
-          ? { ...result, result: finalTotal, active: true }
-          : result);
-      }
-      roll._total = finalTotal;
-    }
-
-    const rollHtml = await roll.render({ flavor });
-    return {
-      roll,
-      total: finalTotal,
-      forced,
-      forcedTotal: forced ? finalTotal : null,
-      rollHtml
-    };
-  }
-
   static async #rollInitiative(actor, rollMode = "public") {
     const modifier = actor.system.derived.initiativeMod ?? Math.ceil((actor.system.abilities.rs.value || 0) / 10);
     const roll = await (new Roll("1d10 + @modifier", { modifier })).evaluate({ allowInteractive: false });
@@ -1928,11 +1492,11 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       flavor: game.i18n.localize("STARFRONTIERS.Character.RollInitiative")
     });
 
-    await StarFrontiersCharacterSheet.#createCheckChatMessage(actor, {
+    await AttackPipeline.createCheckChatMessage(actor, {
       title: game.i18n.format("STARFRONTIERS.Character.InitiativeTitle", {
-        name: StarFrontiersCharacterSheet.#getRollTitleName(actor)
+        name: AttackPipeline.getRollTitleName(actor)
       }),
-      subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
+      subtitle: AttackPipeline.getRollSubtitle(actor),
       rollMode,
       rows: [
         { label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(dieTotal) },
@@ -1947,12 +1511,12 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     if (item.system.rollType !== "active") return;
 
     const chance = StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item);
-    const prompt = await StarFrontiersCharacterSheet.#promptModifier(item.name, chance);
+    const prompt = await AttackPipeline.promptModifier(item.name, chance);
     if (prompt === null) return;
     const modifier = prompt.modifier ?? 0;
 
     const adjustedTarget = chance + modifier;
-    const { total: rollTotal, rollHtml, forcedTotal } = await StarFrontiersCharacterSheet.#evaluatePercentileRoll({
+    const { total: rollTotal, rollHtml, forcedTotal } = await AttackPipeline.evaluatePercentileRoll({
       forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Character.RacialAbilityRollFlavor", { name: item.name })
     });
@@ -1965,12 +1529,12 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       }
     }
 
-    await StarFrontiersCharacterSheet.#createCheckChatMessage(actor, {
+    await AttackPipeline.createCheckChatMessage(actor, {
       title: game.i18n.format("STARFRONTIERS.Character.RacialAbilityRollTitle", {
-        name: StarFrontiersCharacterSheet.#getRollTitleName(actor),
+        name: AttackPipeline.getRollTitleName(actor),
         ability: item.name
       }),
-      subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
+      subtitle: AttackPipeline.getRollSubtitle(actor),
       rows: [
         { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(chance) },
         ...(modifier ? [{
@@ -2006,7 +1570,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
 
     const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/racial-ability-card.hbs", {
       title: item.name,
-      subtitle: StarFrontiersCharacterSheet.#getRollTitleName(actor),
+      subtitle: AttackPipeline.getRollTitleName(actor),
       description,
       isActiveRoll: item.system.rollType === "active",
       currentChance: StarFrontiersCharacterSheet.#getRacialAbilityCurrentChance(actor, item),
@@ -2021,7 +1585,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       speaker: ChatMessage.getSpeaker({ actor })
     };
 
-    StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
+    AttackPipeline.applyChatMessageMode(chatData, rollMode);
     await ChatMessage.create(chatData);
   }
 
@@ -2088,7 +1652,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     await baseTargetRoll.evaluate({ allowInteractive: false });
     const baseTarget = Math.floor(baseTargetRoll.total);
 
-    const prompt = await StarFrontiersCharacterSheet.#promptModifier(skill.name, baseTarget, {
+    const prompt = await AttackPipeline.promptModifier(skill.name, baseTarget, {
       titleKey: "STARFRONTIERS.Character.SkillModifierTitle",
       promptKey: "STARFRONTIERS.Character.SkillModifierPrompt"
     });
@@ -2096,18 +1660,18 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     const modifier = prompt.modifier ?? 0;
 
     const adjustedTarget = baseTarget + modifier;
-    const { total: rollTotal, rollHtml, forcedTotal } = await StarFrontiersCharacterSheet.#evaluatePercentileRoll({
+    const { total: rollTotal, rollHtml, forcedTotal } = await AttackPipeline.evaluatePercentileRoll({
       forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Character.SkillCheckFlavor", { name: skill.name })
     });
     const success = rollTotal <= adjustedTarget;
 
-    await StarFrontiersCharacterSheet.#createCheckChatMessage(actor, {
+    await AttackPipeline.createCheckChatMessage(actor, {
       title: game.i18n.format("STARFRONTIERS.Character.SkillCheckTitle", {
-        name: StarFrontiersCharacterSheet.#getRollTitleName(actor),
+        name: AttackPipeline.getRollTitleName(actor),
         skill: skill.name
       }),
-      subtitle: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
+      subtitle: AttackPipeline.getRollSubtitle(actor),
       rows: [
         { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(baseTarget) },
         { label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: modifier >= 0 ? `+${modifier}` : String(modifier) },
@@ -2130,8 +1694,8 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     this._rememberScrollPosition();
 
     if (target.dataset.itemAmmoLoaded !== undefined) {
-      const linkedAmmo = await StarFrontiersCharacterSheet.#resolveWeaponAmmoItem(this.document, item);
-      const capacity = StarFrontiersCharacterSheet.#getLiveCapacity(item, linkedAmmo);
+      const linkedAmmo = await AttackPipeline.resolveWeaponAmmoItem(this.document, item);
+      const capacity = AttackPipeline.getLiveCapacity(item, linkedAmmo);
       const loaded = Math.min(Math.max(Number(target.value || 0), 0), capacity);
       if (linkedAmmo?.type === "powerSource") {
         await linkedAmmo.update({ "system.remaining": loaded });
@@ -2525,289 +2089,6 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       || normalized === "icons/svg/mystery-man-black.svg";
   }
 
-  static #getWeaponAttackProfile(actor, weapon) {
-    const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
-    const skill = StarFrontiersCharacterSheet.#getWeaponSkill(actor, weapon);
-    const dex = Number(actor.system.abilities.dex.value ?? 0);
-    const str = Number(actor.system.abilities.str.value ?? 0);
-    const skillKey = weapon.system.weaponSkillKey;
-    const isMelee = skillKey === "melee" || weapon.system.weaponType === "melee";
-    const isStr = skillKey === "str";
-
-    let baseTarget;
-    if (rulesEdition === "basic") {
-      if (isStr) baseTarget = str;
-      else if (isMelee) baseTarget = Math.max(str, dex);
-      else baseTarget = dex;
-    } else {
-      const levelBonus = Number(skill?.system.level ?? 0) * 10;
-      const skillBonus = Number(skill?.system.bonus ?? 0);
-      if (isStr) baseTarget = Math.ceil(str / 2) + levelBonus + skillBonus;
-      else if (isMelee) baseTarget = Math.ceil(Math.max(str, dex) / 2) + levelBonus + skillBonus;
-      else baseTarget = Math.ceil(dex / 2) + levelBonus + skillBonus;
-    }
-
-    return {
-      attackAbilityKey: isStr ? "str" : "dex",
-      baseTarget: StarFrontiersCharacterSheet.#clampAttackTarget(baseTarget),
-      rulesEdition,
-      skill,
-      skillLabel: skill?.name
-        ?? game.i18n.localize(`STARFRONTIERS.Choice.WeaponSkill.${skillKey || "None"}`)
-    };
-  }
-
-  static #getWeaponSkill(actor, weapon) {
-    const ref = weapon.system.requiredSkillRef;
-    if (ref) {
-      const owned = actor.items.get(ref);
-      if (owned?.type === "skill") return owned;
-
-      try {
-        const resolved = globalThis.fromUuidSync?.(ref) ?? null;
-        if (resolved?.type === "skill") {
-          if (resolved.parent === actor) return resolved;
-
-          const sourceId = resolved.uuid;
-          const ownedCopy = actor.items.find((item) =>
-            item.type === "skill"
-            && (item._stats?.compendiumSource === sourceId || item.name === resolved.name)
-          );
-          if (ownedCopy) return ownedCopy;
-        }
-      } catch {
-        /* ignore unresolved refs */
-      }
-    }
-
-    const key = weapon.system.weaponSkillKey;
-    if (!key) return null;
-
-    return actor.items
-      .filter((item) => item.type === "skill" && item.system.weaponSkillKey === key)
-      .sort((a, b) => Number(b.system.level ?? 0) - Number(a.system.level ?? 0))[0];
-  }
-
-  static #clampAttackTarget(value) {
-    return Math.min(Math.max(Math.round(value), 0), 100);
-  }
-
-  static #formatAttackTarget(value) {
-    return value === null || value === undefined ? "" : String(value);
-  }
-
-  static #getAbilityEncumbranceMod(actor, ability) {
-    const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
-    if (rulesEdition !== "expanded") return 0;
-    if (!actor.system.derived?.encumbered) return 0;
-
-    const physical = new Set(["str", "sta", "dex", "rs"]);
-    const isPhysical = physical.has(ability);
-    const setting = isPhysical ? "encumbranceAffectsPhysical" : "encumbranceAffectsNonPhysical";
-    return game.settings.get(SYSTEM_ID, setting) ? -10 : 0;
-  }
-
-  static #getCombatEncumbranceMods(actor, rulesEdition, { isMelee = false, attackAbilityKey = "" } = {}) {
-    if (rulesEdition !== "expanded") return { attackerMod: 0, targetMod: 0 };
-    const physical = new Set(["str", "sta", "dex", "rs"]);
-    const nonPhysical = new Set(["int", "log", "per", "ldr"]);
-    const attackerEncumbered = Boolean(actor.system.derived?.encumbered);
-    const extendedAttackPenalty = (
-      (game.settings.get(SYSTEM_ID, "encumbranceAffectsPhysical") && physical.has(attackAbilityKey))
-      || (game.settings.get(SYSTEM_ID, "encumbranceAffectsNonPhysical") && nonPhysical.has(attackAbilityKey))
-    );
-    const attackerMod = attackerEncumbered && (isMelee || extendedAttackPenalty) ? -10 : 0;
-
-    let targetMod = 0;
-    const target = [...(game.user?.targets ?? [])][0];
-    const targetActor = target?.actor;
-    if (targetActor?.system?.derived?.encumbered) targetMod = 10;
-    return { attackerMod, targetMod };
-  }
-
-  static #getTargetDistance(actor) {
-    if (!canvas?.ready) return null;
-    const token = actor.getActiveTokens(true)[0];
-    if (!token) return null;
-    const targets = [...game.user.targets];
-    if (!targets.length) return null;
-    return getTokenDistance(token, targets[0]);
-  }
-
-  static #getRangeBandFromDistance(weapon, distance) {
-    return getWeaponRangeBandFromDistance(weapon, distance);
-  }
-
-  static #getAvailableWeaponRangeBands(weapon) {
-    const bands = [];
-    for (const key of RANGE_BAND_ORDER) {
-      const band = weapon.system.rangeBands?.[key];
-      if (!band) continue;
-      const hasDistance = band.min !== null || band.max !== null;
-      if (!hasDistance) continue;
-
-      bands.push({
-        key,
-        label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
-        modifier: RANGE_BAND_MODS[key] ?? 0
-      });
-    }
-    return bands;
-  }
-
-  static async #promptWeaponAttack(actor, weapon, profile, autoRangeBand = null) {
-    const rangeBands = autoRangeBand ? [] : StarFrontiersCharacterSheet.#getAvailableWeaponRangeBands(weapon);
-    const forcedField = StarFrontiersCharacterSheet.#getForcedRollOverrideField();
-    const options = rangeBands.map((band) => {
-      const mod = band.modifier >= 0 ? `+${band.modifier}` : `${band.modifier}`;
-      return `<option value="${band.key}">${band.label} (${mod})</option>`;
-    }).join("");
-
-    const autoRangeInfo = autoRangeBand
-      ? `<p>${game.i18n.format("STARFRONTIERS.Weapon.AutoRangeDetected", {
-          range: autoRangeBand.label,
-          mod: autoRangeBand.mod >= 0 ? `+${autoRangeBand.mod}` : String(autoRangeBand.mod)
-        })}</p>`
-      : "";
-
-    const rof = profile.rulesEdition === "expanded" ? Number(weapon.system.mechanics?.rateOfFire ?? 1) : 1;
-    const shotsField = rof > 1
-      ? `<label class="dialog-field">
-          <span>${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")} (max ${rof}, −20 each)</span>
-          <input name="shots" type="number" step="1" min="1" max="${rof}" value="1">
-        </label>`
-      : "";
-
-    return foundry.applications.api.DialogV2.wait({
-      window: {
-        title: game.i18n.format("STARFRONTIERS.Weapon.AttackTitle", { weapon: weapon.name })
-      },
-      content: `
-        <p>${game.i18n.format("STARFRONTIERS.Weapon.AttackPrompt", {
-          weapon: weapon.name,
-          target: profile.baseTarget
-        })}</p>
-        ${autoRangeInfo}
-        ${rangeBands.length ? `
-          <label class="dialog-field">
-            <span>${game.i18n.localize("STARFRONTIERS.Weapon.Range")}</span>
-            <select name="rangeBand">${options}</select>
-          </label>
-        ` : ""}
-        ${shotsField}
-        <label class="dialog-field">
-          <span>${game.i18n.localize("STARFRONTIERS.Character.Modifier")}</span>
-          <input name="modifier" type="number" step="1" value="0" autofocus>
-        </label>
-        ${forcedField}
-      `,
-      buttons: [
-        {
-          action: "roll",
-          label: game.i18n.localize("STARFRONTIERS.Weapon.RollAttack"),
-          default: true,
-          callback: (event, button, dialog) => {
-            const root = dialog.element;
-            const modifierInput = root.querySelector("[name='modifier']");
-            const rangeBandInput = root.querySelector("[name='rangeBand']");
-            const shotsInput = root.querySelector("[name='shots']");
-
-            const rangeBand = rangeBandInput?.value ?? "";
-            const rangeLabel = rangeBands.find((band) => band.key === rangeBand)?.label ?? "";
-            const shotsValue = shotsInput ? parseInt(shotsInput.value, 10) : 1;
-
-            return {
-              modifier: Number.isFinite(modifierInput?.valueAsNumber) ? modifierInput.valueAsNumber : 0,
-              forcedRoll: StarFrontiersCharacterSheet.#readForcedRollOverride(root.querySelector("[name='forcedRoll']")),
-              rangeBand,
-              rangeLabel,
-              shots: rof > 1 ? Math.min(Math.max(shotsValue || 1, 1), rof) : 1
-            };
-          }
-        },
-        {
-          action: "cancel",
-          label: game.i18n.localize("Cancel")
-        }
-      ],
-      modal: true,
-      rejectClose: false
-    });
-  }
-
-  static #getAmmoConsumption(weapon) {
-    const uses = weapon.system.ammo?.uses ?? "none";
-    if (uses === "none") return { amount: 0 };
-
-    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
-    const modePerShot = activeMode ? Number(activeMode.seuPerShot ?? 0) : 0;
-    const perShot = modePerShot || Number(weapon.system.ammo?.seuPerShot ?? 0) || 1;
-    if (uses === "rounds") return { amount: Math.max(perShot, 0) };
-
-    const variable = Number(weapon.system.ammo?.variableSetting?.current ?? 0);
-    return { amount: Math.max(variable || perShot, 0) };
-  }
-
-  static #getActiveWeaponMode(weapon) {
-    const modes = Array.from(weapon.system.mechanics?.modes ?? []);
-    if (!modes.length) return null;
-    const key = String(weapon.system.activeModeKey ?? "");
-    return modes.find((mode) => mode.key === key) ?? modes[0] ?? null;
-  }
-
-  static #buildEffectiveDamageFormula(weapon, bandKey = "") {
-    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
-    const modeFormula = activeMode?.damageFormula ?? "";
-    if (activeMode && !modeFormula && !bandKey) return "";
-
-    const bandFormula = bandKey
-      ? (weapon.system.rangeBands?.[bandKey]?.damageFormula ?? "")
-      : "";
-    const baseFormula = bandFormula || modeFormula || weapon.system.damageFormula || "";
-    if (!baseFormula) return "";
-
-    const uses = weapon.system.ammo?.uses ?? "none";
-    if (uses !== "seu") return baseFormula;
-
-    const setting = weapon.system.ammo?.variableSetting ?? {};
-    const min = Number(setting.min ?? 0);
-    const max = Number(setting.max ?? 0);
-    const current = Number(setting.current ?? 0);
-    const hasVariableDial = max > min && min >= 1 && current >= 1;
-    if (!hasVariableDial) return baseFormula;
-
-    return baseFormula.replace(/(\d*)([dD])(\d+)/g, (match, count, d, faces) => {
-      const n = Number(count || 1) * current;
-      return `${n}${d}${faces}`;
-    });
-  }
-
-  static #damageTypeLabel(value) {
-    if (!value) return game.i18n.localize("STARFRONTIERS.Choice.DefenseType.None");
-    return game.i18n.localize(`STARFRONTIERS.Choice.DefenseType.${value}`);
-  }
-
-  static #getWeaponModeLabel(mode) {
-    const label = String(mode?.label ?? "");
-    if (!label) return String(mode?.key ?? "");
-    return game.i18n.has(label) ? game.i18n.localize(label) : label;
-  }
-
-  static #getAvoidanceEffectLabel(value) {
-    const label = String(value ?? "").trim();
-    if (!label) return "";
-    return game.i18n.has(label) ? game.i18n.localize(label) : label;
-  }
-
-  static #getWeaponDefenseLabel(weapon) {
-    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
-    const defenseTypes = Array.from(activeMode?.defenseTypes ?? []);
-    if (defenseTypes.length) {
-      return defenseTypes.map((value) => StarFrontiersCharacterSheet.#damageTypeLabel(value)).join(", ");
-    }
-    return StarFrontiersCharacterSheet.#damageTypeLabel(weapon.system.damageType);
-  }
-
   static #buildRaceCharacterUpdates(actor, race, { applyStats = false, racialAbilitySummary = null, raceBonusSelections = [] } = {}) {
     const updates = {};
     updates["system.charGen.raceBonusSelections"] = Array.from(raceBonusSelections ?? []);
@@ -3071,9 +2352,9 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
   static async #createStatsChatMessage(actor, results, { initiativeMod, initiativeSource, race }) {
     const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/stat-roll-card.hbs", {
       title: game.i18n.format("STARFRONTIERS.Character.RollForStatsTitle", {
-        name: StarFrontiersCharacterSheet.#getRollTitleName(actor)
+        name: AttackPipeline.getRollTitleName(actor)
       }),
-      playerName: StarFrontiersCharacterSheet.#getRollSubtitle(actor),
+      playerName: AttackPipeline.getRollSubtitle(actor),
       raceName: race?.name ?? "",
       results,
       initiative: {
@@ -3089,103 +2370,4 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     });
   }
 
-  static async #createWeaponAttackChatMessage(actor, weapon, {
-    rows,
-    outcome,
-    outcomeClass,
-    rollHtml,
-    rollMode = "public",
-    canRollDamage = false,
-    activeBandKey = "",
-    targetTokenUuid = "",
-    targetActorUuid = "",
-    hitCount = 0,
-    shots = 1
-  }) {
-    const activeMode = StarFrontiersCharacterSheet.#getActiveWeaponMode(weapon);
-    const avoidance = activeMode?.avoidance?.enabled ? {
-      ability: activeMode.avoidance.ability,
-      abilityLabel: activeMode.avoidance.ability
-        ? game.i18n.localize(`STARFRONTIERS.Ability.${activeMode.avoidance.ability}`)
-        : "",
-      onSuccessEffect: activeMode.avoidance.onSuccessEffect ?? "",
-      effectLabel: StarFrontiersCharacterSheet.#getAvoidanceEffectLabel(activeMode.avoidance.onSuccessEffect)
-    } : null;
-
-    const canRollAvoidance = Boolean(
-      avoidance
-      && hitCount > 0
-      && targetActorUuid
-      && shots > 0
-    );
-
-    const avoidanceButtonLabel = avoidance
-      ? game.i18n.format("STARFRONTIERS.Weapon.RollAvoidanceButton", { ability: avoidance.abilityLabel })
-      : "";
-
-    const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/weapon-attack-card.hbs", {
-      title: game.i18n.format("STARFRONTIERS.Weapon.AttackTitle", { weapon: weapon.name }),
-      subtitle: StarFrontiersCharacterSheet.#getRollTitleName(actor),
-      rows,
-      outcome,
-      outcomeClass,
-      rollHtml,
-      canRollDamage,
-      damageButtonLabel: game.i18n.localize("STARFRONTIERS.Weapon.RollDamage"),
-      itemUuid: weapon.uuid,
-      bandKey: activeBandKey,
-      rollMode,
-      canRollAvoidance,
-      avoidance,
-      avoidanceButtonLabel,
-      targetTokenUuid,
-      targetActorUuid
-    });
-
-    const chatData = {
-      content,
-      speaker: ChatMessage.getSpeaker({ actor })
-    };
-
-    StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
-    await ChatMessage.create(chatData);
-  }
-
-  static async #createCheckChatMessage(actor, { title, subtitle, rows, outcome, outcomeClass, rollHtml, rollMode = "public" }) {
-    const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/check-roll-card.hbs", {
-      title,
-      subtitle,
-      rows,
-      outcome,
-      outcomeClass,
-      rollHtml
-    });
-
-    const chatData = {
-      content,
-      speaker: ChatMessage.getSpeaker({ actor })
-    };
-
-    StarFrontiersCharacterSheet.#applyChatMessageMode(chatData, rollMode);
-    await ChatMessage.create(chatData);
-  }
-
-  static #getRollTitleName(actor) {
-    return actor.name || actor.system.playerName || game.i18n.localize("STARFRONTIERS.Character.CharacterName");
-  }
-
-  static #getRollSubtitle(actor) {
-    return actor.system.playerName && actor.system.playerName !== actor.name ? actor.system.playerName : "";
-  }
-
-  static #applyChatMessageMode(chatData, rollMode) {
-    if (rollMode === "public") return chatData;
-
-    const gmRecipients = ChatMessage.getWhisperRecipients("GM").map((user) => user.id);
-    if (!gmRecipients.length) return chatData;
-
-    chatData.whisper = gmRecipients;
-    if (rollMode === "blind") chatData.blind = true;
-    return chatData;
-  }
 }

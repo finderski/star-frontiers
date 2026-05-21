@@ -287,6 +287,13 @@ The system is currently bring-your-own-data. World-builders create every weapon,
 - Companion-rules content: spaceships, space weapons, etc.
 - Bestiary compendium: NPCs and creatures from the rules.
 
+### Authoring conventions to lock in
+
+- **Active Effect `transfer` flag.** Any AE on an item that should apply to the actor when the item is owned/active must set `transfer: true` ("Apply Effect to Actor" in the AE config UI). The default `false` is silent-fail — toggling the AE on does nothing visible because the effect never reaches actor.system. Example: Yazirian Battle Rage on the trained ability item needs `transfer: true` so enabling it actually grants the +20 melee bonus. Same pattern for any future racial ability, condition, or item-granted buff that targets `actor.system.*`.
+- **`disabled: true` initial state** for togglable AEs (Battle Rage, situational buffs). The player turns them on when triggered. Combine with `transfer: true` so the toggle is meaningful.
+- **`disabled: false` initial state** for always-on AEs (e.g. a racial passive bonus that's permanent while the race is selected).
+- **Origin flags.** Standardize `flags["star-frontiers"].source` on every AE so the system can later identify and manage stacked or duplicate effects.
+
 ### Open questions
 
 - Licensing — the original rules and content are owned by a third party. The system code is fine to publish; the compendium content may or may not be. Worth investigating before any public release.
@@ -456,3 +463,51 @@ Spent clips and depleted power sources are never discarded — they can be recha
 
 - 0.2.8 PowerSource Port Limits (already landed) — auto-link must honor `ports.weapon` and related caps.
 - Item 4 (Needler Ammo-Type Variants) — clip-type discrimination becomes meaningful when ammo can vary the weapon's behavior.
+
+---
+
+## 12. Weapon Modes Editor — "Duplicate Mode" Button
+
+**Status:** Polish. The Weapon Modes editor (item sheet) is implemented. This is a small quality-of-life addition.
+
+### Context
+
+When a weapon has multiple modes that share most of their configuration and differ only in a field or two (e.g. three settings that are identical except for damage formula, or stun variants that differ only in avoidance ability), the GM currently has to "Add Mode" and re-enter every field from scratch each time.
+
+### Work
+
+Add a "Duplicate" button to each mode row in the Weapon Modes editor, next to the existing trash icon. Clicking it deep-clones that mode's entire config (key, label, damage, SEU, defense types, avoidance block, on-hit effect IDs) and appends it as a new mode. The GM then tweaks the one or two fields that differ.
+
+- The duplicate should append a disambiguating suffix to the `key` and `label` so the clone isn't an exact duplicate that confuses the active-mode selector (e.g. `stun` → `stun-copy`, `Stun` → `Stun (Copy)`). The GM renames as needed.
+- On-hit effect IDs copy over as-is (they're references, so duplicating the list is fine — both modes can reference the same effects).
+
+### Implementation sketch
+
+```js
+static async #onDuplicateWeaponMode(event, target) {
+  target ??= event.currentTarget;
+  const index = Number(target.dataset.index ?? -1);
+  const modes = Array.from(this.document.system.mechanics?.modes ?? []);
+  if (index < 0 || index >= modes.length) return;
+  const clone = foundry.utils.deepClone(modes[index]);
+  clone.key = clone.key ? `${clone.key}-copy` : "";
+  clone.label = clone.label ? `${clone.label} (Copy)` : "";
+  modes.splice(index + 1, 0, clone);  // insert right after the original
+  await this.document.update({ "system.mechanics.modes": modes });
+}
+```
+
+Register `duplicateWeaponMode` in `DEFAULT_OPTIONS.actions` and add a button to the mode-row header in the template:
+
+```hbs
+<button type="button" data-action="duplicateWeaponMode" data-index="{{index}}"
+        title="{{localize "STARFRONTIERS.Weapon.DuplicateMode"}}">
+  <i class="fa-solid fa-copy"></i>
+</button>
+```
+
+i18n key: `"DuplicateMode": "Duplicate this mode"`.
+
+### Dependencies
+
+- None — the Weapon Modes editor is already in place.
