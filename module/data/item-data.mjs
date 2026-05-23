@@ -160,6 +160,8 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
         capacity: numberField({ initial: 0, min: 0 }),
         consumed: numberField({ initial: 0, min: 0 }),
         clipItem: textField(),
+        loadedSourceId: textField(),
+        internalCharge: boolField(),
         seuPerShot: numberField({ initial: 0, min: 0 }),
         variableSetting: schemaField({
           min: numberField({ initial: 0, min: 0 }),
@@ -260,6 +262,7 @@ export class StarFrontiersAmmoData extends StarFrontiersItemData {
       mass: numberField({ initial: 0, min: 0, integer: false }),
       ammoType: textField({ initial: "rounds", choices: ["rounds", "seu"] }),
       shots: numberField({ initial: 0, min: 0 }),
+      consumed: numberField({ initial: 0, min: 0 }),
       cost: numberField({ initial: 0, min: 0 })
     };
   }

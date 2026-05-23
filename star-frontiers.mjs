@@ -383,9 +383,21 @@ const ITEM_TYPE_ICONS = {
 };
 
 Hooks.on("preCreateItem", (document, data, options, userId) => {
-  if (data.img && data.img !== "icons/svg/item-bag.svg") return;
-  const icon = ITEM_TYPE_ICONS[document.type];
-  if (icon) document.updateSource({ img: icon });
+  if (!data.img || data.img === "icons/svg/item-bag.svg") {
+    const icon = ITEM_TYPE_ICONS[document.type];
+    if (icon) document.updateSource({ img: icon });
+  }
+
+  if (document.type === "weapon") {
+    const ammo = data.system?.ammo ?? {};
+    const uses = ammo.uses ?? document.system?.ammo?.uses ?? "none";
+    const capacity = Number(ammo.capacity ?? document.system?.ammo?.capacity ?? 0);
+    const hasLoadedState = ammo.loadedSourceId !== undefined || ammo.internalCharge !== undefined;
+    if (!hasLoadedState && uses !== "none") {
+      if (ammo.clipItem) document.updateSource({ "system.ammo.loadedSourceId": ammo.clipItem, "system.ammo.internalCharge": false });
+      else if (capacity > 0) document.updateSource({ "system.ammo.loadedSourceId": "", "system.ammo.internalCharge": true });
+    }
+  }
 });
 
 Hooks.on("preCreateActor", (document, data, options, userId) => {

@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.2.8";
+export const CURRENT_SCHEMA_VERSION = "0.2.9";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -434,6 +434,75 @@ const MIGRATIONS = [
               );
             }
             updates.push({ _id: itemSrc._id, "system.ports": ports });
+          }
+          if (updates.length) {
+            await tokenDoc.actor.updateEmbeddedDocuments("Item", updates);
+          }
+        }
+      }
+    }
+  },
+  {
+    version: "0.2.9",
+    description: "Separate weapon ammo availability from loaded state with loadedSourceId/internalCharge.",
+    async migrate() {
+      const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
+
+      function buildWeaponUpdate(systemSource) {
+        const ammo = systemSource?.ammo ?? {};
+        const hasLoadedSource = hasOwn(ammo, "loadedSourceId");
+        const hasInternalCharge = hasOwn(ammo, "internalCharge");
+        if (hasLoadedSource && hasInternalCharge) return null;
+
+        const uses = ammo.uses ?? "none";
+        let loadedSourceId = "";
+        let internalCharge = false;
+
+        if (uses !== "none") {
+          if (ammo.clipItem) loadedSourceId = ammo.clipItem;
+          else if (Number(ammo.capacity ?? 0) > 0) internalCharge = true;
+        }
+
+        const update = {};
+        if (!hasLoadedSource) update["system.ammo.loadedSourceId"] = loadedSourceId;
+        if (!hasInternalCharge) update["system.ammo.internalCharge"] = hasLoadedSource ? false : internalCharge;
+        return Object.keys(update).length ? update : null;
+      }
+
+      async function migrateItem(item, systemSource) {
+        if (item?.type !== "weapon") return;
+        const update = buildWeaponUpdate(systemSource ?? item._source?.system);
+        if (update) await item.update(update);
+      }
+
+      async function migrateInvalidCollection(collection) {
+        for (const id of collection.invalidDocumentIds ?? new Set()) {
+          const item = collection.get(id, { invalid: true });
+          await migrateItem(item, item?._source?.system);
+        }
+      }
+
+      for (const item of game.items) {
+        await migrateItem(item, item._source?.system);
+      }
+      await migrateInvalidCollection(game.items);
+
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          await migrateItem(item, item._source?.system);
+        }
+        await migrateInvalidCollection(actor.items);
+      }
+
+      for (const scene of game.scenes ?? []) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor) continue;
+          const rawItems = tokenDoc.delta?._source?.items ?? [];
+          const updates = [];
+          for (const itemSrc of rawItems) {
+            if (itemSrc?.type !== "weapon") continue;
+            const update = buildWeaponUpdate(itemSrc.system);
+            if (update) updates.push({ _id: itemSrc._id, ...update });
           }
           if (updates.length) {
             await tokenDoc.actor.updateEmbeddedDocuments("Item", updates);

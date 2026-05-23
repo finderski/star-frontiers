@@ -196,13 +196,14 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     const weapons = actor.items.filter((item) => item.type === "weapon");
     const rows = await Promise.all(weapons.map(async (item) => {
       const linkedAmmo = await AttackPipeline.resolveWeaponAmmoItem(actor, item);
-      const liveCapacity = AttackPipeline.getLiveCapacity(item, linkedAmmo);
+      const loadedSource = await AttackPipeline.resolveLoadedSource(actor, item);
+      const liveCapacity = AttackPipeline.getLiveCapacity(item, loadedSource);
       const uses = item.system.ammo?.uses ?? "none";
       const hasAmmo = uses !== "none";
-      const ammoLoaded = AttackPipeline.getLoadedAmmo(item, liveCapacity, linkedAmmo);
+      const ammoLoaded = AttackPipeline.getLoadedAmmo(item, liveCapacity, loadedSource);
       const isSEU = uses === "seu";
       const canReload = StarFrontiersCharacterSheet.#canReloadWeapon(actor, item, linkedAmmo);
-      const linkedClipId = linkedAmmo?.parent === actor ? linkedAmmo.id : "";
+      const linkedClipId = actor.items.get(item.system.ammo?.clipItem ?? "") ? item.system.ammo.clipItem : "";
       const clipChoices = hasAmmo
         ? StarFrontiersCharacterSheet.#prepareAmmoLinkChoices(actor, uses, linkedClipId)
         : [];
@@ -519,7 +520,10 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
   }
 
   static async #syncWeaponPowerSourceLink(actor, weapon, nextRef = "") {
-    const currentRef = weapon.system.ammo?.clipItem ?? "";
+    const currentRefs = new Set([
+      weapon.system.ammo?.clipItem ?? "",
+      weapon.system.ammo?.loadedSourceId ?? ""
+    ].filter(Boolean));
     const nextSource = nextRef ? (actor.items.get(nextRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(nextRef).catch(() => null) : null)) : null;
 
     if (nextSource?.type === "powerSource") {
@@ -536,7 +540,8 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       }
     }
 
-    if (currentRef) {
+    for (const currentRef of currentRefs) {
+      if (currentRef === nextRef) continue;
       const currentSource = actor.items.get(currentRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(currentRef).catch(() => null) : null);
       if (currentSource?.type === "powerSource") {
         const refs = Array.from(currentSource.system.linkedWeaponRefs ?? []);
@@ -697,6 +702,51 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
           await created.update({ "system.subskillRefs": embeddedSubIds });
         }
       }
+      return created;
+    }
+
+    if (document.documentName === "Item" && document.type === "weapon" && document.parent !== this.document) {
+      this._rememberScrollPosition();
+      const weaponData = document.toObject();
+      delete weaponData._id;
+
+      const uses = weaponData.system?.ammo?.uses ?? "none";
+      if (uses !== "none") {
+        const clipRef = weaponData.system?.ammo?.clipItem;
+        let linkedSource = null;
+        if (clipRef) {
+          try {
+            if (typeof clipRef === "string" && clipRef.includes(".") && globalThis.fromUuid) {
+              linkedSource = await globalThis.fromUuid(clipRef);
+            } else {
+              linkedSource = game.items?.get?.(clipRef) ?? null;
+            }
+          } catch {
+            linkedSource = null;
+          }
+        }
+
+        const linkedShots = Number(linkedSource?.system?.shots ?? linkedSource?.system?.capacity ?? 0);
+        const capacity = linkedShots > 0 ? linkedShots : Number(weaponData.system?.ammo?.capacity ?? 0);
+
+        let copiedSourceId = "";
+        if (linkedSource && (linkedSource.type === "ammo" || linkedSource.type === "powerSource")) {
+          const sourceCopy = linkedSource.toObject();
+          delete sourceCopy._id;
+          foundry.utils.setProperty(sourceCopy, "system.carryState", "carried");
+          foundry.utils.setProperty(sourceCopy, "system.quantity", 1);
+          const [copiedSource] = await this.document.createEmbeddedDocuments("Item", [sourceCopy]);
+          copiedSourceId = copiedSource?.id ?? "";
+        }
+
+        foundry.utils.setProperty(weaponData, "system.ammo.capacity", capacity);
+        foundry.utils.setProperty(weaponData, "system.ammo.clipItem", copiedSourceId);
+        foundry.utils.setProperty(weaponData, "system.ammo.loadedSourceId", copiedSourceId);
+        foundry.utils.setProperty(weaponData, "system.ammo.internalCharge", false);
+        foundry.utils.setProperty(weaponData, "system.ammo.consumed", 0);
+      }
+
+      const [created] = await this.document.createEmbeddedDocuments("Item", [weaponData]);
       return created;
     }
 
@@ -892,8 +942,16 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         const linkedWeapon = actor.items.get(ref) ?? null;
         if (!linkedWeapon) continue;
         const clipRef = linkedWeapon.system?.ammo?.clipItem ?? "";
-        if (clipRef === item.id || clipRef === item.uuid) {
-          await linkedWeapon.update({ "system.ammo.clipItem": "" });
+        const loadedRef = linkedWeapon.system?.ammo?.loadedSourceId ?? "";
+        const updates = {};
+        if (clipRef === item.id || clipRef === item.uuid) updates["system.ammo.clipItem"] = "";
+        if (loadedRef === item.id || loadedRef === item.uuid) {
+          updates["system.ammo.loadedSourceId"] = "";
+          updates["system.ammo.internalCharge"] = false;
+          updates["system.ammo.consumed"] = 0;
+        }
+        if (Object.keys(updates).length) {
+          await linkedWeapon.update(updates);
           this._rememberScrollPosition();
         }
       }
@@ -910,6 +968,23 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         if (linkedVehicle.system?.powerSourceRef === item.id || linkedVehicle.system?.powerSourceRef === item.uuid) {
           await linkedVehicle.update({ "system.powerSourceRef": "" });
         }
+      }
+    }
+
+    if (item.type === "ammo" || item.type === "powerSource") {
+      for (const weapon of actor.items.filter((owned) => owned.type === "weapon")) {
+        const clipRef = weapon.system?.ammo?.clipItem ?? "";
+        const loadedRef = weapon.system?.ammo?.loadedSourceId ?? "";
+        const updates = {};
+        if (clipRef === item.id || clipRef === item.uuid) updates["system.ammo.clipItem"] = "";
+        if (loadedRef === item.id || loadedRef === item.uuid) {
+          updates["system.ammo.loadedSourceId"] = "";
+          updates["system.ammo.internalCharge"] = false;
+          updates["system.ammo.consumed"] = 0;
+        }
+        if (!Object.keys(updates).length) continue;
+        await weapon.update(updates);
+        this._rememberScrollPosition();
       }
     }
 
@@ -1223,16 +1298,23 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     const sourceAmmo = await StarFrontiersCharacterSheet.#resolveReloadSource(actor, weapon);
     if (!sourceAmmo) return;
 
+    await StarFrontiersCharacterSheet.#preserveOldClipConsumed(actor, weapon, sourceAmmo);
+
     const isPowerSource = sourceAmmo.type === "powerSource";
     const newCapacity = isPowerSource
       ? Number(sourceAmmo.system.capacity ?? weapon.system.ammo?.capacity ?? 0)
       : Number(sourceAmmo.system.shots ?? weapon.system.ammo?.capacity ?? 0);
+    const nextConsumed = sourceAmmo.type === "ammo"
+      ? Math.min(Number(sourceAmmo.system.consumed ?? 0), newCapacity)
+      : 0;
     const nextClipRef = sourceAmmo.parent === actor ? sourceAmmo.id : sourceAmmo.uuid;
 
     await StarFrontiersCharacterSheet.#syncWeaponPowerSourceLink(actor, weapon, nextClipRef);
     await weapon.update({
       "system.ammo.clipItem": nextClipRef,
-      "system.ammo.consumed": 0,
+      "system.ammo.loadedSourceId": nextClipRef,
+      "system.ammo.internalCharge": false,
+      "system.ammo.consumed": nextConsumed,
       "system.ammo.capacity": newCapacity
     });
     this._rememberScrollPosition();
@@ -1243,9 +1325,6 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         await sourceAmmo.update({ "system.linkedWeaponRefs": [...currentRefs, weapon.id] });
         this._rememberScrollPosition();
       }
-    } else {
-      const sourceQty = Number(sourceAmmo.system?.quantity ?? 0);
-      await sourceAmmo.update({ "system.quantity": Math.max(sourceQty - 1, 0) });
     }
 
     ui.notifications.info(game.i18n.format("STARFRONTIERS.Weapon.Reloaded", {
@@ -1263,56 +1342,68 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     await weapon.update({ "system.activeModeKey": newKey });
   }
 
+  static #qualifiesAmmoReloadSource(actor, item, uses) {
+    return item?.type === "ammo"
+      && item.parent === actor
+      && item.system?.ammoType === uses
+      && Number(item.system?.quantity ?? 0) > 0
+      && item.system?.carryState !== "stored";
+  }
+
+  static #qualifiesPowerReloadSource(actor, item) {
+    return item?.type === "powerSource"
+      && item.parent === actor
+      && Number(item.system?.remaining ?? 0) > 0
+      && item.system?.carryState !== "stored";
+  }
+
+  static #qualifiesReloadSource(actor, item, uses) {
+    if (uses === "seu") {
+      return StarFrontiersCharacterSheet.#qualifiesAmmoReloadSource(actor, item, "seu")
+        || StarFrontiersCharacterSheet.#qualifiesPowerReloadSource(actor, item);
+    }
+    return StarFrontiersCharacterSheet.#qualifiesAmmoReloadSource(actor, item, uses);
+  }
+
+  static async #preserveOldClipConsumed(actor, weapon, newSource) {
+    const oldId = weapon.system.ammo?.loadedSourceId;
+    if (!oldId) return;
+    if (newSource && (oldId === newSource.id || oldId === newSource.uuid)) return;
+    const oldSource = actor.items.get(oldId);
+    if (!oldSource || oldSource.type !== "ammo") return;
+
+    const weaponConsumed = Number(weapon.system.ammo?.consumed ?? 0);
+    const weaponCapacity = Number(weapon.system.ammo?.capacity ?? 0);
+    const oldQty = Number(oldSource.system?.quantity ?? 0);
+    if (oldQty <= 0) return;
+    if (weaponConsumed <= 0) return;
+    if (weaponConsumed >= weaponCapacity) return;
+
+    await oldSource.update({ "system.consumed": weaponConsumed });
+  }
+
   static #canReloadWeapon(actor, weapon, linkedAmmo) {
     const uses = weapon.system.ammo?.uses ?? "none";
     if (uses === "none") return false;
 
-    const qualifiesAmmo = (item) =>
-      item?.type === "ammo"
-      && Number(item?.system?.quantity ?? 0) > 0
-      && item?.system?.carryState !== "stored";
-    const qualifiesPowerSource = (item) =>
-      item?.type === "powerSource"
-      && Number(item?.system?.remaining ?? 0) > 0
-      && item?.system?.carryState !== "stored";
-
     if (uses === "seu") {
-      if (linkedAmmo && (
-        (linkedAmmo.type === "ammo" && linkedAmmo.system?.ammoType === "seu" && qualifiesAmmo(linkedAmmo))
-        || qualifiesPowerSource(linkedAmmo)
-      )) return true;
-      return actor.items.some((it) =>
-        (it.type === "ammo" && it.system.ammoType === "seu" && qualifiesAmmo(it))
-        || qualifiesPowerSource(it));
+      if (linkedAmmo && StarFrontiersCharacterSheet.#qualifiesReloadSource(actor, linkedAmmo, uses)) return true;
+      return actor.items.some((it) => StarFrontiersCharacterSheet.#qualifiesReloadSource(actor, it, uses));
     }
 
-    return !!linkedAmmo && qualifiesAmmo(linkedAmmo);
+    return !!linkedAmmo && StarFrontiersCharacterSheet.#qualifiesReloadSource(actor, linkedAmmo, uses);
   }
 
   static async #resolveReloadSource(actor, weapon) {
     const uses = weapon.system.ammo?.uses ?? "none";
     if (uses === "none") return null;
 
-    const qualifiesAmmo = (item) =>
-      item?.type === "ammo"
-      && Number(item?.system?.quantity ?? 0) > 0
-      && item?.system?.carryState !== "stored";
-    const qualifiesPowerSource = (item) =>
-      item?.type === "powerSource"
-      && Number(item?.system?.remaining ?? 0) > 0
-      && item?.system?.carryState !== "stored";
-
     const linkedAmmo = await AttackPipeline.resolveWeaponAmmoItem(actor, weapon);
 
     if (uses === "seu") {
-      if (linkedAmmo && (
-        (linkedAmmo.type === "ammo" && linkedAmmo.system?.ammoType === "seu" && qualifiesAmmo(linkedAmmo))
-        || qualifiesPowerSource(linkedAmmo)
-      )) return linkedAmmo;
+      if (linkedAmmo && StarFrontiersCharacterSheet.#qualifiesReloadSource(actor, linkedAmmo, uses)) return linkedAmmo;
 
-      const candidates = actor.items.filter((it) =>
-        (it.type === "ammo" && it.system.ammoType === "seu" && qualifiesAmmo(it))
-        || qualifiesPowerSource(it));
+      const candidates = actor.items.filter((it) => StarFrontiersCharacterSheet.#qualifiesReloadSource(actor, it, uses));
 
       if (!candidates.length) {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoSeuAvailable"));
@@ -1326,12 +1417,16 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       ui.notifications.warn(game.i18n.format("STARFRONTIERS.Weapon.NoLinkedAmmo", { weapon: weapon.name }));
       return null;
     }
-    if (Number(linkedAmmo.system?.quantity ?? 0) <= 0) {
-      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoAmmoAvailable"));
+    if (linkedAmmo.parent !== actor) {
+      ui.notifications.warn(game.i18n.format("STARFRONTIERS.Weapon.NoLinkedAmmo", { weapon: weapon.name }));
       return null;
     }
     if (linkedAmmo.system?.carryState === "stored") {
       ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AmmoStored"));
+      return null;
+    }
+    if (Number(linkedAmmo.system?.quantity ?? 0) <= 0) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoAmmoAvailable"));
       return null;
     }
     return linkedAmmo;
@@ -1694,11 +1789,11 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     this._rememberScrollPosition();
 
     if (target.dataset.itemAmmoLoaded !== undefined) {
-      const linkedAmmo = await AttackPipeline.resolveWeaponAmmoItem(this.document, item);
-      const capacity = AttackPipeline.getLiveCapacity(item, linkedAmmo);
+      const loadedSource = await AttackPipeline.resolveLoadedSource(this.document, item);
+      const capacity = AttackPipeline.getLiveCapacity(item, loadedSource);
       const loaded = Math.min(Math.max(Number(target.value || 0), 0), capacity);
-      if (linkedAmmo?.type === "powerSource") {
-        await linkedAmmo.update({ "system.remaining": loaded });
+      if (loadedSource?.type === "powerSource") {
+        await loadedSource.update({ "system.remaining": loaded });
         await item.update({ "system.ammo.consumed": Math.max(capacity - loaded, 0) });
         return;
       }
@@ -1717,16 +1812,51 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
 
     if (target.dataset.itemField === "system.ammo.clipItem" && item.type === "weapon") {
       const nextRef = String(target.value ?? "");
+      if (!nextRef) {
+        const synced = await StarFrontiersCharacterSheet.#syncWeaponPowerSourceLink(this.document, item, "");
+        if (synced === false) {
+          target.value = item.system.ammo?.clipItem ?? "";
+          return;
+        }
+        await StarFrontiersCharacterSheet.#preserveOldClipConsumed(this.document, item, null);
+        await item.update({
+          "system.ammo.clipItem": "",
+          "system.ammo.loadedSourceId": "",
+          "system.ammo.internalCharge": false,
+          "system.ammo.consumed": 0
+        });
+        return;
+      }
+
+      const uses = item.system.ammo?.uses ?? "none";
+      const nextSource = this.document.items.get(nextRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(nextRef).catch(() => null) : null);
+      if (!StarFrontiersCharacterSheet.#qualifiesReloadSource(this.document, nextSource, uses)) {
+        target.value = item.system.ammo?.clipItem ?? "";
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoAmmoAvailable"));
+        return;
+      }
+
       const synced = await StarFrontiersCharacterSheet.#syncWeaponPowerSourceLink(this.document, item, nextRef);
       if (synced === false) {
         target.value = item.system.ammo?.clipItem ?? "";
         return;
       }
-      const nextSource = nextRef ? (this.document.items.get(nextRef) ?? (globalThis.fromUuid ? await globalThis.fromUuid(nextRef).catch(() => null) : null)) : null;
-      const updateData = { "system.ammo.clipItem": nextRef };
-      if (nextSource?.type === "ammo") updateData["system.ammo.capacity"] = Number(nextSource.system.shots ?? 0);
-      if (nextSource?.type === "powerSource") updateData["system.ammo.capacity"] = Number(nextSource.system.capacity ?? item.system.ammo?.capacity ?? 0);
-      await item.update(updateData);
+
+      await StarFrontiersCharacterSheet.#preserveOldClipConsumed(this.document, item, nextSource);
+
+      const nextCapacity = nextSource?.type === "ammo"
+        ? Number(nextSource.system.shots ?? 0)
+        : Number(nextSource?.system?.capacity ?? item.system.ammo?.capacity ?? 0);
+      const nextConsumed = nextSource?.type === "ammo"
+        ? Math.min(Number(nextSource.system?.consumed ?? 0), nextCapacity)
+        : 0;
+      await item.update({
+        "system.ammo.clipItem": nextRef,
+        "system.ammo.loadedSourceId": nextRef,
+        "system.ammo.internalCharge": false,
+        "system.ammo.consumed": nextConsumed,
+        "system.ammo.capacity": nextCapacity
+      });
       return;
     }
 

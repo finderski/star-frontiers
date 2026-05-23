@@ -491,10 +491,16 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
           }
         }
       }
+      const loadedRef = this.item.system.ammo?.loadedSourceId ?? "";
       const updateData = {
         "system.ammo.clipItem": ref,
         "system.ammo.capacity": document.system.shots ?? 0
       };
+      if (loadedRef && loadedRef === currentRef && currentRef !== ref) {
+        updateData["system.ammo.loadedSourceId"] = "";
+        updateData["system.ammo.internalCharge"] = false;
+        updateData["system.ammo.consumed"] = 0;
+      }
       await this.item.update(updateData);
       ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.AmmoLinked", { name: document.name }));
       return document;
@@ -678,7 +684,14 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
 
   static async #onClearAmmo(event, target) {
     const currentRef = this.item.system.ammo?.clipItem ?? "";
-    await this.item.update({ "system.ammo.clipItem": "" });
+    const loadedRef = this.item.system.ammo?.loadedSourceId ?? "";
+    const updates = { "system.ammo.clipItem": "" };
+    if (loadedRef && loadedRef === currentRef) {
+      updates["system.ammo.loadedSourceId"] = "";
+      updates["system.ammo.internalCharge"] = false;
+      updates["system.ammo.consumed"] = 0;
+    }
+    await this.item.update(updates);
 
     if (!currentRef) return;
     let doc = this.item.actor?.items?.get(currentRef) ?? game.items?.get(currentRef) ?? null;
@@ -910,9 +923,14 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     }
 
     await this.item.update({ "system.linkedWeaponRefs": current });
-    await document.update({
-      "system.ammo.clipItem": psRef
-    });
+    const loadedRef = document.system?.ammo?.loadedSourceId ?? "";
+    const updates = { "system.ammo.clipItem": psRef };
+    if (loadedRef && loadedRef === prevPsRef && prevPsRef !== psRef) {
+      updates["system.ammo.loadedSourceId"] = "";
+      updates["system.ammo.internalCharge"] = false;
+      updates["system.ammo.consumed"] = 0;
+    }
+    await document.update(updates);
   }
 
   async #linkPowerSourceScreen(document) {
@@ -1014,7 +1032,14 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       }
     }
 
-    await this.item.update({ "system.ammo.clipItem": psRef });
+    const loadedRef = this.item.system.ammo?.loadedSourceId ?? "";
+    const updates = { "system.ammo.clipItem": psRef };
+    if (loadedRef && loadedRef === prevRef && prevRef !== psRef) {
+      updates["system.ammo.loadedSourceId"] = "";
+      updates["system.ammo.internalCharge"] = false;
+      updates["system.ammo.consumed"] = 0;
+    }
+    await this.item.update(updates);
     const refs = Array.from(document.system.linkedWeaponRefs ?? []);
     if (!refs.includes(weaponRef)) refs.push(weaponRef);
     await document.update({ "system.linkedWeaponRefs": refs });
@@ -1093,8 +1118,16 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     if (!doc) return;
 
     const clipRef = doc.system?.ammo?.clipItem ?? "";
-    if (clipRef === this.item.id || clipRef === this.item.uuid) {
-      await doc.update({ "system.ammo.clipItem": "" });
+    const loadedRef = doc.system?.ammo?.loadedSourceId ?? "";
+    const updates = {};
+    if (clipRef === this.item.id || clipRef === this.item.uuid) updates["system.ammo.clipItem"] = "";
+    if (loadedRef === this.item.id || loadedRef === this.item.uuid) {
+      updates["system.ammo.loadedSourceId"] = "";
+      updates["system.ammo.internalCharge"] = false;
+      updates["system.ammo.consumed"] = 0;
+    }
+    if (Object.keys(updates).length) {
+      await doc.update(updates);
     }
   }
 

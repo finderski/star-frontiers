@@ -355,31 +355,33 @@ The compute-on-the-fly approach is cleaner (no new schema). The cap check then b
 
 ## 11. Ammo Management — Partial-Clip Preservation & Reload Workflow
 
-**Status:** Concept only. Current reload behavior is binary: a weapon either has its loaded clip or it doesn't. Swapping a partially-used clip for a fresh one loses the old one's remaining state.
+**Status:** Partial-clip preservation **DONE** (0.2.9). Auto-link on drop **DONE** for compendium drops (0.2.9). Clip-type discrimination and recharge hierarchy still pending.
 
 ### Context
 
 In play, characters don't throw away partially-used clips between firefights. A character who finishes combat with 5 SEU left in a powerclip and 6 fresh powerclips in their pack will swap the depleted clip for a fresh one but keep the partial — it's a backup for emergencies, or to top off later if the clip type is rechargeable.
 
-The current model doesn't represent this. When a character reloads, the existing `linkedPowerSource` is essentially abandoned, and a new one takes its place. There's no tracked partial-clip in inventory that the player can swap back to.
-
 Related concern: when a new powerclip is dropped onto a character sheet, the system could auto-link it to any compatible weapon that has no current power source. That's a usability win but needs care — auto-linking one powerclip to multiple weapons would conflict with port limits (from the 0.2.8 work).
 
-### Work — partial-clip preservation
+### Work — partial-clip preservation (DONE 0.2.9)
 
-When a player swaps a clip on a weapon:
+Implemented for `ammo`-type clips (SEU clips and rounds clips). PowerSource items already track `remaining` per shot — no change needed there.
 
-1. The weapon's currently-linked PowerSource (the depleted clip) becomes a standalone inventory item on the actor. Its `remaining` SEU is preserved as-is. Its bidirectional link to the weapon clears.
-2. The new clip (which the player selects from their inventory of compatible clips) becomes the weapon's `clipItem`. Its bidirectional link to the weapon establishes.
-3. If the depleted clip was already a standalone owned inventory item (i.e. not embedded in the weapon's data), step 1 is just "clear the link" — the item already exists.
+What landed:
 
-The UX flow:
+- New schema field `ammo.system.consumed` (default 0, hidden from item sheet UI — actor-context state).
+- `#preserveOldClipConsumed(actor, weapon, newSource)` saves `weapon.system.ammo.consumed` onto the OLD `loadedSourceId` item's `system.consumed` at every swap, guarded so only true partials are saved (old qty > 0, weapon.consumed > 0 AND < capacity, old is ammo type).
+- When loading a new source, weapon's `consumed` is initialized from `newSource.system.consumed` clamped to capacity — so loading a partial clip resumes with the right remaining count; loading a fresh clip (consumed=0) starts full.
+- Both reload paths use this: `#onReloadWeapon` (Reload button) and the Linked-Ammo dropdown branch of `#onItemFieldChange`.
+- Fire-empty path still decrements clip `quantity` to 0 when the gun empties — the clip's `consumed` is left at its last save (qty=0 prevents reuse).
+- Compendium-link drop copies the linked source into inventory as `qty: 1, consumed: 0` and sets `weapon.loadedSourceId` to the embedded copy, so the dropped weapon ships pre-loaded from the inventory clip.
 
-- Click "Reload" on a weapon row → dialog or popover lists all compatible PowerSource items in actor inventory (matching sourceType, with `remaining > 0`).
-- Each option shows the clip's name and current SEU (e.g. "Powerclip — 20/20", "Powerclip — 14/20", "Beltpack — 47/50").
-- Player picks one. The swap executes: old clip becomes/stays inventory, new clip becomes linked.
+**Stacking caveat (documented):** `consumed` lives on the ammo *item*, which represents `quantity` identical clips. For `qty > 1` stacks, every clip would share the same `consumed` value, incorrectly marking unused stack-siblings as partial. Partial tracking is correct only for `qty = 1` items (the shape produced by compendium-link drops). Player-created stacks with qty > 1 should be treated as best-effort until split-on-swap lands.
 
-This implies clips should be **first-class inventory items**, always — never just nested inside the weapon's data. The current schema supports this (powerclip is a `powerSource` item type), but the implementation may shortcut to embedded data in some paths. Audit before implementing.
+**Still open in this section (NOT done):**
+
+- Reload UX with a chooser dialog that lists all compatible inventory clips with their partial counts ("Powerclip — 14/20", etc.). Current implementation auto-picks: linked clip if it qualifies, else single owned candidate, else a chooser only when multiple SEU candidates exist.
+- Split-on-swap for stacks (qty > 1): when swapping a partially-used clip back into inventory while qty > 1, create a separate item with qty=1 + partial consumed so the partial doesn't pollute the rest of the stack.
 
 ### Work — clip-type discrimination
 

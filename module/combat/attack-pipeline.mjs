@@ -50,19 +50,35 @@ export function getRangePreviewData(sourceToken, targetToken) {
   };
 }
 
-export function getLiveCapacity(weapon, linkedAmmo) {
-  if (linkedAmmo?.type === "powerSource") return Number(linkedAmmo.system?.capacity ?? weapon.system.ammo?.capacity ?? 0);
-  if (linkedAmmo?.system?.shots > 0) return linkedAmmo.system.shots;
+export function getLiveCapacity(weapon, loadedSource = null) {
+  if (loadedSource?.type === "powerSource") return Number(loadedSource.system?.capacity ?? weapon.system.ammo?.capacity ?? 0);
+  if (loadedSource?.system?.shots > 0) return loadedSource.system.shots;
   return weapon.system.ammo?.capacity ?? 0;
 }
 
-export function getLoadedAmmo(weapon, liveCapacity, linkedSource = null) {
-  if (linkedSource?.type === "powerSource") {
-    return Math.max(Number(linkedSource.system?.remaining ?? 0), 0);
+export function getLoadedAmmo(weapon, liveCapacity, loadedSource = null) {
+  if (loadedSource?.type === "powerSource") {
+    return Math.max(Number(loadedSource.system?.remaining ?? 0), 0);
+  }
+  if (!loadedSource && !weapon.system.ammo?.internalCharge) {
+    return 0;
   }
   const capacity = liveCapacity ?? weapon.system.ammo?.capacity ?? 0;
   if (!capacity) return 0;
   return Math.max(capacity - (weapon.system.ammo?.consumed ?? 0), 0);
+}
+
+export async function resolveLoadedSource(actor, weapon) {
+  const ref = weapon.system.ammo?.loadedSourceId;
+  if (!ref) return null;
+  const owned = actor.items.get(ref);
+  if (owned) return owned;
+  if (!globalThis.fromUuid) return null;
+  try {
+    return await globalThis.fromUuid(ref);
+  } catch {
+    return null;
+  }
 }
 
 export async function resolveWeaponAmmoItem(actor, weapon) {
@@ -381,11 +397,11 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   const targetActorUuid = targetedToken?.actor?.uuid ?? "";
 
   const ammoCheck = getAmmoConsumption(weapon);
-  const linkedAmmo = await resolveWeaponAmmoItem(actor, weapon);
-  const liveCapacity = getLiveCapacity(weapon, linkedAmmo);
+  const loadedSource = await resolveLoadedSource(actor, weapon);
+  const liveCapacity = getLiveCapacity(weapon, loadedSource);
 
   if (ammoCheck.amount > 0) {
-    const loaded = getLoadedAmmo(weapon, liveCapacity, linkedAmmo);
+    const loaded = getLoadedAmmo(weapon, liveCapacity, loadedSource);
     if (loaded < ammoCheck.amount) {
       ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
       return;
@@ -411,19 +427,31 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   });
 
   if (ammoCheck.amount > 0) {
-    const loaded = getLoadedAmmo(weapon, liveCapacity, linkedAmmo);
+    const loaded = getLoadedAmmo(weapon, liveCapacity, loadedSource);
     if (loaded < totalAmmo) {
       ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.OutOfAmmo"));
       return;
     }
   }
 
-  if (game.settings.get(SYSTEM_ID, "automateAmmo") && ammoCheck.amount > 0) {
-    const nextConsumed = Math.min((weapon.system.ammo?.consumed ?? 0) + totalAmmo, Math.max(liveCapacity, totalAmmo));
+  const automateAmmo = game.settings.get(SYSTEM_ID, "automateAmmo");
+  let displayedConsumed = Number(weapon.system.ammo?.consumed ?? 0);
+  let displayedPowerRemaining = loadedSource?.type === "powerSource"
+    ? Number(loadedSource.system?.remaining ?? 0)
+    : null;
+  if (automateAmmo && ammoCheck.amount > 0) {
+    const nextConsumed = Math.min(displayedConsumed + totalAmmo, Math.max(liveCapacity, totalAmmo));
     await weapon.update({ "system.ammo.consumed": nextConsumed });
-    if (linkedAmmo?.type === "powerSource") {
-      const nextRemaining = Math.max(Number(linkedAmmo.system?.remaining ?? 0) - totalAmmo, 0);
-      await linkedAmmo.update({ "system.remaining": nextRemaining });
+    displayedConsumed = nextConsumed;
+    if (loadedSource?.type === "powerSource") {
+      const nextRemaining = Math.max(displayedPowerRemaining - totalAmmo, 0);
+      await loadedSource.update({ "system.remaining": nextRemaining });
+      displayedPowerRemaining = nextRemaining;
+    } else if (loadedSource?.type === "ammo" && nextConsumed >= liveCapacity) {
+      const currentQty = Number(loadedSource.system?.quantity ?? 0);
+      if (currentQty > 0) {
+        await loadedSource.update({ "system.quantity": currentQty - 1 });
+      }
     }
   }
 
@@ -497,9 +525,9 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   }
 
   if (ammoCheck.amount > 0) {
-    const displayRemaining = linkedAmmo?.type === "powerSource"
-      ? Math.max(Number(linkedAmmo.system?.remaining ?? 0) - (game.settings.get(SYSTEM_ID, "automateAmmo") ? totalAmmo : 0), 0)
-      : Math.max(liveCapacity - ((weapon.system.ammo?.consumed ?? 0) + (game.settings.get(SYSTEM_ID, "automateAmmo") ? totalAmmo : 0)), 0);
+    const displayRemaining = loadedSource?.type === "powerSource"
+      ? Math.max(displayedPowerRemaining, 0)
+      : Math.max(liveCapacity - displayedConsumed, 0);
     rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.AmmoRemaining"), value: `${displayRemaining}/${liveCapacity}` });
   }
 
