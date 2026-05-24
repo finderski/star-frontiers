@@ -1115,6 +1115,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     target ??= event.currentTarget;
     const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!weapon) return;
+    this._rememberScrollPosition();
     await AttackPipeline.rollWeaponAttack(this.document, weapon, target.dataset.rollMode ?? "public");
   }
 
@@ -1122,6 +1123,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     target ??= event.currentTarget;
     const weapon = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!weapon) return;
+    this._rememberScrollPosition();
     await AttackPipeline.rollWeaponDamage(this.document, weapon, target.dataset.rollMode ?? "public");
   }
 

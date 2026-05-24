@@ -602,20 +602,26 @@ export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid 
     return;
   }
 
-  const targetScore = Number(abilityRecord.value ?? 0);
-  const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
-  const success = roll.total <= targetScore;
-
+  const targetScore = ability === "sta"
+    ? Number(target.system.stamina?.value ?? abilityRecord.value ?? 0)
+    : Number(abilityRecord.value ?? 0);
   const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
   const modeLabel = getWeaponModeLabel(activeMode);
   const effectLabel = getAvoidanceEffectLabel(activeMode.avoidance.onSuccessEffect);
 
-  const rollHtml = await roll.render({
+  const prompt = await promptModifier(abilityLabel, targetScore);
+  if (!prompt) return;
+  const { modifier = 0, forcedRoll = null } = prompt;
+  const adjustedTarget = targetScore + modifier;
+
+  const { total: rollTotal, rollHtml, forcedTotal } = await evaluatePercentileRoll({
+    forcedTotal: forcedRoll,
     flavor: game.i18n.format("STARFRONTIERS.Weapon.AvoidanceFlavor", {
       target: target.name,
       ability: abilityLabel
     })
   });
+  const success = rollTotal <= adjustedTarget;
 
   const outcome = success
     ? game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceSuccess")
@@ -636,6 +642,22 @@ export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid 
     {
       label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceTargetLabel"),
       value: `${abilityLabel} ${targetScore}`
+    },
+    {
+      label: game.i18n.localize("STARFRONTIERS.Character.Modifier"),
+      value: modifier >= 0 ? `+${modifier}` : String(modifier)
+    },
+    {
+      label: game.i18n.localize("STARFRONTIERS.Character.Target"),
+      value: String(adjustedTarget)
+    },
+    ...(forcedTotal !== null ? [{
+      label: game.i18n.localize("STARFRONTIERS.Character.ForcedResult"),
+      value: String(forcedTotal).padStart(2, "0")
+    }] : []),
+    {
+      label: game.i18n.localize("STARFRONTIERS.Character.Rolled"),
+      value: String(rollTotal).padStart(2, "0")
     }
   ];
 
