@@ -581,6 +581,9 @@
                   {{#if row.statusBadge}}
                     <span class="equipment-row__badge">{{row.statusBadge}}</span>
                   {{/if}}
+                  {{#if row.isLinked}}
+                    <i class="fa-solid fa-link equipment-row__link-icon" title="{{row.linkedWeaponsLabel}}" aria-label="{{row.linkedWeaponsLabel}}"></i>
+                  {{/if}}
                   {{#if row.expandable}}
                     <i class="fa-solid fa-chevron-down equipment-row__chevron"></i>
                   {{/if}}

@@ -896,13 +896,30 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     }
 
     const currentLinks = Array.from(powerSource.system?.[config.field] ?? []);
-    const alreadyLinked = currentLinks.includes(incomingRef);
-    if (!alreadyLinked && currentLinks.length >= maxPorts) {
+    const validLinks = currentLinks.filter((ref) => StarFrontiersItemSheet.#linkRefResolves(powerSource, ref, portKey));
+    if (validLinks.length !== currentLinks.length) {
+      await powerSource.update({ [`system.${config.field}`]: validLinks });
+    }
+    const alreadyLinked = validLinks.includes(incomingRef);
+    if (!alreadyLinked && validLinks.length >= maxPorts) {
       ui.notifications.warn(game.i18n.format(reverse ? config.reverseFullKey : config.forwardFullKey, { max: maxPorts }));
       return false;
     }
 
     return true;
+  }
+
+  static #linkRefResolves(powerSource, ref, portKey) {
+    if (!ref) return false;
+    const owner = powerSource?.parent;
+    if (owner?.items?.get?.(ref)) return true;
+    try {
+      const resolved = globalThis.fromUuidSync?.(ref);
+      if (resolved && resolved.type === portKey) return true;
+    } catch {
+      /* ignore */
+    }
+    return false;
   }
 
   async #linkPowerSourceWeapon(document) {

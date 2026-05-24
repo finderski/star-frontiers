@@ -356,6 +356,7 @@
       "LimbGrowMinutes": "Limb Grow (min)",
       "LimbsPerDexBucket": "Limbs / DEX",
       "LinkedAmmo": "Linked Ammo",
+      "LinkedToWeapons": "Linked to: {weapons}",
       "LinkedRacialAbility": "Linked Racial Ability",
       "LightSensitivity": "Light Sensitivity",
       "Loaded": "Loaded",

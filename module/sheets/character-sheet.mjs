@@ -205,7 +205,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       const canReload = StarFrontiersCharacterSheet.#canReloadWeapon(actor, item, linkedAmmo);
       const linkedClipId = actor.items.get(item.system.ammo?.clipItem ?? "") ? item.system.ammo.clipItem : "";
       const clipChoices = hasAmmo
-        ? StarFrontiersCharacterSheet.#prepareAmmoLinkChoices(actor, uses, linkedClipId)
+        ? StarFrontiersCharacterSheet.#prepareAmmoLinkChoices(actor, uses, linkedClipId, item.id)
         : [];
       const modeList = Array.from(item.system.mechanics?.modes ?? []).map((mode) => ({
         key: mode.key,
@@ -297,6 +297,8 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       inventoryItems.push(item);
     }
 
+    const ownedWeapons = actor.items.filter((it) => it.type === "weapon");
+
     const buildRow = async (item) => {
       const sys = item.system ?? {};
       const quantity = Number(sys.quantity ?? 1);
@@ -306,6 +308,12 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       const carryState = item.type === "computer" && !isPortableComputer
         ? "stored"
         : (sys.carryState || "carried");
+
+      const linkedWeapons = (item.type === "ammo" || item.type === "powerSource")
+        ? ownedWeapons
+            .filter((w) => w.system.ammo?.clipItem === item.id || w.system.ammo?.loadedSourceId === item.id)
+            .map((w) => ({ id: w.id, name: w.name }))
+        : [];
 
       let statusBadge = "";
       if (item.type === "consumable") statusBadge = `${sys.uses?.value ?? 0}/${sys.uses?.max ?? 0}`;
@@ -346,6 +354,11 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
           ? StarFrontiersCharacterSheet.#resolveLinkedSkillName(actor, sys.requiredSkillRef ?? "")
           : "",
         portabilityLocked: item.type === "computer" && !isPortableComputer,
+        linkedWeapons,
+        isLinked: linkedWeapons.length > 0,
+        linkedWeaponsLabel: linkedWeapons.length
+          ? game.i18n.format("STARFRONTIERS.Item.LinkedToWeapons", { weapons: linkedWeapons.map((w) => w.name).join(", ") })
+          : "",
         details: await StarFrontiersCharacterSheet.#prepareEquipmentDetails(actor, item)
       };
     };
@@ -492,11 +505,22 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     };
   }
 
-  static #prepareAmmoLinkChoices(actor, uses, linkedRef = "") {
+  static #prepareAmmoLinkChoices(actor, uses, linkedRef = "", currentWeaponId = "") {
+    const weapons = actor.items.filter((it) => it.type === "weapon" && it.id !== currentWeaponId);
+    const otherWeaponsHolding = (sourceId) => weapons.filter((w) =>
+      w.system.ammo?.clipItem === sourceId || w.system.ammo?.loadedSourceId === sourceId);
+
+    const formatChoice = (item, linkedElsewhere) => ({
+      id: item.id,
+      name: linkedElsewhere ? `🔗 ${item.name}` : item.name,
+      selected: item.id === linkedRef,
+      linkedElsewhere
+    });
+
     const groups = [];
     const clips = actor.items
       .filter((it) => it.type === "ammo" && it.system.ammoType === uses)
-      .map((it) => ({ id: it.id, name: it.name, selected: it.id === linkedRef }));
+      .map((it) => formatChoice(it, otherWeaponsHolding(it.id).length > 0));
     if (clips.length) {
       groups.push({
         group: game.i18n.localize("STARFRONTIERS.Weapon.ClipGroup"),
@@ -507,7 +531,12 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     if (uses === "seu") {
       const powerSources = actor.items
         .filter((it) => it.type === "powerSource")
-        .map((it) => ({ id: it.id, name: it.name, selected: it.id === linkedRef }));
+        .map((it) => {
+          const cap = Number(it.system?.ports?.weapon ?? 0);
+          const holders = otherWeaponsHolding(it.id);
+          const atCap = cap > 0 && holders.length >= cap;
+          return formatChoice(it, atCap);
+        });
       if (powerSources.length) {
         groups.push({
           group: game.i18n.localize("STARFRONTIERS.Weapon.PowerSourceGroup"),
@@ -528,13 +557,17 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
 
     if (nextSource?.type === "powerSource") {
       const maxPorts = Number(nextSource.system.ports?.weapon ?? 0);
-      const refs = Array.from(nextSource.system.linkedWeaponRefs ?? []);
-      const alreadyLinked = refs.includes(weapon.id) || refs.includes(weapon.uuid);
       if (maxPorts <= 0) {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.NoPortsForType.weapon"));
         return false;
       }
-      if (!alreadyLinked && refs.length >= maxPorts) {
+      const refs = Array.from(nextSource.system.linkedWeaponRefs ?? []);
+      const validRefs = refs.filter((ref) => StarFrontiersCharacterSheet.#weaponRefResolves(actor, ref));
+      if (validRefs.length !== refs.length) {
+        await nextSource.update({ "system.linkedWeaponRefs": validRefs });
+      }
+      const alreadyLinked = validRefs.includes(weapon.id) || validRefs.includes(weapon.uuid);
+      if (!alreadyLinked && validRefs.length >= maxPorts) {
         ui.notifications.warn(game.i18n.format("STARFRONTIERS.Item.PortsFull.weapon", { max: maxPorts }));
         return false;
       }
@@ -563,6 +596,18 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       });
     }
     return true;
+  }
+
+  static #weaponRefResolves(actor, ref) {
+    if (!ref) return false;
+    if (actor?.items?.get?.(ref)) return true;
+    try {
+      const resolved = globalThis.fromUuidSync?.(ref);
+      if (resolved && resolved.type === "weapon") return true;
+    } catch {
+      /* ignore */
+    }
+    return false;
   }
 
   static #getBatteryIcon(loaded, capacity) {
@@ -711,6 +756,8 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       delete weaponData._id;
 
       const uses = weaponData.system?.ammo?.uses ?? "none";
+      let copiedSourceId = "";
+      let copiedSourceType = "";
       if (uses !== "none") {
         const clipRef = weaponData.system?.ammo?.clipItem;
         let linkedSource = null;
@@ -729,14 +776,22 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         const linkedShots = Number(linkedSource?.system?.shots ?? linkedSource?.system?.capacity ?? 0);
         const capacity = linkedShots > 0 ? linkedShots : Number(weaponData.system?.ammo?.capacity ?? 0);
 
-        let copiedSourceId = "";
         if (linkedSource && (linkedSource.type === "ammo" || linkedSource.type === "powerSource")) {
           const sourceCopy = linkedSource.toObject();
           delete sourceCopy._id;
           foundry.utils.setProperty(sourceCopy, "system.carryState", "carried");
           foundry.utils.setProperty(sourceCopy, "system.quantity", 1);
+          if (linkedSource.type === "powerSource") {
+            foundry.utils.setProperty(sourceCopy, "system.linkedWeaponRefs", []);
+            foundry.utils.setProperty(sourceCopy, "system.linkedScreenRefs", []);
+            foundry.utils.setProperty(sourceCopy, "system.linkedVehicleRefs", []);
+          }
+          if (linkedSource.type === "ammo") {
+            foundry.utils.setProperty(sourceCopy, "system.consumed", 0);
+          }
           const [copiedSource] = await this.document.createEmbeddedDocuments("Item", [sourceCopy]);
           copiedSourceId = copiedSource?.id ?? "";
+          copiedSourceType = linkedSource.type;
         }
 
         foundry.utils.setProperty(weaponData, "system.ammo.capacity", capacity);
@@ -747,6 +802,30 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       }
 
       const [created] = await this.document.createEmbeddedDocuments("Item", [weaponData]);
+
+      if (copiedSourceType === "powerSource" && copiedSourceId && created?.id) {
+        const copiedSource = this.document.items.get(copiedSourceId);
+        if (copiedSource) {
+          await copiedSource.update({ "system.linkedWeaponRefs": [created.id] });
+        }
+      }
+
+      return created;
+    }
+
+    if (document.documentName === "Item" && (document.type === "powerSource" || document.type === "ammo") && document.parent !== this.document) {
+      this._rememberScrollPosition();
+      const itemData = document.toObject();
+      delete itemData._id;
+      if (document.type === "powerSource") {
+        foundry.utils.setProperty(itemData, "system.linkedWeaponRefs", []);
+        foundry.utils.setProperty(itemData, "system.linkedScreenRefs", []);
+        foundry.utils.setProperty(itemData, "system.linkedVehicleRefs", []);
+      }
+      if (document.type === "ammo") {
+        foundry.utils.setProperty(itemData, "system.consumed", 0);
+      }
+      const [created] = await this.document.createEmbeddedDocuments("Item", [itemData]);
       return created;
     }
 
@@ -1365,6 +1444,42 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     return StarFrontiersCharacterSheet.#qualifiesAmmoReloadSource(actor, item, uses);
   }
 
+  static async #forceUnlinkOtherWeapons(actor, weapon, nextSource) {
+    if (!nextSource) return;
+    const sourceId = nextSource.id;
+    if (!sourceId) return;
+
+    const cap = nextSource.type === "powerSource"
+      ? Number(nextSource.system?.ports?.weapon ?? 0)
+      : 1;
+
+    const holders = actor.items.filter((w) =>
+      w.type === "weapon"
+      && w.id !== weapon.id
+      && (w.system.ammo?.clipItem === sourceId || w.system.ammo?.loadedSourceId === sourceId));
+
+    if (!holders.length) return;
+    if (nextSource.type === "powerSource" && cap > 0 && holders.length < cap) return;
+
+    const displacedIds = new Set();
+    for (const other of holders) {
+      await StarFrontiersCharacterSheet.#preserveOldClipConsumed(actor, other, nextSource);
+      await other.update({
+        "system.ammo.clipItem": "",
+        "system.ammo.loadedSourceId": "",
+        "system.ammo.internalCharge": false,
+        "system.ammo.consumed": 0
+      });
+      displacedIds.add(other.id);
+      if (other.uuid) displacedIds.add(other.uuid);
+    }
+
+    if (nextSource.type === "powerSource" && displacedIds.size) {
+      const remaining = Array.from(nextSource.system.linkedWeaponRefs ?? []).filter((ref) => !displacedIds.has(ref));
+      await nextSource.update({ "system.linkedWeaponRefs": remaining });
+    }
+  }
+
   static async #preserveOldClipConsumed(actor, weapon, newSource) {
     const oldId = weapon.system.ammo?.loadedSourceId;
     if (!oldId) return;
@@ -1835,6 +1950,8 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.NoAmmoAvailable"));
         return;
       }
+
+      await StarFrontiersCharacterSheet.#forceUnlinkOtherWeapons(this.document, item, nextSource);
 
       const synced = await StarFrontiersCharacterSheet.#syncWeaponPowerSourceLink(this.document, item, nextRef);
       if (synced === false) {
