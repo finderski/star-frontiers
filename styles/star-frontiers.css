@@ -441,6 +441,26 @@ label.field-line,
   justify-content: flex-end;
 }
 
+.drag-handle {
+  align-items: center;
+  color: var(--sf-muted);
+  cursor: grab;
+  display: inline-flex;
+  flex: 0 0 18px;
+  justify-content: center;
+  min-height: 24px;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  color: var(--sf-focus);
+}
+
 /* --- 4d. Item-list / item-row pattern ---
  * Generic vertical list of items with name + action buttons. Used for
  * armor list, screen list (Profile tab), skills list (Skills tab), and
@@ -470,6 +490,10 @@ label.field-line,
   grid-template-columns: minmax(0, 1fr) auto;
   min-height: 28px;
   padding: 4px;
+}
+
+.item-row--reorderable {
+  grid-template-columns: 18px minmax(0, 1fr) auto;
 }
 
 .item-name-button {
@@ -1117,6 +1141,18 @@ button.roll-label-main:focus-visible {
   text-align: center;
 }
 
+.weapon-row__name-cell {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.weapon-row__name-cell .roll-label-group {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .weapons-grid .item-actions {
   display: grid;
   gap: 4px;
@@ -1527,6 +1563,47 @@ button.roll-label-main:focus-visible {
   margin: 0 0 15px 0;
   padding: 0 0 20px 0;
   border-bottom: 2px solid var(--sf-line);
+}
+
+.skills-box {
+  display: grid;
+  gap: 12px;
+}
+
+.skill-group {
+  display: grid;
+  gap: 6px;
+}
+
+.skill-group__header {
+  align-items: center;
+  border-bottom: 1px solid var(--sf-row-line);
+  display: flex;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+.skill-group__title {
+  align-items: center;
+  display: inline-flex;
+  font-family: var(--fieldset);
+  font-size: 0.95rem;
+  gap: 6px;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+.skill-group__title .fa-star {
+  color: var(--sf-focus);
+  font-size: 0.8em;
+}
+
+.skill-group__spacer {
+  flex: 0 0 18px;
+}
+
+.skill-group__list {
+  min-height: 0;
 }
 
 .equipment-section {

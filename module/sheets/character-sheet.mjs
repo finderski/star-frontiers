@@ -34,6 +34,12 @@ const CARRY_STATE_CHOICES = {
   carried: "STARFRONTIERS.Choice.CarryState.carried",
   stored: "STARFRONTIERS.Choice.CarryState.stored"
 };
+const PSA_GROUP_KEYS = ["military", "technological", "biosocial"];
+const SKILL_GROUP_UNASSIGNED = "__unassigned__";
+const SKILL_GROUP_ORDER_FLAG = "skillGroupOrder";
+const INVENTORY_ITEM_TYPES = new Set(["gear", "consumable", "ammo", "powerSource", "computer", "program"]);
+const ASSET_ITEM_TYPES = new Set(["vehicle"]);
+const EQUIPMENT_REORDER_TYPES = new Set([...INVENTORY_ITEM_TYPES, ...ASSET_ITEM_TYPES]);
 const SHEET_TABS = ["profile", "skills-equipment", "notes"];
 const DEFAULT_SHEET_TAB = "profile";
 
@@ -114,13 +120,17 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       ? "STARFRONTIERS.Character.ReplaceStats"
       : "STARFRONTIERS.Character.GenerateStats";
     context.weaponRows = await this.#prepareWeaponRows(actor);
-    context.armorItems = actor.items.filter((item) => item.type === "armor");
-    context.screenItems = actor.items.filter((item) => item.type === "screen");
+    context.armorItems = actor.items
+      .filter((item) => item.type === "armor")
+      .sort(StarFrontiersCharacterSheet.#compareBySort);
+    context.screenItems = actor.items
+      .filter((item) => item.type === "screen")
+      .sort(StarFrontiersCharacterSheet.#compareBySort);
     const suitId = actor.system.defenses?.suit ?? "";
     const screenId = actor.system.defenses?.screen ?? "";
     context.wornSuit = suitId ? actor.items.get(suitId) ?? null : null;
     context.wornScreen = screenId ? actor.items.get(screenId) ?? null : null;
-    context.skillRows = context.expandedRules ? this.#prepareSkillRows(actor) : [];
+    context.skillGroups = context.expandedRules ? this.#prepareSkillGroups(actor) : [];
     context.racialAbilityRows = this.#prepareRacialAbilityRows(actor);
     const { inventoryRows, assetRows, hasAssets } = await StarFrontiersCharacterSheet.#prepareEquipmentRows(actor);
     context.inventoryRows = inventoryRows;
@@ -148,19 +158,77 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     return context;
   }
 
-  #prepareSkillRows(actor) {
+  #prepareSkillGroups(actor) {
     const allSkills = actor.items.filter((item) => item.type === "skill");
-    const referencedIds = new Set(
-      allSkills
-        .filter((s) => s.system.category === "main")
-        .flatMap((s) => Array.from(s.system.subskillRefs ?? []))
-    );
-    return allSkills.map((item) => ({
+    const mains = allSkills.filter((item) => item.system.category === "main");
+    const skillsById = new Map(allSkills.map((item) => [item.id, item]));
+    const coveredIds = new Set();
+    const groupOrder = StarFrontiersCharacterSheet.#getSkillGroupOrder(actor);
+
+    const buildRow = (item, isSubskill = false) => ({
       id: item.id,
       name: item.name,
       level: item.system.level ?? 0,
-      isSubskill: item.system.category === "subskill" && referencedIds.has(item.id)
-    }));
+      isSubskill
+    });
+
+    const groups = groupOrder.map((psa) => {
+      const rows = [];
+      const groupMains = mains
+        .filter((item) => (item.system.psa ?? "") === psa)
+        .sort(StarFrontiersCharacterSheet.#compareByName);
+
+      for (const main of groupMains) {
+        rows.push(buildRow(main, false));
+        coveredIds.add(main.id);
+
+        const subs = Array.from(main.system.subskillRefs ?? [])
+          .map((ref) => skillsById.get(ref))
+          .filter((item) => item?.type === "skill")
+          .sort(StarFrontiersCharacterSheet.#compareByName);
+
+        for (const sub of subs) {
+          if (coveredIds.has(sub.id)) continue;
+          rows.push(buildRow(sub, true));
+          coveredIds.add(sub.id);
+        }
+      }
+
+      const leftovers = allSkills
+        .filter((item) => !coveredIds.has(item.id) && (item.system.psa ?? "") === psa)
+        .sort(StarFrontiersCharacterSheet.#compareByName);
+
+      for (const item of leftovers) {
+        rows.push(buildRow(item, item.system.category === "subskill"));
+        coveredIds.add(item.id);
+      }
+
+      if (!rows.length) return null;
+      return {
+        psa,
+        label: game.i18n.localize(PSA_CHOICES[psa]),
+        isCharacterPsa: psa === actor.system.psa,
+        reorderable: true,
+        rows
+      };
+    }).filter(Boolean);
+
+    const unassignedRows = allSkills
+      .filter((item) => !coveredIds.has(item.id))
+      .sort(StarFrontiersCharacterSheet.#compareByName)
+      .map((item) => buildRow(item, item.system.category === "subskill"));
+
+    if (unassignedRows.length) {
+      groups.push({
+        psa: SKILL_GROUP_UNASSIGNED,
+        label: game.i18n.localize("STARFRONTIERS.Character.SkillGroupUnassigned"),
+        isCharacterPsa: false,
+        reorderable: false,
+        rows: unassignedRows
+      });
+    }
+
+    return groups;
   }
 
   #prepareRacialAbilityRows(actor) {
@@ -193,7 +261,9 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
   }
 
   async #prepareWeaponRows(actor) {
-    const weapons = actor.items.filter((item) => item.type === "weapon");
+    const weapons = actor.items
+      .filter((item) => item.type === "weapon")
+      .sort(StarFrontiersCharacterSheet.#compareBySort);
     const rows = await Promise.all(weapons.map(async (item) => {
       const linkedAmmo = await AttackPipeline.resolveWeaponAmmoItem(actor, item);
       const loadedSource = await AttackPipeline.resolveLoadedSource(actor, item);
@@ -279,23 +349,16 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     const portabilityThreshold = game.settings.get(SYSTEM_ID, "computerPortabilityLevel") ?? 4;
     const inventoryItems = [];
     const assetItems = [];
-    const inventoryTypes = new Set(["gear", "consumable", "ammo", "powerSource", "computer", "program"]);
-    const assetTypes = new Set(["vehicle"]);
     const expandableTypes = new Set(["consumable", "powerSource", "computer", "ammo"]);
 
     for (const item of actor.items) {
-      const sys = item.system ?? {};
-      if (item.type === "computer" && Number(sys.level ?? 1) > portabilityThreshold) {
-        assetItems.push(item);
-        continue;
-      }
-      if (assetTypes.has(item.type)) {
-        assetItems.push(item);
-        continue;
-      }
-      if (!inventoryTypes.has(item.type)) continue;
-      inventoryItems.push(item);
+      const listKind = StarFrontiersCharacterSheet.#getEquipmentListKind(item, portabilityThreshold);
+      if (listKind === "asset") assetItems.push(item);
+      else if (listKind === "equipment") inventoryItems.push(item);
     }
+
+    inventoryItems.sort(StarFrontiersCharacterSheet.#compareBySort);
+    assetItems.sort(StarFrontiersCharacterSheet.#compareBySort);
 
     const ownedWeapons = actor.items.filter((it) => it.type === "weapon");
 
@@ -636,6 +699,10 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     for (const dragHandle of this.element.querySelectorAll("[data-item-drag]")) {
       dragHandle.addEventListener("dragstart", this.#onItemDragStart.bind(this));
     }
+    for (const dragHandle of this.element.querySelectorAll(".drag-handle[data-drag]")) {
+      dragHandle.addEventListener("dragstart", this.#onReorderDragStart.bind(this));
+      dragHandle.addEventListener("click", (event) => event.stopPropagation());
+    }
     this.element.addEventListener("click", (event) => {
       if (!event.target.closest(".weapon-gear-wrap")) {
         for (const panel of this.element.querySelectorAll(".weapon-gear-panel--open")) {
@@ -660,6 +727,17 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         this.#applyActiveTab();
       });
     }
+  }
+
+  async _onDrop(event) {
+    const payload = StarFrontiersCharacterSheet.#parseDragPayload(event);
+    if (payload?.type === "sf-reorder" && payload.actorId === this.document.id) {
+      return this.#onReorderDrop(event, payload);
+    }
+    if (payload?.type === "sf-psa-reorder" && payload.actorId === this.document.id) {
+      return this.#onPsaGroupReorderDrop(event, payload);
+    }
+    return super._onDrop(event);
   }
 
   #applyActiveTab() {
@@ -871,6 +949,113 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     event.stopPropagation();
     event.dataTransfer.effectAllowed = "copyMove";
     event.dataTransfer.setData("text/plain", JSON.stringify(item.toDragData()));
+  }
+
+  #onReorderDragStart(event) {
+    const handle = event.currentTarget;
+    if (!event.dataTransfer) return;
+
+    if (handle.dataset.drag === "reorder") {
+      const row = handle.closest("[data-item-id][data-list]");
+      const itemId = row?.dataset.itemId ?? "";
+      const list = row?.dataset.list ?? "";
+      if (!itemId || !list) return;
+      event.stopPropagation();
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", JSON.stringify({
+        type: "sf-reorder",
+        actorId: this.document.id,
+        itemId,
+        list
+      }));
+      return;
+    }
+
+    if (handle.dataset.drag === "psa-reorder") {
+      const group = handle.closest(".skill-group[data-psa]");
+      const psa = group?.dataset.psa ?? "";
+      if (!PSA_GROUP_KEYS.includes(psa)) return;
+      event.stopPropagation();
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", JSON.stringify({
+        type: "sf-psa-reorder",
+        actorId: this.document.id,
+        psa
+      }));
+    }
+  }
+
+  async #onReorderDrop(event, payload) {
+    event.preventDefault();
+    const actor = this.document;
+    const source = actor.items.get(payload.itemId);
+    if (!source) return;
+
+    const targetRow = event.target.closest?.(`[data-item-id][data-list="${payload.list}"]`);
+    const targetId = targetRow?.dataset.itemId ?? "";
+    if (!targetId || targetId === payload.itemId) return;
+
+    const target = actor.items.get(targetId);
+    if (!target) return;
+
+    const portabilityThreshold = game.settings.get(SYSTEM_ID, "computerPortabilityLevel") ?? 4;
+    let siblings = [];
+    if (payload.list === "equipment" || payload.list === "asset") {
+      if (StarFrontiersCharacterSheet.#getEquipmentListKind(source, portabilityThreshold) !== payload.list) return;
+      if (StarFrontiersCharacterSheet.#getEquipmentListKind(target, portabilityThreshold) !== payload.list) return;
+      siblings = actor.items.filter((item) =>
+        EQUIPMENT_REORDER_TYPES.has(item.type)
+        && StarFrontiersCharacterSheet.#getEquipmentListKind(item, portabilityThreshold) === payload.list);
+    } else {
+      const typeForList = { weapon: "weapon", armor: "armor", screen: "screen" };
+      const itemType = typeForList[payload.list];
+      if (!itemType || source.type !== itemType || target.type !== itemType) return;
+      siblings = actor.items.filter((item) => item.type === itemType);
+    }
+
+    if (!siblings.some((item) => item.id === target.id)) return;
+
+    const sortHelper = foundry.utils.performIntegerSort ?? globalThis.SortingHelpers?.performIntegerSort;
+    if (!sortHelper) return;
+
+    const sortBefore = StarFrontiersCharacterSheet.#shouldSortBefore(event, targetRow);
+    const orderedSiblings = siblings
+      .filter((item) => item.id !== source.id)
+      .sort(StarFrontiersCharacterSheet.#compareBySort);
+    const sortUpdates = sortHelper(source, {
+      target,
+      siblings: orderedSiblings,
+      sortBefore,
+      sortKey: "sort"
+    });
+    const updates = sortUpdates.map((entry) => ({ _id: entry.target.id, sort: entry.update.sort }));
+    if (!updates.length) return;
+    this._rememberScrollPosition();
+    await actor.updateEmbeddedDocuments("Item", updates);
+  }
+
+  async #onPsaGroupReorderDrop(event, payload) {
+    event.preventDefault();
+    if (!PSA_GROUP_KEYS.includes(payload.psa)) return;
+
+    const targetGroup = event.target.closest?.(".skill-group[data-psa]");
+    const targetPsa = targetGroup?.dataset.psa ?? "";
+    if (!PSA_GROUP_KEYS.includes(targetPsa) || targetPsa === payload.psa) return;
+
+    const currentOrder = StarFrontiersCharacterSheet.#getSkillGroupOrder(this.document);
+    const sourceIndex = currentOrder.indexOf(payload.psa);
+    const targetIndex = currentOrder.indexOf(targetPsa);
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const nextOrder = [...currentOrder];
+    nextOrder.splice(sourceIndex, 1);
+    let insertIndex = nextOrder.indexOf(targetPsa);
+    if (insertIndex === -1) return;
+    if (!StarFrontiersCharacterSheet.#shouldSortBefore(event, targetGroup)) insertIndex += 1;
+    nextOrder.splice(insertIndex, 0, payload.psa);
+
+    this._rememberScrollPosition();
+    await this.document.setFlag(SYSTEM_ID, SKILL_GROUP_ORDER_FLAG, nextOrder);
   }
 
   _processFormData(event, form, formData) {
@@ -1594,6 +1779,51 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
   static #getItemFromTarget(actor, target) {
     const itemId = target.closest("[data-item-id]")?.dataset.itemId;
     return actor.items.get(itemId);
+  }
+
+  static #parseDragPayload(event) {
+    if (!event.dataTransfer) return null;
+    try {
+      return JSON.parse(event.dataTransfer.getData("text/plain"));
+    } catch {
+      return null;
+    }
+  }
+
+  static #shouldSortBefore(event, element) {
+    const rect = element?.getBoundingClientRect?.();
+    if (!rect) return false;
+    return event.clientY < rect.top + (rect.height / 2);
+  }
+
+  static #compareBySort(a, b) {
+    return Number(a?.sort ?? 0) - Number(b?.sort ?? 0);
+  }
+
+  static #compareByName(a, b) {
+    return String(a?.name ?? "").localeCompare(String(b?.name ?? ""));
+  }
+
+  static #getSkillGroupOrder(actor) {
+    const explicit = Array.from(actor.getFlag?.(SYSTEM_ID, SKILL_GROUP_ORDER_FLAG) ?? [])
+      .filter((psa) => PSA_GROUP_KEYS.includes(psa));
+    if (explicit.length) {
+      return [...explicit, ...PSA_GROUP_KEYS.filter((psa) => !explicit.includes(psa))];
+    }
+    const own = actor.system.psa;
+    if (PSA_GROUP_KEYS.includes(own)) {
+      return [own, ...PSA_GROUP_KEYS.filter((psa) => psa !== own)];
+    }
+    return [...PSA_GROUP_KEYS];
+  }
+
+  static #getEquipmentListKind(item, portabilityThreshold) {
+    if (!item) return "";
+    const sys = item.system ?? {};
+    if (item.type === "computer" && Number(sys.level ?? 1) > portabilityThreshold) return "asset";
+    if (ASSET_ITEM_TYPES.has(item.type)) return "asset";
+    if (INVENTORY_ITEM_TYPES.has(item.type)) return "equipment";
+    return "";
   }
 
   static async handleChatCardAction(element) {

@@ -401,6 +401,18 @@ Hooks.on("preCreateItem", (document, data, options, userId) => {
 });
 
 Hooks.on("preCreateActor", (document, data, options, userId) => {
+  const LINK_DEFAULTS = {
+    character: true,
+    npc: true,
+    creature: false,
+    robot: false,
+    vehicle: true
+  };
+
+  if (data.prototypeToken?.actorLink === undefined && document.type in LINK_DEFAULTS) {
+    document.updateSource({ "prototypeToken.actorLink": LINK_DEFAULTS[document.type] });
+  }
+
   if (document.type !== "character") return;
   const tokenSrc = String(data.prototypeToken?.texture?.src ?? "").trim();
   if (tokenSrc && tokenSrc !== "icons/svg/mystery-man.svg") return;

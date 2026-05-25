@@ -51,6 +51,7 @@
 - Prefer nested localization keys and add labels to `lang/en.json` rather than hardcoding display text.
 - Use existing `STARFRONTIERS.*` naming patterns for i18n and config.
 - Any Foundry sheet class that uses `submitOnChange: true` should inherit the shared scroll-preserving mixin so field edits do not snap the sheet back to the top.
+- Character-sheet manual row ordering should use Foundry's built-in embedded-item `sort` field plus handle-only drag/drop on the sheet. Do not add parallel custom order numbers for weapons, armor, screens, or equipment rows.
 - Use `apply_patch` for edits when working manually.
 - Rules-specific UI should usually be driven by `system.rulesEdition` or world `rulesEdition`, not forked templates.
 - Styling is centralized in one stylesheet and theme-aware through CSS variables.
@@ -126,10 +127,12 @@
 ## Current data model decisions
 
 - `system.psa` is the character’s Expanded Rules Career PSA. Do not add a separate `careerPsa` field; use `system.psa` for Military, Technological, and Biosocial.
+- Character-sheet PSA skill-group order is a presentation preference stored in `flags.star-frontiers.skillGroupOrder`, not in `system.*`. The skill items themselves remain the source of truth for PSA membership and subskill links.
 
 ### Character abilities and stamina
 - Character actor portraits are edited from the Player Name row profile image button (`editProfileImage`). The action updates `actor.img` and only mirrors the new path to `prototypeToken.texture.src` when the token image is blank or still default (`DEFAULT_CHARACTER_TOKEN_IMAGE` or Foundry's old `icons/svg/mystery-man.svg`). Do not overwrite custom token art during portrait edits.
 - New character actors default their prototype token image to `systems/star-frontiers/assets/images/sheet-icons/robber-mask.svg` via `preCreateActor`; this is a token default, not a schema field.
+- Prototype token `actorLink` defaults are also set in `preCreateActor` for new actors only: `character` / `npc` / `vehicle` default linked, `creature` / `robot` default unlinked. The hook only fills the default when incoming creation data did not already specify `prototypeToken.actorLink`, so imports and duplicates with a deliberate setting are preserved.
 - Character abilities are stored as:
   - `system.abilities.<key>.base`: pre-racial/base score
   - `system.abilities.<key>.value`: current racial-adjusted/final score
@@ -469,6 +472,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not replace the current theme model (paper vs retro) with template forks unless explicitly decided.
 - Do not treat race secondary modifiers (`sta`, `rs`, `log`, `ldr`) as active authoring fields anymore. The supported race-authoring model is paired modifiers plus optional `im`; human/special-case single-stat tweaks belong in bonus-pick handling.
 - Do not move ammo depletion to the ammo item itself; current logic tracks per-shot depletion on the weapon via `system.ammo.consumed`. Ammo `system.quantity` tracks **spare containers**, which is a different concept.
+- Do not add ad hoc schema fields for character-sheet row ordering. Weapons / armor / screens / equipment reorder off embedded-item `sort`, while PSA skill-block ordering lives in `flags.star-frontiers.skillGroupOrder`.
 - Do not store range band modifiers on weapon items; they are the `RANGE_BAND_MODS` constant in `module/combat/attack-pipeline.mjs` and must not be stored in the database or on weapon documents.
 - Do not fork the hover range preview into its own distance/band math. It intentionally reuses the exported `attack-pipeline.mjs` helpers so the canvas preview and attack auto-range stay in lockstep.
 - Do not repurpose token double-right-click casually. It is now reserved for the targeting shortcut; preserve `Shift` as the multi-target modifier if this interaction is touched later.
@@ -477,6 +481,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not change Basic-rules encumbrance from "display only, no penalty, no movement halving." Basic intentionally has no encumbrance enforcement — only Expanded does.
 - Do not gate the attacker/target combat encumbrance modifiers behind the two `encumbranceAffectsPhysical/NonPhysical` world settings alone. Core Expanded combat mods still apply (melee attacker `−10`, encumbered target `+10`), and the world settings only **extend** the attacker-side `−10` to other attacks that use a matching physical/non-physical ability. They do not stack a second penalty on top of melee.
 - Do not overwrite a character actor's custom `prototypeToken.texture.src` when changing `actor.img`; portrait edits only sync the token image while it is blank or default.
+- Do not force prototype-token `actorLink` defaults onto existing actors via migration. The `preCreateActor` hook sets type-based defaults only for newly created actors with no incoming `prototypeToken.actorLink`, so imports/duplicates that already chose a link state remain untouched.
 - Do not expose `weapon.system.quantity` on the weapon item sheet — it lives on the gear panel slide-up on the character sheet by design (character-tied data, not item-template data).
 - Do not make the Required Skill drop handler copy `weaponSkillKey` from the dropped skill onto the weapon. `requiredSkillRef` is the modern attack skill link; `weaponSkillKey` remains a fallback for legacy/authored data.
 - The attack/damage/avoidance pipeline lives in `module/combat/attack-pipeline.mjs` as exported functions shared by sheets that roll attacks. Sheet action handlers should stay thin wrappers. Do not duplicate attack logic into creature/character sheets, and do not convert the pipeline back into class-private methods.
@@ -508,6 +513,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - All `submitOnChange` sheet classes should inherit `ScrollPreservingSheetMixin`, which owns `_onChangeForm`, `_rememberScrollPosition()`, and `_restoreScrollPosition()` based on the class's `PARTS.sheet.scrollable` selector. Do not reintroduce one-off per-sheet scroll hacks unless the shared mixin proves insufficient.
 - Sheet action handlers that trigger document writes (item updates, embedded-doc CRUD) must call `this._rememberScrollPosition()` before the async work — `_onChangeForm` only fires for form-input changes, not for action-button clicks. Notably, `#onRollWeaponAttack` and `#onRollWeaponDamage` now call it because the attack pipeline can issue multiple item updates per roll (weapon.consumed, loaded-source quantity on fire-empty, loaded-source remaining for powerSource). The mixin's 3-render persistence covers consecutive re-renders so the scroll survives the whole flow. Symptoms before the fix were most visible on weapons with firing modes / Active Effects (Electrostunner), where the extra render passes pushed the scroll back to the top.
 - All player-initiated d100 target-vs-roll checks from the character sheet must prompt for a misc. modifier through `#promptModifier(label, targetValue)`. That includes ability checks, skill checks, and active racial ability rolls. Weapon attacks intentionally use their own range-band-plus-modifier prompt.
+- Skills on the character sheet are grouped by PSA block, but the skills INSIDE each block are still auto-sorted alphabetically by parent skill with referenced subskills directly beneath their parent. Only the PSA blocks themselves are user-reorderable.
 - The GM forced-roll testing hook must stay GM-only and setting-gated. If future d100 roll flows gain prompt dialogs, route them through `#evaluatePercentileRoll()` instead of hand-rolling `new Roll("1d100")`, or the override path will silently stop applying there.
 - Racial Ability XP adjustments must honor `item.system.xpPerPoint` and must be serialized per actor via the `_racialAbilityAdjustQueue` promise chain stored on the sheet instance. Do not replace this with a simple in-flight flag; that drops user clicks and reintroduces XP/chance desync.
 - `system.combatProfile.meleeBonus` and `.rangedBonus` are the canonical attachment points for persistent state-based attack bonuses. Active Effects, racial abilities, and GM tooling should target those fields; per-attack situational modifiers still belong in the attack prompt.
