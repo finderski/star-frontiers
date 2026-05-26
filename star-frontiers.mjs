@@ -30,7 +30,7 @@ import {
 import {
   StarFrontiersCharacterSheet
 } from "./module/sheets/character-sheet.mjs";
-import { getRangePreviewData } from "./module/combat/attack-pipeline.mjs";
+import * as AttackPipeline from "./module/combat/attack-pipeline.mjs";
 import { StarFrontiersItemSheet } from "./module/sheets/item-sheet.mjs";
 import {
   registerMigrationSettings,
@@ -125,7 +125,7 @@ function showRangePreview(hoveredToken) {
     return;
   }
 
-  const preview = getRangePreviewData(sourceToken, hoveredToken);
+  const preview = AttackPipeline.getRangePreviewData(sourceToken, hoveredToken);
   if (!preview) {
     destroyRangePreview();
     return;
@@ -356,6 +356,10 @@ Hooks.once("init", () => {
     types: Object.keys(ITEM_TYPE_LABELS),
     makeDefault: true,
     label: "STARFRONTIERS.Sheet.Item"
+  });
+
+  game.socket.on(`system.${SYSTEM_ID}`, async (payload) => {
+    await AttackPipeline.handleSystemSocketMessage(payload);
   });
 
   installTokenDoubleRightClickTargeting();

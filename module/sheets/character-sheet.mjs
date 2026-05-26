@@ -1,6 +1,6 @@
 import { DEFAULT_CHARACTER_TOKEN_IMAGE, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
 import * as AttackPipeline from "../combat/attack-pipeline.mjs";
-import { ScrollPreservingSheetMixin } from "./scroll-preserving-sheet-mixin.mjs";
+import { rememberDocumentSheetScroll, ScrollPreservingSheetMixin } from "./scroll-preserving-sheet-mixin.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -1316,6 +1316,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     target ??= event.currentTarget;
     const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
     if (!item) return;
+    this._rememberScrollPosition();
     await StarFrontiersCharacterSheet.#rollRacialAbility(this.document, item, target.dataset.rollMode ?? "public");
   }
 
@@ -1414,6 +1415,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     for (const effectId of Array.from(sys.effectIds ?? [])) {
       const effect = item.effects.get(effectId);
       if (!effect || !targetActor) continue;
+      rememberDocumentSheetScroll(targetActor, 5);
       await targetActor.createEmbeddedDocuments("ActiveEffect", [effect.toObject()]);
     }
 
@@ -1967,6 +1969,8 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     if (success && game.settings.get(SYSTEM_ID, "automateActiveEffects")) {
       const effect = StarFrontiersCharacterSheet.#getRacialAbilityEffect(item);
       if (effect && effect.disabled) {
+        rememberDocumentSheetScroll(actor, 5);
+        rememberDocumentSheetScroll(item, 5);
         await effect.update({ disabled: false });
       }
     }

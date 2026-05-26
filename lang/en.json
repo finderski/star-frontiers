@@ -137,6 +137,11 @@
       "InitiativeModifier-abbr": "IM",
       "Weapons": "Weapons"
     },
+    "Effects": {
+      "AppliedToTarget": "{effects} applied to {target}.",
+      "NoGmConnectedToApply": "No GM is connected to apply effects to that target.",
+      "NoPermissionToApply": "You don't have permission to apply effects to that target."
+    },
     "Common": {
       "DragToReorder": "Drag to reorder"
     },

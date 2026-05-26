@@ -1,7 +1,9 @@
 import { SYSTEM_ID } from "../config.mjs";
+import { rememberDocumentSheetScroll } from "../sheets/scroll-preserving-sheet-mixin.mjs";
 
 export const RANGE_BAND_ORDER = ["pointBlank", "short", "medium", "long", "extreme"];
 export const RANGE_BAND_MODS = { pointBlank: 0, short: -10, medium: -20, long: -40, extreme: -80 };
+export const APPLY_ON_HIT_EFFECTS_SOCKET_ACTION = "applyOnHitEffects";
 
 export function getPreferredWeaponForRangePreview(actor) {
   const weapons = actor?.items?.filter((item) => item.type === "weapon") ?? [];
@@ -368,6 +370,190 @@ export function getWeaponModeLabel(mode) {
   return game.i18n.has(label) ? game.i18n.localize(label) : label;
 }
 
+export function getWeaponOnHitEffectIds(weapon) {
+  const activeMode = getActiveWeaponMode(weapon);
+  if (activeMode) return Array.from(activeMode.onHitEffectIds ?? []);
+  return Array.from(weapon.system.mechanics?.onHitEffectIds ?? []);
+}
+
+export function getWeaponOnHitEffectOrigin(weapon) {
+  const activeMode = getActiveWeaponMode(weapon);
+  const modeLabel = activeMode ? getWeaponModeLabel(activeMode) : "";
+  return {
+    weaponUuid: weapon.uuid,
+    sourceItemUuid: weapon.uuid,
+    modeKey: activeMode?.key ?? "",
+    sourceName: modeLabel ? `${weapon.name} (${modeLabel})` : weapon.name
+  };
+}
+
+function getActiveGmUser() {
+  return game.users?.activeGM
+    ?? game.users?.find?.((user) => user.active && user.isGM)
+    ?? null;
+}
+
+function normalizeOnHitEffectOrigin(origin = {}, sourceDocument = null) {
+  const weaponUuid = String(origin.weaponUuid ?? sourceDocument?.uuid ?? "");
+  const sourceItemUuid = String(origin.sourceItemUuid ?? weaponUuid);
+  return {
+    weaponUuid,
+    sourceItemUuid,
+    modeKey: String(origin.modeKey ?? ""),
+    sourceName: String(origin.sourceName ?? sourceDocument?.name ?? "")
+  };
+}
+
+async function resolveOnHitEffectSource(sourceDocument, ref) {
+  if (!ref) return null;
+
+  const localEffect = sourceDocument?.effects?.get?.(ref);
+  if (localEffect) return localEffect;
+
+  if (globalThis.fromUuid) {
+    try {
+      const resolved = await globalThis.fromUuid(ref);
+      if (resolved?.documentName === "ActiveEffect") return resolved;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  try {
+    const resolved = globalThis.fromUuidSync?.(ref);
+    if (resolved?.documentName === "ActiveEffect") return resolved;
+  } catch {
+    /* ignore */
+  }
+
+  return null;
+}
+
+export async function applyOnHitEffects(targetActor, effectRefs, origin = {}, sourceDocument = null) {
+  const effectIds = Array.from(effectRefs ?? []).map((ref) => String(ref ?? "")).filter(Boolean);
+  if (!targetActor || !effectIds.length) return { applied: 0, refreshed: 0, delegated: false };
+  if (!game.settings.get(SYSTEM_ID, "automateActiveEffects")) return { applied: 0, refreshed: 0, delegated: false };
+
+  if (!sourceDocument) {
+    const sourceUuid = String(origin.sourceItemUuid ?? origin.weaponUuid ?? "");
+    if (sourceUuid && globalThis.fromUuid) {
+      try {
+        sourceDocument = await globalThis.fromUuid(sourceUuid);
+      } catch {
+        sourceDocument = null;
+      }
+    }
+  }
+
+  const normalizedOrigin = normalizeOnHitEffectOrigin(origin, sourceDocument);
+
+  if (!game.user.isGM && !targetActor.isOwner) {
+    const activeGm = getActiveGmUser();
+    if (!activeGm) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoGmConnectedToApply"));
+      return { applied: 0, refreshed: 0, delegated: false };
+    }
+    if (!game.socket?.emit) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoPermissionToApply"));
+      return { applied: 0, refreshed: 0, delegated: false };
+    }
+
+    game.socket.emit(`system.${SYSTEM_ID}`, {
+      action: APPLY_ON_HIT_EFFECTS_SOCKET_ACTION,
+      targetActorUuid: targetActor.uuid,
+      effectIds,
+      origin: normalizedOrigin
+    });
+    return { applied: 0, refreshed: 0, delegated: true };
+  }
+
+  const appliedNames = new Set();
+  const toCreate = [];
+  let refreshed = 0;
+  rememberDocumentSheetScroll(targetActor, 5);
+
+  for (const effectRef of effectIds) {
+    const sourceEffect = await resolveOnHitEffectSource(sourceDocument, effectRef);
+    if (!sourceEffect) continue;
+
+    const data = sourceEffect.toObject();
+    delete data._id;
+    delete data._stats;
+    data.transfer = false;
+    data.disabled = false;
+    data.origin = normalizedOrigin.weaponUuid || normalizedOrigin.sourceItemUuid || data.origin;
+    data.flags = foundry.utils.mergeObject(data.flags ?? {}, {
+      "star-frontiers": {
+        appliedFrom: {
+          weaponUuid: normalizedOrigin.weaponUuid,
+          sourceItemUuid: normalizedOrigin.sourceItemUuid,
+          modeKey: normalizedOrigin.modeKey,
+          sourceName: normalizedOrigin.sourceName,
+          effectRef
+        }
+      }
+    }, { inplace: false, overwrite: true });
+
+    const existing = targetActor.effects.find((effect) => {
+      const appliedFrom = effect.flags?.["star-frontiers"]?.appliedFrom;
+      return appliedFrom
+        && String(appliedFrom.weaponUuid ?? "") === normalizedOrigin.weaponUuid
+        && String(appliedFrom.sourceItemUuid ?? "") === normalizedOrigin.sourceItemUuid
+        && String(appliedFrom.modeKey ?? "") === normalizedOrigin.modeKey
+        && String(appliedFrom.effectRef ?? "") === effectRef;
+    });
+
+    if (existing) {
+      data.disabled = false;
+      await existing.update(data);
+      refreshed += 1;
+      appliedNames.add(data.name || existing.name);
+      continue;
+    }
+
+    toCreate.push(data);
+    appliedNames.add(data.name || sourceEffect.name);
+  }
+
+  if (toCreate.length) {
+    await targetActor.createEmbeddedDocuments("ActiveEffect", toCreate);
+  }
+
+  if (appliedNames.size) {
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+      content: game.i18n.format("STARFRONTIERS.Effects.AppliedToTarget", {
+        target: targetActor.name,
+        effects: Array.from(appliedNames).join(", ")
+      })
+    });
+  }
+
+  return { applied: toCreate.length, refreshed, delegated: false };
+}
+
+export async function handleSystemSocketMessage(payload) {
+  if (payload?.action !== APPLY_ON_HIT_EFFECTS_SOCKET_ACTION) return false;
+  if (!game.user?.isGM) return true;
+
+  const activeGm = getActiveGmUser();
+  if (activeGm && activeGm.id !== game.user.id) return true;
+
+  const targetActorUuid = String(payload.targetActorUuid ?? "");
+  if (!targetActorUuid || !globalThis.fromUuid) return true;
+
+  let targetActor = null;
+  try {
+    targetActor = await globalThis.fromUuid(targetActorUuid);
+  } catch {
+    targetActor = null;
+  }
+  if (!targetActor) return true;
+
+  await applyOnHitEffects(targetActor, payload.effectIds ?? [], payload.origin ?? {});
+  return true;
+}
+
 export function getAvoidanceEffectLabel(value) {
   const label = String(value ?? "").trim();
   if (!label) return "";
@@ -551,6 +737,13 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     hitCount,
     shots
   });
+
+  const targetActor = targetedToken?.actor ?? null;
+  const avoidanceEnabled = Boolean(activeMode?.avoidance?.enabled);
+  const onHitEffectIds = getWeaponOnHitEffectIds(weapon);
+  if (anyHit && targetActor && onHitEffectIds.length && !avoidanceEnabled) {
+    await applyOnHitEffects(targetActor, onHitEffectIds, getWeaponOnHitEffectOrigin(weapon), weapon);
+  }
 }
 
 export async function rollWeaponDamage(actor, weapon, rollMode = "public", bandKey = "") {
@@ -694,6 +887,11 @@ export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid 
 
   applyChatMessageMode(chatData, rollMode);
   await ChatMessage.create(chatData);
+
+  const onHitEffectIds = getWeaponOnHitEffectIds(weapon);
+  if (!success && onHitEffectIds.length) {
+    await applyOnHitEffects(target, onHitEffectIds, getWeaponOnHitEffectOrigin(weapon), weapon);
+  }
 }
 
 export const rollAvoidanceCheck = rollAvoidance;

@@ -1,3 +1,12 @@
+export function rememberDocumentSheetScroll(document, renders = 3) {
+  for (const app of Object.values(document?.apps ?? {})) {
+    const remember = app?._rememberScrollPosition;
+    if (typeof remember === "function") {
+      remember.call(app, renders);
+    }
+  }
+}
+
 export function ScrollPreservingSheetMixin(Base) {
   return class ScrollPreservingSheet extends Base {
     async _onRender(context, options) {

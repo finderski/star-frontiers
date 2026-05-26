@@ -376,6 +376,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     if (psaEl && this.item.type === "skill") {
       psaEl.addEventListener("change", async () => {
         if (psaEl.value !== "military") {
+          this._rememberScrollPosition();
           await this.item.update({
             "system.mechanics.applyMeleeBonus": false,
             "system.mechanics.applyRangeBonus": false
@@ -394,6 +395,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
           Number(currentPorts[key] ?? previousDefaults[key] ?? 0) === Number(previousDefaults[key] ?? 0)
         );
         if (portsMatchPreviousDefaults) {
+          this._rememberScrollPosition();
           await this.item.update({ "system.ports": ports });
         }
       });
@@ -428,6 +430,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       const ref = sameActor ? document.id : document.uuid;
       const current = Array.from(this.item.system.subskillRefs ?? []);
       if (!current.includes(ref)) {
+        this._rememberScrollPosition();
         current.push(ref);
         await this.item.update({ "system.subskillRefs": current });
       }
@@ -443,6 +446,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     if (this.item.type === "weapon" && document.documentName === "Item" && document.type === "skill") {
       const sameActor = document.parent && document.parent === this.item.parent;
       const ref = sameActor ? document.id : document.uuid;
+      this._rememberScrollPosition();
       await this.item.update({ "system.requiredSkillRef": ref });
       ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.SkillLinked", { name: document.name }));
       return document;
@@ -451,6 +455,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     if (this.item.type === "consumable" && document.documentName === "Item" && document.type === "skill") {
       const sameActor = document.parent && document.parent === this.item.parent;
       const ref = sameActor ? document.id : document.uuid;
+      this._rememberScrollPosition();
       await this.item.update({ "system.requiredSkillRef": ref });
       ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.SkillLinked", { name: document.name }));
       return document;
@@ -461,6 +466,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       const ref = sameActor ? document.id : document.uuid;
       const current = Array.from(this.item.system.racialAbilityRefs ?? []);
       if (!current.includes(ref)) {
+        this._rememberScrollPosition();
         current.push(ref);
         await this.item.update({ "system.racialAbilityRefs": current });
       }
@@ -485,6 +491,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
         if (currentSource?.type === "powerSource") {
           const refs = Array.from(currentSource.system.linkedWeaponRefs ?? []);
           if (refs.includes(this.item.id)) {
+            this._rememberScrollPosition();
             await currentSource.update({
               "system.linkedWeaponRefs": refs.filter((entry) => entry !== this.item.id)
             });
@@ -501,6 +508,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
         updateData["system.ammo.internalCharge"] = false;
         updateData["system.ammo.consumed"] = 0;
       }
+      this._rememberScrollPosition();
       await this.item.update(updateData);
       ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.AmmoLinked", { name: document.name }));
       return document;
@@ -556,6 +564,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     if (this.item.type === "gear" && document.documentName === "Item" && document.type === "skill") {
       const sameActor = document.parent && document.parent === this.item.parent;
       const ref = sameActor ? document.id : document.uuid;
+      this._rememberScrollPosition();
       await this.item.update({ "system.requiredSkillRef": ref });
       ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.SkillLinked", { name: document.name }));
       return document;
@@ -675,7 +684,10 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     const fp = new FilePickerImpl({
       type: "image",
       current: this.document.img,
-      callback: async (path) => this.document.update({ img: path }),
+      callback: async (path) => {
+        this._rememberScrollPosition();
+        await this.document.update({ img: path });
+      },
       top: this.position.top + 40,
       left: this.position.left + 10
     });
@@ -683,6 +695,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   static async #onClearAmmo(event, target) {
+    this._rememberScrollPosition();
     const currentRef = this.item.system.ammo?.clipItem ?? "";
     const loadedRef = this.item.system.ammo?.loadedSourceId ?? "";
     const updates = { "system.ammo.clipItem": "" };
@@ -710,6 +723,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     target ??= event.currentTarget;
     const ref = target.dataset.ref ?? "";
     if (!ref) return;
+    this._rememberScrollPosition();
     const current = Array.from(this.item.system.racialAbilityRefs ?? []);
     await this.item.update({
       "system.racialAbilityRefs": current.filter((entry) => entry !== ref)
@@ -717,6 +731,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   static async #onAddBonusPick(event, target) {
+    this._rememberScrollPosition();
     const current = Array.from(this.item.system.bonusPicks ?? []);
     current.push({
       amount: 0,
@@ -727,6 +742,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   static async #onAddWeaponMode(event, target) {
+    this._rememberScrollPosition();
     const modes = StarFrontiersItemSheet.#copyWeaponModes(this.item.system.mechanics?.modes ?? []);
     modes.push({
       key: "",
@@ -750,6 +766,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     target ??= event.currentTarget;
     const modeIndex = Number(target.dataset.modeIndex ?? -1);
     if (modeIndex < 0) return;
+    this._rememberScrollPosition(5);
 
     const modes = StarFrontiersItemSheet.#copyWeaponModes(this.item.system.mechanics?.modes ?? []);
     if (modeIndex >= modes.length) return;
@@ -770,6 +787,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     const index = Number(target.dataset.index ?? -1);
     const current = Array.from(this.item.system.bonusPicks ?? []);
     if (index < 0 || index >= current.length) return;
+    this._rememberScrollPosition();
     current.splice(index, 1);
     await this.item.update({ "system.bonusPicks": current });
   }
@@ -779,6 +797,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     const index = Number(target.dataset.index ?? -1);
     const modes = StarFrontiersItemSheet.#copyWeaponModes(this.item.system.mechanics?.modes ?? []);
     if (index < 0 || index >= modes.length) return;
+    this._rememberScrollPosition();
 
     const [removed] = modes.splice(index, 1);
     const activeModeKey = String(this.item.system.activeModeKey ?? "");
@@ -801,6 +820,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     const modeIndex = Number(target.dataset.modeIndex ?? target.closest?.("[data-mode-index]")?.dataset.modeIndex ?? -1);
     const effectId = String(target.dataset.effectId ?? "");
     if (modeIndex < 0 || !effectId) return;
+    this._rememberScrollPosition();
 
     const modes = StarFrontiersItemSheet.#copyWeaponModes(this.item.system.mechanics?.modes ?? []);
     if (modeIndex >= modes.length) return;
@@ -923,6 +943,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   async #linkPowerSourceWeapon(document) {
+    this._rememberScrollPosition();
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
     if (!(await this.#ensurePowerSourcePortAvailable(this.item, "weapon", ref))) return;
@@ -951,6 +972,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   async #linkPowerSourceScreen(document) {
+    this._rememberScrollPosition();
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
     const psRef = sameActor ? this.item.id : this.item.uuid;
@@ -972,6 +994,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   async #linkPowerSourceVehicle(document) {
+    this._rememberScrollPosition();
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
     const psRef = sameActor ? this.item.id : this.item.uuid;
@@ -993,6 +1016,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   async #linkVehiclePowerSource(document) {
+    this._rememberScrollPosition();
     const sameActor = document.parent && document.parent === this.item.parent;
     const psRef = sameActor ? document.id : document.uuid;
     const vehRef = sameActor ? this.item.id : this.item.uuid;
@@ -1014,6 +1038,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   async #linkScreenPowerSource(document) {
+    this._rememberScrollPosition();
     const sameActor = document.parent && document.parent === this.item.parent;
     const psRef = sameActor ? document.id : document.uuid;
     const screenRef = sameActor ? this.item.id : this.item.uuid;
@@ -1035,6 +1060,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   async #linkWeaponPowerSource(document) {
+    this._rememberScrollPosition();
     const sameActor = document.parent && document.parent === this.item.parent;
     const psRef = sameActor ? document.id : document.uuid;
     const weaponRef = sameActor ? this.item.id : this.item.uuid;
@@ -1063,6 +1089,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   async #installComputerProgram(document) {
+    this._rememberScrollPosition();
     const sameActor = document.parent && document.parent === this.item.parent;
     const ref = sameActor ? document.id : document.uuid;
     const installed = Array.from(this.item.system.installedPrograms ?? []);
@@ -1075,6 +1102,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   async #addKitContent(document) {
+    this._rememberScrollPosition();
     if (!this.item.system.isKit) return false;
     if (document.type === "gear" && document.system.isKit) {
       ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Item.NoKitsInKits"));
@@ -1112,11 +1140,13 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     target ??= event.currentTarget;
     const ref = target.dataset.ref ?? "";
     if (!ref) return;
+    this._rememberScrollPosition();
     const current = Array.from(this.item.system.subskillRefs ?? []);
     await this.item.update({ "system.subskillRefs": current.filter(r => r !== ref) });
   }
 
   static async #onClearRequiredSkill(event, target) {
+    this._rememberScrollPosition();
     await this.item.update({ "system.requiredSkillRef": "" });
   }
 
@@ -1124,6 +1154,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     target ??= event.currentTarget;
     const ref = String(target.dataset.ref ?? "");
     if (!ref) return;
+    this._rememberScrollPosition();
 
     const current = Array.from(this.item.system.linkedWeaponRefs ?? []).filter((entry) => entry !== ref);
     await this.item.update({ "system.linkedWeaponRefs": current });
@@ -1152,6 +1183,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     target ??= event.currentTarget;
     const ref = String(target.dataset.ref ?? "");
     if (!ref) return;
+    this._rememberScrollPosition();
     const current = Array.from(this.item.system.linkedScreenRefs ?? []).filter((entry) => entry !== ref);
     await this.item.update({ "system.linkedScreenRefs": current });
 
@@ -1165,6 +1197,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     target ??= event.currentTarget;
     const ref = String(target.dataset.ref ?? "");
     if (!ref) return;
+    this._rememberScrollPosition();
     const current = Array.from(this.item.system.linkedVehicleRefs ?? []).filter((entry) => entry !== ref);
     await this.item.update({ "system.linkedVehicleRefs": current });
 
@@ -1175,6 +1208,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   static async #onClearVehiclePowerSource(event, target) {
+    this._rememberScrollPosition();
     const ref = this.item.system.powerSourceRef ?? "";
     if (ref) {
       const ps = this.#resolveItemRef(ref, "powerSource");
@@ -1187,6 +1221,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   static async #onClearScreenPowerSource(event, target) {
+    this._rememberScrollPosition();
     const ref = this.item.system.powerSourceRef ?? "";
     if (ref) {
       const ps = this.#resolveItemRef(ref, "powerSource");
@@ -1202,6 +1237,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     target ??= event.currentTarget;
     const ref = String(target.dataset.ref ?? "");
     if (!ref) return;
+    this._rememberScrollPosition();
     const installed = Array.from(this.item.system.installedPrograms ?? []).filter((r) => r !== ref);
     await this.item.update({ "system.installedPrograms": installed });
   }
@@ -1217,15 +1253,18 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       consumeOnUse: Boolean(e.consumeOnUse)
     }));
     if (index < 0 || index >= contents.length) return;
+    this._rememberScrollPosition();
     contents.splice(index, 1);
     await this.item.update({ "system.contents": contents });
   }
 
   static async #onClearGearRequiredSkill(event, target) {
+    this._rememberScrollPosition();
     await this.item.update({ "system.requiredSkillRef": "" });
   }
 
   static async #onAddEffect(event, target) {
+    this._rememberScrollPosition(5);
     const [effect] = await this.item.createEmbeddedDocuments("ActiveEffect", [{
       name: game.i18n.localize("STARFRONTIERS.Item.NewEffect"),
       transfer: this.item.type === "trainedAbility"
@@ -1248,6 +1287,9 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   static async #onDeleteEffect(event, target) {
     target ??= event.currentTarget;
     const effectId = target.dataset.effectId ?? "";
-    if (effectId) await this.item.deleteEmbeddedDocuments("ActiveEffect", [effectId]);
+    if (effectId) {
+      this._rememberScrollPosition();
+      await this.item.deleteEmbeddedDocuments("ActiveEffect", [effectId]);
+    }
   }
 }
