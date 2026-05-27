@@ -19,8 +19,8 @@ function buildChoices(keys, prefix) {
   }, {});
 }
 
-const SIZE_CHOICES = buildChoices(SIZE_KEYS, "STARFRONTIERS.Creature.Size");
-const ECOLOGY_CHOICES = buildChoices(ECOLOGY_KEYS, "STARFRONTIERS.Creature.Ecology");
+const SIZE_CHOICES = buildChoices(SIZE_KEYS, "STARFRONTIERS.Creature.sizeChoices");
+const ECOLOGY_CHOICES = buildChoices(ECOLOGY_KEYS, "STARFRONTIERS.Creature.ecologyChoices");
 const MOVE_CATEGORY_CHOICES = buildChoices(MOVE_CATEGORY_KEYS, "STARFRONTIERS.Creature.MoveCategoryChoice");
 const MOVE_MODE_CHOICES = buildChoices(MOVE_MODE_KEYS, "STARFRONTIERS.Creature.MoveModeChoice");
 const DISPOSITION_CHOICES = buildChoices(DISPOSITION_KEYS, "STARFRONTIERS.Creature.DispositionChoice");
