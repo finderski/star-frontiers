@@ -55,7 +55,8 @@
           "description",
           "defense.notes",
           "goal.notes",
-          "gmNotes"
+          "gmNotes",
+          "specialAttacks.*.detail"
         ]
       },
       "robot": {

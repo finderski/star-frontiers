@@ -8,8 +8,23 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 const SIZE_KEYS = ["tiny", "small", "medium", "large", "giant", "huge"];
 const ECOLOGY_KEYS = ["", "herbivore", "carnivore", "omnivore", "other"];
 const MOVE_CATEGORY_KEYS = ["", "verySlow", "slow", "medium", "fast", "veryFast"];
-const MOVE_MODE_KEYS = ["", "walk", "swim", "fly", "burrow", "swing", "stationary"];
-const DISPOSITION_KEYS = ["", "timid", "curious", "aggressive", "territorial"];
+const MOVE_MODE_KEYS = ["", "walk", "swim", "fly", "burrow", "swing", "climb", "stationary", "other"];
+const CREATURE_DEFENSE_KEYS = [
+  "acid",
+  "albedo",
+  "gauss",
+  "gaussAS",
+  "inertia",
+  "ir",
+  "laser",
+  "needler",
+  "other",
+  "poison",
+  "reactionSpeed",
+  "sonic",
+  "sonicAS",
+  "stamina"
+];
 
 function buildChoices(keys, prefix) {
   return keys.reduce((acc, key) => {
@@ -23,7 +38,41 @@ const SIZE_CHOICES = buildChoices(SIZE_KEYS, "STARFRONTIERS.Creature.sizeChoices
 const ECOLOGY_CHOICES = buildChoices(ECOLOGY_KEYS, "STARFRONTIERS.Creature.ecologyChoices");
 const MOVE_CATEGORY_CHOICES = buildChoices(MOVE_CATEGORY_KEYS, "STARFRONTIERS.Creature.MoveCategoryChoice");
 const MOVE_MODE_CHOICES = buildChoices(MOVE_MODE_KEYS, "STARFRONTIERS.Creature.MoveModeChoice");
-const DISPOSITION_CHOICES = buildChoices(DISPOSITION_KEYS, "STARFRONTIERS.Creature.DispositionChoice");
+
+function blankMovementEntry() {
+  return {
+    mode: "",
+    modeOther: "",
+    category: "",
+    ratePerTurn: 0,
+    ratePerHour: 0,
+    notes: ""
+  };
+}
+
+function blankSpecialAttack() {
+  return {
+    label: "",
+    detail: ""
+  };
+}
+
+function getCreatureDefenseChoiceLabel(value) {
+  const keys = [
+    `STARFRONTIERS.Choice.DamageType.${value}`,
+    `STARFRONTIERS.Choice.DefenseType.${value}`
+  ];
+  const match = keys.find((key) => game.i18n.has(key));
+  return match ? game.i18n.localize(match) : value;
+}
+
+function buildCreatureDefenseChoices(selected = []) {
+  const values = new Set(CREATURE_DEFENSE_KEYS);
+  for (const value of selected) {
+    if (value) values.add(String(value));
+  }
+  return Object.fromEntries(Array.from(values).map((value) => [value, getCreatureDefenseChoiceLabel(value)]));
+}
 
 export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(HandlebarsApplicationMixin(ActorSheetV2)) {
   static DEFAULT_OPTIONS = {
@@ -45,6 +94,10 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
       openItem: StarFrontiersCreatureSheet.#onOpenItem,
       deleteItem: StarFrontiersCreatureSheet.#onDeleteItem,
       addNaturalWeapon: StarFrontiersCreatureSheet.#onAddNaturalWeapon,
+      addMovement: StarFrontiersCreatureSheet.#onAddMovement,
+      removeMovement: StarFrontiersCreatureSheet.#onRemoveMovement,
+      addSpecialAttack: StarFrontiersCreatureSheet.#onAddSpecialAttack,
+      removeSpecialAttack: StarFrontiersCreatureSheet.#onRemoveSpecialAttack,
       rollWeaponAttack: StarFrontiersCreatureSheet.#onRollWeaponAttack,
       rollWeaponDamage: StarFrontiersCreatureSheet.#onRollWeaponDamage,
       rollCreatureInitiative: StarFrontiersCreatureSheet.#onRollInitiative,
@@ -87,53 +140,58 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
     context.ecologyChoices = ECOLOGY_CHOICES;
     context.movementCategoryChoices = MOVE_CATEGORY_CHOICES;
     context.movementModeChoices = MOVE_MODE_CHOICES;
-    context.reactionDispositionChoices = DISPOSITION_CHOICES;
+    context.movementRows = Array.isArray(actor.system.movement)
+      ? actor.system.movement.map((entry, index) => ({
+          index,
+          mode: String(entry.mode ?? ""),
+          modeOther: String(entry.modeOther ?? ""),
+          category: String(entry.category ?? ""),
+          ratePerTurn: Number(entry.ratePerTurn ?? 0),
+          ratePerHour: Number(entry.ratePerHour ?? 0),
+          notes: String(entry.notes ?? "")
+        }))
+      : [];
+    context.specialDefenseChoices = buildCreatureDefenseChoices([
+      ...Array.from(actor.system.defense?.immunities ?? []),
+      ...Array.from(actor.system.defense?.halves ?? [])
+    ]);
 
     context.staminaValue = Number(actor.system.abilities?.sta?.value ?? 0);
     context.staminaMax = Number(actor.system.abilities?.sta?.max ?? context.staminaValue);
 
-    context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
-      actor.system.description ?? "",
-      {
-        secrets: actor.isOwner,
-        relativeTo: actor,
-        rollData: actor.getRollData?.() ?? {},
-        async: true
-      }
-    );
-    context.enrichedGmNotes = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
-      actor.system.gmNotes ?? "",
-      {
-        secrets: actor.isOwner,
-        relativeTo: actor,
-        rollData: actor.getRollData?.() ?? {},
-        async: true
-      }
-    );
-    context.enrichedDefenseNotes = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
-      actor.system.defense?.notes ?? "",
-      {
-        secrets: actor.isOwner,
-        relativeTo: actor,
-        rollData: actor.getRollData?.() ?? {},
-        async: true
-      }
-    );
+    context.specialAttackRows = [];
+    for (let index = 0; index < (actor.system.specialAttacks ?? []).length; index++) {
+      const entry = actor.system.specialAttacks[index] ?? blankSpecialAttack();
+      context.specialAttackRows.push({
+        index,
+        label: String(entry.label ?? ""),
+        detail: String(entry.detail ?? ""),
+        enrichedDetail: await StarFrontiersCreatureSheet.#enrichHtml(actor, entry.detail ?? "")
+      });
+    }
+
+    context.enrichedDescription = await StarFrontiersCreatureSheet.#enrichHtml(actor, actor.system.description ?? "");
+    context.enrichedGmNotes = await StarFrontiersCreatureSheet.#enrichHtml(actor, actor.system.gmNotes ?? "");
+    context.enrichedDefenseNotes = await StarFrontiersCreatureSheet.#enrichHtml(actor, actor.system.defense?.notes ?? "");
 
     return context;
   }
 
+  static async #enrichHtml(actor, value) {
+    return foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      value ?? "",
+      {
+        secrets: actor.isOwner,
+        relativeTo: actor,
+        rollData: actor.getRollData?.() ?? {},
+        async: true
+      }
+    );
+  }
+
   static #buildAttackRow(actor, item) {
-    let toHit = "";
     let damage = "";
     let hasDamage = false;
-
-    try {
-      const profile = AttackPipeline.getWeaponAttackProfile(actor, item);
-      toHit = AttackPipeline.formatAttackTarget(profile.baseTarget);
-    } catch {
-      toHit = "";
-    }
 
     try {
       const formula = AttackPipeline.buildEffectiveDamageFormula(item, "");
@@ -159,10 +217,9 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
       name: item.name,
       img: item.img,
       isCreatureAttack: item.type === "creatureAttack",
-      toHit,
       damage,
       hasDamage,
-      defenseLabel
+      defenseLabel: defenseLabel || "—"
     };
   }
 
@@ -217,7 +274,6 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
       name: game.i18n.localize("STARFRONTIERS.Creature.NewNaturalWeapon"),
       type: "creatureAttack",
       system: {
-        attackScore: 50,
         damageFormula: "1d10",
         damageType: "inertia",
         targets: 1,
@@ -225,6 +281,40 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
       }
     }]);
     item?.sheet?.render(true);
+  }
+
+  static async #onAddMovement(event, target) {
+    this._rememberScrollPosition();
+    const movement = Array.from(this.document.system.movement ?? []).map((entry) => ({ ...entry }));
+    movement.push(blankMovementEntry());
+    await this.document.update({ "system.movement": movement });
+  }
+
+  static async #onRemoveMovement(event, target) {
+    target ??= event.currentTarget;
+    const index = Number(target.dataset.index ?? -1);
+    const movement = Array.from(this.document.system.movement ?? []).map((entry) => ({ ...entry }));
+    if (index < 0 || index >= movement.length) return;
+    this._rememberScrollPosition();
+    movement.splice(index, 1);
+    await this.document.update({ "system.movement": movement });
+  }
+
+  static async #onAddSpecialAttack(event, target) {
+    this._rememberScrollPosition();
+    const entries = Array.from(this.document.system.specialAttacks ?? []).map((entry) => ({ ...entry }));
+    entries.push(blankSpecialAttack());
+    await this.document.update({ "system.specialAttacks": entries });
+  }
+
+  static async #onRemoveSpecialAttack(event, target) {
+    target ??= event.currentTarget;
+    const index = Number(target.dataset.index ?? -1);
+    const entries = Array.from(this.document.system.specialAttacks ?? []).map((entry) => ({ ...entry }));
+    if (index < 0 || index >= entries.length) return;
+    this._rememberScrollPosition();
+    entries.splice(index, 1);
+    await this.document.update({ "system.specialAttacks": entries });
   }
 
   static async #onRollWeaponAttack(event, target) {
@@ -244,6 +334,7 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
   }
 
   static async #onRollInitiative(event, target) {
+    target ??= event.currentTarget;
     const actor = this.document;
     const mod = Number(actor.system.initiativeMod ?? 0);
     const roll = await (new Roll("1d10 + @mod", { mod })).evaluate({ allowInteractive: false });

@@ -777,8 +777,7 @@
     {{#if is.creatureAttack}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.CreatureAttackData"}}</legend>
-        <div class="compact-grid three-columns">
-          <label><span>{{localize "STARFRONTIERS.Item.AttackScore"}}</span><input type="number" name="system.attackScore" value="{{system.attackScore}}" min="0" max="100" /></label>
+        <div class="compact-grid two-columns">
           <label><span>{{localize "STARFRONTIERS.Item.DamageFormula"}}</span><input type="text" name="system.damageFormula" value="{{system.damageFormula}}" placeholder="2d10" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Defense"}}</span><select name="system.damageType">{{selectOptions choices.damageType selected=system.damageType}}</select></label>
         </div>

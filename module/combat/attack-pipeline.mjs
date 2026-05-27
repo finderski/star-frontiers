@@ -108,19 +108,19 @@ export async function resolveWeaponAmmoItem(actor, weapon) {
 export function getWeaponAttackProfile(actor, weapon) {
   const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
 
-  if (weapon.type === "creatureAttack") {
+  if (actor?.type === "creature") {
     return {
       attackAbilityKey: "",
-      baseTarget: clampAttackTarget(Number(weapon.system.attackScore ?? 0)),
+      baseTarget: clampAttackTarget(Number(actor.system.attackScore ?? weapon._source?.system?.attackScore ?? 0)),
       rulesEdition,
       skill: null,
-      skillLabel: game.i18n.localize("STARFRONTIERS.Creature.NaturalAttack")
+      skillLabel: game.i18n.localize("STARFRONTIERS.Creature.Attack")
     };
   }
 
   const skill = getWeaponSkill(actor, weapon);
-  const dex = Number(actor.system.abilities.dex.value ?? 0);
-  const str = Number(actor.system.abilities.str.value ?? 0);
+  const dex = Number(actor.system.abilities?.dex?.value ?? 0);
+  const str = Number(actor.system.abilities?.str?.value ?? 0);
   const skillKey = weapon.system.weaponSkillKey;
   const isMelee = skillKey === "melee" || weapon.system.weaponType === "melee";
   const isStr = skillKey === "str";

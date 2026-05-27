@@ -466,7 +466,6 @@ export class StarFrontiersCreatureAttackData extends StarFrontiersItemData {
   static defineSchema() {
     return {
       ...super.defineSchema(),
-      attackScore: numberField({ initial: 50, min: 0, max: 100 }),
       damageFormula: textField({ initial: "1d10" }),
       damageType: textField({
         initial: "inertia",

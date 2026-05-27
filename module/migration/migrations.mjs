@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.3.0";
+export const CURRENT_SCHEMA_VERSION = "0.3.1";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -540,6 +540,77 @@ const MIGRATIONS = [
         if (reactionSpeed === undefined || reactionSpeed === null) {
           const legacy = Number(actor._source?.system?.abilities?.dex?.value ?? 30);
           await actor.update({ "system.reactionSpeed": legacy });
+        }
+      }
+
+      for (const actor of game.actors) {
+        await migrateCreature(actor);
+      }
+
+      for (const scene of game.scenes ?? []) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor) continue;
+          await migrateCreature(tokenDoc.actor);
+        }
+      }
+    }
+  },
+  {
+    version: "0.3.1",
+    description: "Creature movement becomes an array, creatureAttack attackScore moves to the owning creature, and descriptor is removed.",
+    async migrate() {
+      function buildMovementEntry(systemSource = {}) {
+        const mode = String(systemSource?.movementMode ?? "");
+        const category = String(systemSource?.movementCategory ?? "");
+        const ratePerTurn = Math.max(Number(systemSource?.movement ?? 0), 0);
+        if (!mode && !category && ratePerTurn <= 0) return [];
+        return [{
+          mode,
+          modeOther: "",
+          category,
+          ratePerTurn,
+          ratePerHour: 0,
+          notes: ""
+        }];
+      }
+
+      function getBestAttackScore(actor) {
+        let best = Number(actor._source?.system?.attackScore ?? actor.system?.attackScore ?? 0);
+        for (const item of actor.items ?? []) {
+          if (item.type !== "creatureAttack") continue;
+          best = Math.max(best, Number(item._source?.system?.attackScore ?? 0));
+        }
+        return best;
+      }
+
+      async function migrateCreature(actor) {
+        if (actor?.type !== "creature") return;
+
+        const updates = {};
+        const systemSource = actor._source?.system ?? {};
+        if (!Array.isArray(systemSource.movement)) {
+          updates["system.movement"] = buildMovementEntry(systemSource);
+        }
+        if (foundry.utils.hasProperty(systemSource, "movementMode")) {
+          updates["system.-=movementMode"] = null;
+        }
+        if (foundry.utils.hasProperty(systemSource, "movementCategory")) {
+          updates["system.-=movementCategory"] = null;
+        }
+        if (foundry.utils.hasProperty(systemSource, "descriptor")) {
+          updates["system.-=descriptor"] = null;
+        }
+
+        const currentAttackScore = Number(systemSource?.attackScore ?? actor.system?.attackScore ?? 0);
+        if (currentAttackScore <= 0) {
+          const bestAttackScore = getBestAttackScore(actor);
+          if (bestAttackScore > 0) {
+            updates["system.attackScore"] = bestAttackScore;
+          }
+        }
+
+        if (Object.keys(updates).length) {
+          await actor.update(updates);
         }
       }
 

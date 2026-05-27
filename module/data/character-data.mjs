@@ -64,6 +64,17 @@ function attackField() {
   });
 }
 
+function creatureMovementEntryField() {
+  return schemaField({
+    mode: textField({ choices: ["", "walk", "swim", "fly", "burrow", "swing", "climb", "stationary", "other"] }),
+    modeOther: textField(),
+    category: textField({ choices: ["", "verySlow", "slow", "medium", "fast", "veryFast"] }),
+    ratePerTurn: numberField({ initial: 0, min: 0 }),
+    ratePerHour: numberField({ initial: 0, min: 0 }),
+    notes: textField()
+  });
+}
+
 function liveVehicleTemplateField() {
   return schemaField({
     vehicleClass: textField(),
@@ -282,19 +293,18 @@ export class StarFrontiersCreatureData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       description: htmlField(),
-      descriptor: textField(),
       ecology: textField({ choices: ["", "herbivore", "carnivore", "omnivore", "other"] }),
+      ecologyOther: textField(),
       size: textField({ initial: "medium", choices: ["tiny", "small", "medium", "large", "giant", "huge"] }),
       nativeWorld: textField(),
+      habitat: textField(),
       groupSize: schemaField({
         formula: textField(),
         min: numberField({ initial: 1, min: 0 }),
         max: numberField({ initial: 1, min: 0 }),
         typical: numberField({ initial: 1, min: 0 })
       }),
-      movementCategory: textField({ choices: ["", "verySlow", "slow", "medium", "fast", "veryFast"] }),
-      movement: numberField({ initial: 0, min: 0 }),
-      movementMode: textField({ choices: ["", "walk", "swim", "fly", "burrow", "swing", "stationary"] }),
+      movement: arrayField(creatureMovementEntryField()),
       initiativeMod: numberField({ initial: 0, min: 0 }),
       reactionSpeed: numberField({ initial: 30, min: 1, max: 100 }),
       abilities: schemaField({
@@ -314,6 +324,10 @@ export class StarFrontiersCreatureData extends foundry.abstract.TypeDataModel {
       }),
       specialAbilities: arrayField(schemaField({
         key: textField(),
+        label: textField(),
+        detail: htmlField()
+      })),
+      specialAttacks: arrayField(schemaField({
         label: textField(),
         detail: htmlField()
       })),

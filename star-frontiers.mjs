@@ -232,7 +232,7 @@ Hooks.once("init", () => {
     },
     creature: {
       bar: ["abilities.sta"],
-      value: ["initiativeMod", "movement"]
+      value: ["initiativeMod", "attackScore", "reactionSpeed"]
     },
     robot: {
       bar: ["structuralPoints"],
