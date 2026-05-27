@@ -2787,7 +2787,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .star-frontiers-creature-sheet .inline-field {
@@ -2800,6 +2800,14 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 
 .star-frontiers-creature-sheet .inline-field span {
   white-space: nowrap;
+}
+
+.star-frontiers-creature-sheet .inline-field.small span {
+  font-size: 1em;
+}
+
+.star-frontiers-creature-sheet .inline-field .smallField {
+  width: 70px;
 }
 
 .star-frontiers-creature-sheet .inline-field input,
@@ -2845,7 +2853,8 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 }
 
 .star-frontiers-creature-sheet .creature-stamina-field {
-  flex: 1 1 11rem;
+  /*flex: 1 1 11rem;*/
+  display:inline-block;
 }
 
 .star-frontiers-creature-sheet .creature-stamina-pair {
@@ -2860,6 +2869,20 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 
 .star-frontiers-creature-sheet .creature-stamina-pair__slash {
   font-weight: 700;
+}
+
+.star-frontiers-creature-sheet .creature-label-pair {
+  display: block;
+}
+
+.star-frontiers-creature-sheet .creature-label-pair .shim {
+  display: inline-block;
+  width: 108px;
+}
+
+.star-frontiers-creature-sheet .creature-label-pair .smallerLabel {
+  display: inline-block;
+  width: 70px;
 }
 
 .star-frontiers-creature-sheet .creature-roll-row {
@@ -3010,7 +3033,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 
 .star-frontiers-creature-sheet .creature-line--combat .inline-field,
 .star-frontiers-creature-sheet .creature-line--defense-stats .inline-field {
-  flex: 1 1 10rem;
+  flex: 1 1 auto;
 }
 
 .star-frontiers-creature-sheet .creature-line--defense-stats {

@@ -41,7 +41,7 @@
             data-action="rollNumberAppearing"
             title="{{localize "STARFRONTIERS.Creature.RollNumberHint"}}"
           >
-            {{localize "STARFRONTIERS.Creature.Number"}} <i class="fa-solid fa-dice-d10"></i>
+            <i class="fa-solid fa-dice-d10"></i> {{localize "STARFRONTIERS.Creature.Number"}}
           </button>
           <input type="text" name="system.groupSize.formula" value="{{system.groupSize.formula}}" placeholder="2-6" />
         </div>
@@ -69,8 +69,8 @@
         <div class="creature-list">
           {{#each movementRows as |row|}}
             <div class="creature-list-row creature-movement-row">
-              <label class="inline-field">
-                <span>{{localize "STARFRONTIERS.Creature.MoveMode"}}</span>
+              <label class="inline-field small">
+                <span>{{localize "STARFRONTIERS.Creature.Mode"}}</span>
                 <select name="system.movement.{{row.index}}.mode">
                   {{selectOptions @root.movementModeChoices selected=row.mode localize=true}}
                 </select>
@@ -85,21 +85,21 @@
                   />
                 </label>
               {{/if}}
-              <label class="inline-field">
-                <span>{{localize "STARFRONTIERS.Creature.MoveCategory"}}</span>
+              <label class="inline-field small">
+                <span>{{localize "STARFRONTIERS.Creature.Speed"}}</span>
                 <select name="system.movement.{{row.index}}.category">
                   {{selectOptions @root.movementCategoryChoices selected=row.category localize=true}}
                 </select>
               </label>
-              <label class="inline-field">
+              <label class="inline-field small">
                 <span>{{localize "STARFRONTIERS.Creature.MetersPerTurn"}}</span>
-                <input type="number" name="system.movement.{{row.index}}.ratePerTurn" value="{{row.ratePerTurn}}" min="0" />
+                <input class="smallField" type="number" name="system.movement.{{row.index}}.ratePerTurn" value="{{row.ratePerTurn}}" min="0" />
               </label>
-              <label class="inline-field">
-                <span>{{localize "STARFRONTIERS.Creature.KilometersPerHour"}}</span>
-                <input type="number" name="system.movement.{{row.index}}.ratePerHour" value="{{row.ratePerHour}}" min="0" />
+              <label class="inline-field small">
+                <span>{{localize "STARFRONTIERS.Creature.Kilometers-abbr-PerHour"}}</span>
+                <input class="smallField" type="number" name="system.movement.{{row.index}}.ratePerHour" value="{{row.ratePerHour}}" min="0" />
               </label>
-              <label class="inline-field inline-field--grow">
+              <label class="inline-field small inline-field--grow">
                 <span>{{localize "STARFRONTIERS.Creature.MoveNotes"}}</span>
                 <input
                   type="text"
@@ -134,41 +134,46 @@
     <fieldset class="paper-box full-width">
       <legend>{{localize "STARFRONTIERS.Creature.Combat"}}</legend>
       <div class="creature-line creature-line--combat">
-        <label class="inline-field">
+        <label class="inline-field small">
           <span>{{localize "STARFRONTIERS.Creature.IM"}}</span>
-          <input type="number" name="system.initiativeMod" value="{{system.initiativeMod}}" min="0" />
+          <input class="smallField" type="number" name="system.initiativeMod" value="{{system.initiativeMod}}" min="0" />
         </label>
-        <label class="inline-field">
+        <label class="inline-field small">
           <span>{{localize "STARFRONTIERS.Creature.RS"}}</span>
-          <input type="number" name="system.reactionSpeed" value="{{system.reactionSpeed}}" min="1" max="100" />
+          <input class="smallField" type="number" name="system.reactionSpeed" value="{{system.reactionSpeed}}" min="1" max="100" />
         </label>
-        <label class="inline-field creature-stamina-field">
+        <label class="inline-field small creature-stamina-field">
           <span>{{localize "STARFRONTIERS.Creature.Stamina"}}</span>
           <span class="creature-stamina-pair">
-            <input type="number" name="system.abilities.sta.value" value="{{staminaValue}}" />
+            <input class="smallField" type="number" name="system.abilities.sta.value" value="{{staminaValue}}" />
             <span class="creature-stamina-pair__slash">/</span>
-            <input type="number" name="system.abilities.sta.max" value="{{staminaMax}}" />
+            <input class="smallField" type="number" name="system.abilities.sta.max" value="{{staminaMax}}" />
           </span>
+          <div class="creature-label-pair">
+              <div class="shim">&nbsp;</div>
+              <div class="smallerLabel">{{localize "STARFRONTIERS.Creature.Current"}}</div>
+              <span class="slashShim">&nbsp;&nbsp;</span>
+              <div class="smallerLabel">{{localize "STARFRONTIERS.Creature.Max"}}</div>
+          </div>
         </label>
-        <label class="inline-field">
+        <label class="inline-field small">
           <span>{{localize "STARFRONTIERS.Creature.Attack"}}</span>
-          <input type="number" name="system.attackScore" value="{{system.attackScore}}" min="0" max="100" />
+          <input class="smallField" type="number" name="system.attackScore" value="{{system.attackScore}}" min="0" max="100" />
         </label>
-        <label class="inline-field">
+        <label class="inline-field small">
           <span>{{localize "STARFRONTIERS.Creature.AttacksPerTurn"}}</span>
-          <input type="number" name="system.numAttacksPerTurn" value="{{system.numAttacksPerTurn}}" min="0" />
+          <input class="smallField" type="number" name="system.numAttacksPerTurn" value="{{system.numAttacksPerTurn}}" min="0" />
         </label>
       </div>
       <div class="creature-roll-row">
         <div class="roll-label-group roll-label-group--left">
           <button
             type="button"
-            class="roll-label-main"
+            class="creature-field__roll-label"
             data-action="rollCreatureInitiative"
             title="{{localize "STARFRONTIERS.Creature.RollInitiativePublic"}}"
           >
-            <i class="fa-solid fa-dice-d10 roll-label-main__icon" aria-hidden="true"></i>
-            <span class="roll-label-main__text">{{localize "STARFRONTIERS.Creature.RollInitiative"}}</span>
+            <i class="fa-solid fa-dice-d10"></i> {{localize "STARFRONTIERS.Creature.RollInitiative"}}
           </button>
           <div class="roll-label-actions">
             <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollCreatureInitiative" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Creature.RollInitiativeBlind"}}"></button>

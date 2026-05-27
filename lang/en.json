@@ -154,6 +154,7 @@
       "AttacksPerTurn": "Attacks / Turn",
       "CarriedWeapons": "Carried Weapons",
       "Combat": "Combat",
+      "Current": "Current",
       "DefenseNotes": "Defense Notes",
       "Description": "Description",
       "Descriptor": "Descriptor",
@@ -184,8 +185,9 @@
       "InitiativeFlavor": "{creature} rolls initiative",
       "InitiativeTitle": "{creature}: Initiative",
       "KilometersPerHour": "Kilometers / Hour",
+      "Kilometers-abbr-PerHour": "km / hour",
+      "Max": "Max",
       "MetersPerTurn": "Meters / Turn",
-      "MoveCategory": "Move Category",
       "MoveCategoryChoice": {
         "None": "Unspecified",
         "fast": "Fast",
@@ -194,7 +196,7 @@
         "veryFast": "Very Fast",
         "verySlow": "Very Slow"
       },
-      "MoveMode": "Move Mode",
+      "Mode": "Mode",
       "MoveModeChoice": {
         "None": "Unspecified",
         "burrow": "Burrow",
@@ -244,6 +246,7 @@
       "SpecialAttackLabel": "Label",
       "SpecialAttacks": "Special Attacks",
       "SpecialDefenses": "Special Defenses",
+      "Speed": "Speed",
       "Stamina": "Stamina",
       "Temperament": "Temperament",
       "Type": "Type",
