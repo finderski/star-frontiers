@@ -1835,7 +1835,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     if (action === "rollWeaponDamage") {
       if (!itemUuid) return;
       const item = await globalThis.fromUuid(itemUuid);
-      if (!item?.actor || item.type !== "weapon") return;
+      if (!item?.actor || (item.type !== "weapon" && item.type !== "creatureAttack")) return;
       await AttackPipeline.rollWeaponDamage(item.actor, item, rollMode ?? "public", bandKey ?? "");
       return;
     }
@@ -1845,7 +1845,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
 
       const item = await globalThis.fromUuid(itemUuid);
       const targetActor = await globalThis.fromUuid(targetActorUuid);
-      if (!item?.actor || item.type !== "weapon" || !targetActor) {
+      if (!item?.actor || (item.type !== "weapon" && item.type !== "creatureAttack") || !targetActor) {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceTargetGone"));
         return;
       }

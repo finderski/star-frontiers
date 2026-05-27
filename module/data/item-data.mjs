@@ -461,3 +461,32 @@ export class StarFrontiersProgramData extends StarFrontiersItemData {
     };
   }
 }
+
+export class StarFrontiersCreatureAttackData extends StarFrontiersItemData {
+  static defineSchema() {
+    return {
+      ...super.defineSchema(),
+      attackScore: numberField({ initial: 50, min: 0, max: 100 }),
+      damageFormula: textField({ initial: "1d10" }),
+      damageType: textField({
+        initial: "inertia",
+        choices: ["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"]
+      }),
+      targets: numberField({ initial: 1, min: 1 }),
+      range: schemaField({
+        enabled: boolField(),
+        rangeBands: rangeBandsField()
+      }),
+      avoidance: schemaField({
+        enabled: boolField(),
+        ability: textField({ choices: ["", "sta", "rs", "dex", "str", "int", "log", "per", "ldr", "im"] }),
+        comparison: textField({ initial: "currentOrLess", choices: ["currentOrLess"] }),
+        onSuccessEffect: textField(),
+        failNote: textField()
+      }),
+      onHitEffectIds: arrayField(textField()),
+      notes: htmlField(),
+      isNatural: boolField(true)
+    };
+  }
+}

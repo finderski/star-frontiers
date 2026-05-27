@@ -18,10 +18,19 @@ export function getTokenDistance(sourceToken, targetToken) {
   return measurement.distance ?? null;
 }
 
+function getWeaponRangeBandsSource(weapon) {
+  if (weapon.type === "creatureAttack") {
+    return weapon.system.range?.enabled ? weapon.system.range.rangeBands : null;
+  }
+  return weapon.system.rangeBands;
+}
+
 export function getWeaponRangeBandFromDistance(weapon, distance) {
   if (distance === null || distance === undefined || !weapon) return null;
+  const bands = getWeaponRangeBandsSource(weapon);
+  if (!bands) return null;
   for (const key of RANGE_BAND_ORDER) {
-    const band = weapon.system.rangeBands?.[key];
+    const band = bands[key];
     if (!band) continue;
     if (band.min === null && band.max === null) continue;
     const min = band.min ?? 0;
@@ -98,6 +107,17 @@ export async function resolveWeaponAmmoItem(actor, weapon) {
 
 export function getWeaponAttackProfile(actor, weapon) {
   const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
+
+  if (weapon.type === "creatureAttack") {
+    return {
+      attackAbilityKey: "",
+      baseTarget: clampAttackTarget(Number(weapon.system.attackScore ?? 0)),
+      rulesEdition,
+      skill: null,
+      skillLabel: game.i18n.localize("STARFRONTIERS.Creature.NaturalAttack")
+    };
+  }
+
   const skill = getWeaponSkill(actor, weapon);
   const dex = Number(actor.system.abilities.dex.value ?? 0);
   const str = Number(actor.system.abilities.str.value ?? 0);
@@ -217,8 +237,10 @@ export function getRangeBandFromDistance(weapon, distance) {
 
 export function getAvailableWeaponRangeBands(weapon) {
   const bands = [];
+  const source = getWeaponRangeBandsSource(weapon);
+  if (!source) return bands;
   for (const key of RANGE_BAND_ORDER) {
-    const band = weapon.system.rangeBands?.[key];
+    const band = source[key];
     if (!band) continue;
     const hasDistance = band.min !== null || band.max !== null;
     if (!hasDistance) continue;
@@ -313,6 +335,7 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
 }
 
 export function getAmmoConsumption(weapon) {
+  if (weapon.type === "creatureAttack") return { amount: 0 };
   const uses = weapon.system.ammo?.uses ?? "none";
   if (uses === "none") return { amount: 0 };
 
@@ -326,6 +349,7 @@ export function getAmmoConsumption(weapon) {
 }
 
 export function getActiveWeaponMode(weapon) {
+  if (weapon.type === "creatureAttack") return null;
   const modes = Array.from(weapon.system.mechanics?.modes ?? []);
   if (!modes.length) return null;
   const key = String(weapon.system.activeModeKey ?? "");
@@ -333,6 +357,13 @@ export function getActiveWeaponMode(weapon) {
 }
 
 export function buildEffectiveDamageFormula(weapon, bandKey = "") {
+  if (weapon.type === "creatureAttack") {
+    const bandFormula = bandKey
+      ? (weapon.system.range?.rangeBands?.[bandKey]?.damageFormula ?? "")
+      : "";
+    return bandFormula || weapon.system.damageFormula || "";
+  }
+
   const activeMode = getActiveWeaponMode(weapon);
   const modeFormula = activeMode?.damageFormula ?? "";
   if (activeMode && !modeFormula && !bandKey) return "";
@@ -371,12 +402,23 @@ export function getWeaponModeLabel(mode) {
 }
 
 export function getWeaponOnHitEffectIds(weapon) {
+  if (weapon.type === "creatureAttack") {
+    return Array.from(weapon.system.onHitEffectIds ?? []);
+  }
   const activeMode = getActiveWeaponMode(weapon);
   if (activeMode) return Array.from(activeMode.onHitEffectIds ?? []);
   return Array.from(weapon.system.mechanics?.onHitEffectIds ?? []);
 }
 
 export function getWeaponOnHitEffectOrigin(weapon) {
+  if (weapon.type === "creatureAttack") {
+    return {
+      weaponUuid: weapon.uuid,
+      sourceItemUuid: weapon.uuid,
+      modeKey: "",
+      sourceName: weapon.name
+    };
+  }
   const activeMode = getActiveWeaponMode(weapon);
   const modeLabel = activeMode ? getWeaponModeLabel(activeMode) : "";
   return {
@@ -560,6 +602,11 @@ export function getAvoidanceEffectLabel(value) {
   return game.i18n.has(label) ? game.i18n.localize(label) : label;
 }
 
+export function getWeaponAvoidance(weapon) {
+  if (weapon.type === "creatureAttack") return weapon.system.avoidance ?? null;
+  return getActiveWeaponMode(weapon)?.avoidance ?? null;
+}
+
 export function getWeaponDefenseLabel(weapon) {
   const activeMode = getActiveWeaponMode(weapon);
   const defenseTypes = Array.from(activeMode?.defenseTypes ?? []);
@@ -572,7 +619,9 @@ export function getWeaponDefenseLabel(weapon) {
 export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   const profile = getWeaponAttackProfile(actor, weapon);
   const activeMode = getActiveWeaponMode(weapon);
-  const isMelee = weapon.system.weaponSkillKey === "melee" || weapon.system.weaponType === "melee";
+  const isCreatureAttack = weapon.type === "creatureAttack";
+  const isMelee = !isCreatureAttack
+    && (weapon.system.weaponSkillKey === "melee" || weapon.system.weaponType === "melee");
   const combatProfileBonus = Number(
     isMelee
       ? actor.system.combatProfile?.meleeBonus ?? 0
@@ -739,7 +788,7 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   });
 
   const targetActor = targetedToken?.actor ?? null;
-  const avoidanceEnabled = Boolean(activeMode?.avoidance?.enabled);
+  const avoidanceEnabled = Boolean(getWeaponAvoidance(weapon)?.enabled);
   const onHitEffectIds = getWeaponOnHitEffectIds(weapon);
   if (anyHit && targetActor && onHitEffectIds.length && !avoidanceEnabled) {
     await applyOnHitEffects(targetActor, onHitEffectIds, getWeaponOnHitEffectOrigin(weapon), weapon);
@@ -782,10 +831,11 @@ export async function rollWeaponDamage(actor, weapon, rollMode = "public", bandK
 }
 
 export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid = "", rollMode = "public" }) {
-  const activeMode = getActiveWeaponMode(weapon);
-  if (!activeMode?.avoidance?.enabled) return;
+  const avoidance = getWeaponAvoidance(weapon);
+  if (!avoidance?.enabled) return;
 
-  const ability = String(activeMode.avoidance.ability ?? "");
+  const activeMode = getActiveWeaponMode(weapon);
+  const ability = String(avoidance.ability ?? "");
   const abilityRecord = target.system.abilities?.[ability];
   if (!abilityRecord) {
     ui.notifications.error(game.i18n.format(
@@ -799,8 +849,8 @@ export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid 
     ? Number(target.system.stamina?.value ?? abilityRecord.value ?? 0)
     : Number(abilityRecord.value ?? 0);
   const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
-  const modeLabel = getWeaponModeLabel(activeMode);
-  const effectLabel = getAvoidanceEffectLabel(activeMode.avoidance.onSuccessEffect);
+  const modeLabel = activeMode ? getWeaponModeLabel(activeMode) : "";
+  const effectLabel = getAvoidanceEffectLabel(avoidance.onSuccessEffect);
 
   const prompt = await promptModifier(abilityLabel, targetScore);
   if (!prompt) return;
@@ -830,7 +880,7 @@ export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid 
     },
     {
       label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceWeaponLabel"),
-      value: `${weapon.name} (${modeLabel})`
+      value: modeLabel ? `${weapon.name} (${modeLabel})` : weapon.name
     },
     {
       label: game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceTargetLabel"),
@@ -871,15 +921,15 @@ export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid 
     speaker: ChatMessage.getSpeaker({ actor: target })
   };
 
-  if (!success && activeMode.avoidance.onSuccessEffect) {
+  if (!success && avoidance.onSuccessEffect) {
     chatData.flags = {
       "star-frontiers": {
         avoidanceFailure: {
           targetActorUuid: target.uuid,
           targetTokenUuid,
           weaponUuid: weapon.uuid,
-          modeKey: activeMode.key,
-          onSuccessEffect: activeMode.avoidance.onSuccessEffect
+          modeKey: activeMode?.key ?? "",
+          onSuccessEffect: avoidance.onSuccessEffect
         }
       }
     };
@@ -987,14 +1037,14 @@ export async function createWeaponAttackChatMessage(actor, weapon, {
   hitCount = 0,
   shots = 1
 }) {
-  const activeMode = getActiveWeaponMode(weapon);
-  const avoidance = activeMode?.avoidance?.enabled ? {
-    ability: activeMode.avoidance.ability,
-    abilityLabel: activeMode.avoidance.ability
-      ? game.i18n.localize(`STARFRONTIERS.Ability.${activeMode.avoidance.ability}`)
+  const avoidanceSource = getWeaponAvoidance(weapon);
+  const avoidance = avoidanceSource?.enabled ? {
+    ability: avoidanceSource.ability,
+    abilityLabel: avoidanceSource.ability
+      ? game.i18n.localize(`STARFRONTIERS.Ability.${avoidanceSource.ability}`)
       : "",
-    onSuccessEffect: activeMode.avoidance.onSuccessEffect ?? "",
-    effectLabel: getAvoidanceEffectLabel(activeMode.avoidance.onSuccessEffect)
+    onSuccessEffect: avoidanceSource.onSuccessEffect ?? "",
+    effectLabel: getAvoidanceEffectLabel(avoidanceSource.onSuccessEffect)
   } : null;
 
   const canRollAvoidance = Boolean(

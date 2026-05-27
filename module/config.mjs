@@ -9,6 +9,7 @@ export const ITEM_TYPE_LABELS = {
   armor: "STARFRONTIERS.Item.Type.Armor",
   computer: "STARFRONTIERS.Item.Type.Computer",
   consumable: "STARFRONTIERS.Item.Type.Consumable",
+  creatureAttack: "STARFRONTIERS.Item.Type.CreatureAttack",
   gear: "STARFRONTIERS.Item.Type.Gear",
   powerSource: "STARFRONTIERS.Item.Type.PowerSource",
   program: "STARFRONTIERS.Item.Type.Program",

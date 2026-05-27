@@ -145,6 +145,86 @@
     "Common": {
       "DragToReorder": "Drag to reorder"
     },
+    "Creature": {
+      "AddNaturalWeapon": "Add Natural Attack",
+      "ArmorPoints": "Armor Points",
+      "AttacksPerTurn": "Attacks / Turn",
+      "CarriedWeapons": "Carried Weapons",
+      "Combat": "Combat",
+      "DefenseNotes": "Defense Notes",
+      "Description": "Description",
+      "Descriptor": "Descriptor",
+      "DescriptorPlaceholder": "e.g. Ambush predator",
+      "DispositionChoice": {
+        "None": "Unspecified",
+        "aggressive": "Aggressive",
+        "curious": "Curious",
+        "territorial": "Territorial",
+        "timid": "Timid"
+      },
+      "DropTypeUnsupported": "Creatures can only hold natural attacks and weapons.",
+      "Ecology": "Ecology",
+      "ecologyChoices": {
+        "None": "Unspecified",
+        "carnivore": "Carnivore",
+        "herbivore": "Herbivore",
+        "omnivore": "Omnivore",
+        "other": "Other"
+      },
+      "GMNotes": "GM Notes",
+      "IM": "IM",
+      "Identity": "Identity",
+      "InitiativeFlavor": "{creature} rolls initiative",
+      "InitiativeTitle": "{creature}: Initiative",
+      "MetersPerTurn": "Meters / Turn",
+      "MoveCategory": "Move Category",
+      "MoveCategoryChoice": {
+        "None": "Unspecified",
+        "fast": "Fast",
+        "medium": "Medium",
+        "slow": "Slow",
+        "veryFast": "Very Fast",
+        "verySlow": "Very Slow"
+      },
+      "MoveMode": "Move Mode",
+      "MoveModeChoice": {
+        "None": "Unspecified",
+        "burrow": "Burrow",
+        "fly": "Fly",
+        "stationary": "Stationary",
+        "swim": "Swim",
+        "swing": "Swing",
+        "walk": "Walk"
+      },
+      "Movement": "Movement",
+      "Name": "Name",
+      "NativeWorld": "Native World",
+      "NaturalAttack": "Natural Attack",
+      "NaturalWeapons": "Natural Attacks",
+      "NewNaturalWeapon": "New Natural Attack",
+      "NoNaturalWeapons": "No natural attacks yet.",
+      "Number": "Number Appearing",
+      "NumberFlavor": "Number Appearing for {creature} ({input} → {formula})",
+      "NumberParseError": "Could not parse the Number Appearing value. Use a range (2-6), a dice formula (4d10), or a single number.",
+      "RS": "RS",
+      "Regenerate": "Regenerate",
+      "RollInitiative": "Roll Initiative",
+      "RollNumberHint": "Roll how many of this creature appear",
+      "Size": "Size",
+      "sizeChoices": {
+        "None": "Unspecified",
+        "giant": "Giant",
+        "huge": "Huge",
+        "large": "Large",
+        "medium": "Medium",
+        "small": "Small",
+        "tiny": "Tiny"
+      },
+      "SizeToHitMod": "Size To-Hit Mod",
+      "SpecialDefenses": "Special Defenses",
+      "Stamina": "Stamina",
+      "Temperament": "Temperament"
+    },
     "Ability": {
       "None": "None",
       "dex": "DEX",
@@ -525,6 +605,7 @@
         "Armor": "Armor",
         "Computer": "Computer",
         "Consumable": "Consumable",
+        "CreatureAttack": "Creature Attack",
         "Gear": "Gear",
         "PowerSource": "Power Source",
         "Program": "Program",
@@ -535,6 +616,12 @@
         "Vehicle": "Vehicle",
         "Weapon": "Weapon"
       },
+      "AttackScore": "Attack Score",
+      "Avoidance": "Avoidance",
+      "CreatureAttackData": "Creature Attack",
+      "CreatureAttackName": "Attack Name",
+      "HasRange": "Has Range",
+      "Targets": "Targets",
       "NewEffect": "New Effect",
       "NoBonusPicks": "No bonus picks configured.",
       "NoEffects": "No active effects configured.",
@@ -616,6 +703,7 @@
     },
     "Sheet": {
       "Character": "Star Frontiers Character Sheet",
+      "Creature": "Star Frontiers Creature Sheet",
       "Item": "Star Frontiers Item Sheet"
     },
     "Weapon": {

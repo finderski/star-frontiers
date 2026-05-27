@@ -122,6 +122,12 @@
           "description"
         ]
       },
+      "creatureAttack": {
+        "htmlFields": [
+          "description",
+          "notes"
+        ]
+      },
       "vehicle": {
         "htmlFields": [
           "description"

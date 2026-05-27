@@ -282,10 +282,12 @@ export class StarFrontiersCreatureData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       description: htmlField(),
+      descriptor: textField(),
       ecology: textField({ choices: ["", "herbivore", "carnivore", "omnivore", "other"] }),
       size: textField({ initial: "medium", choices: ["tiny", "small", "medium", "large", "giant", "huge"] }),
       nativeWorld: textField(),
       groupSize: schemaField({
+        formula: textField(),
         min: numberField({ initial: 1, min: 0 }),
         max: numberField({ initial: 1, min: 0 }),
         typical: numberField({ initial: 1, min: 0 })
@@ -294,6 +296,7 @@ export class StarFrontiersCreatureData extends foundry.abstract.TypeDataModel {
       movement: numberField({ initial: 0, min: 0 }),
       movementMode: textField({ choices: ["", "walk", "swim", "fly", "burrow", "swing", "stationary"] }),
       initiativeMod: numberField({ initial: 0, min: 0 }),
+      reactionSpeed: numberField({ initial: 30, min: 1, max: 100 }),
       abilities: schemaField({
         dex: schemaField({ value: numberField({ initial: 30, min: 1, max: 100 }) }),
         sta: vitalField()
@@ -332,11 +335,19 @@ export class StarFrontiersCreatureData extends foundry.abstract.TypeDataModel {
 
   prepareDerivedData() {
     this.warnings = [];
-    if (!this.attacks.length) {
+    const hasNaturalAttacks = (this.parent?.items ?? [])
+      .some((item) => item.type === "creatureAttack");
+    if (!hasNaturalAttacks && !this.attacks.length) {
       this.warnings.push({
         key: "no-attacks",
         message: "This creature has no attacks defined."
       });
+    }
+
+    const sta = this.abilities?.sta;
+    if (sta) {
+      if (!sta.max) sta.max = sta.value || 0;
+      sta.value = clamp(sta.value, 0, sta.max);
     }
   }
 }

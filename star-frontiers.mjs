@@ -17,6 +17,7 @@ import {
   StarFrontiersArmorData,
   StarFrontiersComputerData,
   StarFrontiersConsumableData,
+  StarFrontiersCreatureAttackData,
   StarFrontiersGearData,
   StarFrontiersPowerSourceData,
   StarFrontiersProgramData,
@@ -30,6 +31,9 @@ import {
 import {
   StarFrontiersCharacterSheet
 } from "./module/sheets/character-sheet.mjs";
+import {
+  StarFrontiersCreatureSheet
+} from "./module/sheets/creature-sheet.mjs";
 import * as AttackPipeline from "./module/combat/attack-pipeline.mjs";
 import { StarFrontiersItemSheet } from "./module/sheets/item-sheet.mjs";
 import {
@@ -206,6 +210,7 @@ Hooks.once("init", () => {
     powerSource: StarFrontiersPowerSourceData,
     gear: StarFrontiersGearData,
     consumable: StarFrontiersConsumableData,
+    creatureAttack: StarFrontiersCreatureAttackData,
     vehicle: StarFrontiersVehicleData,
     computer: StarFrontiersComputerData,
     program: StarFrontiersProgramData
@@ -350,6 +355,11 @@ Hooks.once("init", () => {
     makeDefault: true,
     label: "STARFRONTIERS.Sheet.Character"
   });
+  Actors.registerSheet(SYSTEM_ID, StarFrontiersCreatureSheet, {
+    types: ["creature"],
+    makeDefault: true,
+    label: "STARFRONTIERS.Sheet.Creature"
+  });
 
   const Items = foundry.documents.collections.Items ?? globalThis.Items;
   Items.registerSheet(SYSTEM_ID, StarFrontiersItemSheet, {
@@ -381,6 +391,7 @@ const ITEM_TYPE_ICONS = {
   powerSource:    "systems/star-frontiers/assets/images/sheet-icons/power-generator.svg",
   gear:           "systems/star-frontiers/assets/images/sheet-icons/light-backpack.svg",
   consumable:     "icons/svg//pill.svg",
+  creatureAttack: "icons/svg/skull.svg",
   vehicle:        "systems/star-frontiers/assets/images/sheet-icons/steering-wheel.svg",
   computer:       "systems/star-frontiers/assets/images/sheet-icons/tablet.svg",
   program:        "systems/star-frontiers/assets/images/sheet-icons/computing.svg"

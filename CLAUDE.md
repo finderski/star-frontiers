@@ -143,13 +143,17 @@ module/config.mjs               SYSTEM_ID, ITEM_TYPE_LABELS, STAR_FRONTIERS_CONF
 module/data/fields.mjs          Thin wrappers: textField(), numberField(), boolField(), schemaField(), etc.
 module/data/character-data.mjs  Actor TypeDataModels: Character, Npc, Creature, Robot, VehicleActor
 module/data/item-data.mjs       Item TypeDataModels: Race, Skill, TrainedAbility, Weapon, Armor, Screen,
-                                  Ammo, PowerSource, Gear, Consumable, Vehicle, Computer, Program
+                                  Ammo, PowerSource, Gear, Consumable, CreatureAttack, Vehicle, Computer, Program
 module/combat/attack-pipeline.mjs  Shared attack/damage/avoidance pipeline and range/ammo helpers
 module/sheets/character-sheet.mjs  StarFrontiersCharacterSheet (ActorSheetV2) — character UI, item CRUD,
                                   non-combat rolls, delegates combat to attack-pipeline
+module/sheets/creature-sheet.mjs StarFrontiersCreatureSheet (ActorSheetV2) — single-page stat-block
+                                  sheet for `creature` actors; natural-attack + carried-weapon sections,
+                                  Number Appearing roll, initiative button; delegates combat to attack-pipeline
 module/sheets/item-sheet.mjs    StarFrontiersItemSheet (ItemSheetV2) — generic item sheet, ammo linking
-module/migration/migrations.mjs Schema migration runner — current version 0.2.9
+module/migration/migrations.mjs Schema migration runner — current version 0.3.0
 templates/actor/character-sheet.hbs   Main character sheet (single PARTS template)
+templates/actor/creature-sheet.hbs    Creature statblock sheet (single PARTS template)
 templates/item/item-sheet.hbs         Item sheet (single PARTS template, subtype-conditional sections)
 templates/chat/check-roll-card.hbs    Ability check / damage / initiative chat card
 templates/chat/stat-roll-card.hbs     Stats generation chat card
@@ -172,7 +176,7 @@ thePlan/                        Design documents — PLAN.md, PHASES.md, DATA-MO
 
 **Actor subtypes:** `character` · `npc` · `creature` · `robot` · `vehicle`
 
-**Item subtypes:** `race` · `skill` · `trainedAbility` · `weapon` · `armor` · `screen` · `ammo` · `powerSource` · `gear` · `consumable` · `vehicle` · `computer` · `program`
+**Item subtypes:** `race` · `skill` · `trainedAbility` · `weapon` · `armor` · `screen` · `ammo` · `powerSource` · `gear` · `consumable` · `creatureAttack` · `vehicle` · `computer` · `program`
 
 All declared in `system.json` `documentTypes` from day one. Stub schemas are in place for `robot`, `vehicle` (actor), `computer`, and `program`; they fill out in later phases.
 
@@ -196,6 +200,7 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 ## Implementation status
 
 ### Done
+- **0.3.0 — Creature sheet + creatureAttack item type.** Added new `creatureAttack` item type (flat `attackScore`, `damageFormula`, `damageType`, optional `range.{enabled,rangeBands}`, `avoidance`, `onHitEffectIds`, `notes`, `isNatural`). The shared `module/combat/attack-pipeline.mjs` now has a `creatureAttack` branch in `getWeaponAttackProfile` (returns flat attack score as `baseTarget`), and `buildEffectiveDamageFormula` / `getAvailableWeaponRangeBands` / `getWeaponRangeBandFromDistance` / `getAmmoConsumption` / `getActiveWeaponMode` / `getWeaponOnHitEffectIds` / `getWeaponOnHitEffectOrigin` are guarded so creatureAttacks bypass weapon-only fields. A new `getWeaponAvoidance(weapon)` helper resolves avoidance from either the active weapon mode or `creatureAttack.system.avoidance`, used by `rollWeaponAttack`, `rollAvoidance`, and the chat card. The character-sheet chat-card action handler also accepts creatureAttack items for damage/avoidance follow-ups. New `StarFrontiersCreatureSheet` ([module/sheets/creature-sheet.mjs](module/sheets/creature-sheet.mjs)) extends `ScrollPreservingSheetMixin`; single-page stat-block layout with two attack sections — Natural Weapons (creatureAttack items with Add button + drag) and Carried Weapons (weapon items, drag-only, hidden when empty). Sheet handlers arm `_rememberScrollPosition()` before mutating to avoid scroll-to-top. Added Number Appearing parser/handler (dice formula | range min-max | literal integer | blank fallback to min/max fields) that whispers the roll to GM. Roll Initiative button posts `1d10 + initiativeMod`. Refined `StarFrontiersCreatureData`: added `descriptor`, `reactionSpeed` (top-level 1–100), `groupSize.formula`; deprecated inline `attacks[]` array (still in schema but emptied by migration). Schema bumped to **0.3.0** with migration that converts each creature's legacy inline attacks into embedded `creatureAttack` items and backfills `reactionSpeed` from the legacy `abilities.dex.value`.
 - Phase 0 — manifest, skeleton, system loads with zero errors
 - Phase 1 — all TypeDataModel subclasses with `prepareDerivedData`; ability derivation, stamina clamping, race movement lookup, initiative mod
 - Phase 2 (core) — character sheet fully wired:
@@ -460,6 +465,7 @@ Use this exact shape when hand-authoring the Electrostunner until compendium con
 - **Needler / alternate-ammo future shape.** `mechanics.modes[]` is now the likely home for stun/blast/ammo-variant style toggles. Before adding needler dart variants or similar gear, decide whether that lives as weapon modes, linked ammo metadata, or both.
 - **Weapon modes editor runtime smoke test.** `npm run check` is green, but the new Weapon item-sheet Modes editor still needs a live Foundry pass: add/remove modes, rename the active mode key, toggle `Has Firing Modes` off/on without data loss, verify embedded Active Effect create/open/remove persistence, and confirm authored rounds-per-shot values consume correctly in play.
 - **Weapon-effect automation runtime smoke test.** `npm run check` is green, but the new on-hit / avoidance-failure AE application still needs a live Foundry pass: confirm local target-owner application, GM-socket handoff when the attacker lacks ownership, duration refresh on re-application, and no double-apply with multiple connected GMs.
+- **Creature sheet runtime smoke test (0.3.0).** `npm run check` is green, but the new `creatureAttack` item type, single-page creature sheet, Number Appearing parser, and 0.3.0 migration still need a live Foundry pass. Verify that authoring a reusable `creatureAttack` in the items directory and dragging it onto a creature lands in Natural Weapons; that a dropped `weapon` item surfaces the Carried Weapons section (and disappears when removed); that Number Appearing handles dice formulas, ranges, literals, and the blank fallback correctly; that the migration converts pre-existing inline `system.attacks[]` into embedded `creatureAttack` items and backfills `reactionSpeed`; and that scroll position survives Add Natural Weapon and dropping a weapon.
 - **Race movement presentation** — walking/running/hourly still need a final UX decision on the race item sheet (show units, and decide whether Hourly should remain visible in Basic mode or just be treated as optional worldbuilding data).
 - **Encumbrance indicator placement** — currently the Total Mass / Encumbered badge lives in the Equipment section header, but the underlying total counts weapons/armor/screens too. Easy to misread as "Equipment-section mass." Candidate fixes: relabel to "Total Mass" + relocate near Walking/Running, or add a per-section breakdown tooltip.
 - **Consumable effect authoring** — the character-sheet Use flow supports `system.effectIds` on consumables, but the consumable item sheet still lacks a dedicated Active Effects picker/editor. Decide whether to expose that directly on consumables or leave it as advanced/manual data entry for now.

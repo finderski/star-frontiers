@@ -773,5 +773,100 @@
         </div>
       </fieldset>
     {{/if}}
+
+    {{#if is.creatureAttack}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Item.CreatureAttackData"}}</legend>
+        <div class="compact-grid three-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.AttackScore"}}</span><input type="number" name="system.attackScore" value="{{system.attackScore}}" min="0" max="100" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.DamageFormula"}}</span><input type="text" name="system.damageFormula" value="{{system.damageFormula}}" placeholder="2d10" /></label>
+          <label><span>{{localize "STARFRONTIERS.Item.Defense"}}</span><select name="system.damageType">{{selectOptions choices.damageType selected=system.damageType}}</select></label>
+        </div>
+
+        <div class="compact-grid two-columns">
+          <label><span>{{localize "STARFRONTIERS.Item.Targets"}}</span><input type="number" name="system.targets" value="{{system.targets}}" min="1" /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HasRange"}}</span><input type="checkbox" name="system.range.enabled" {{checked system.range.enabled}} /></label>
+        </div>
+
+        {{#if system.range.enabled}}
+          <div class="range-editor">
+            <span></span>
+            <span>{{localize "STARFRONTIERS.Item.RangeMin"}}</span>
+            <span>{{localize "STARFRONTIERS.Item.RangeMax"}}</span>
+            <span>{{localize "STARFRONTIERS.Item.RangeDamage"}}</span>
+            {{#each rangeRows as |row|}}
+              <span>{{row.label}}</span>
+              <input type="number" name="system.range.rangeBands.{{row.key}}.min" value="{{row.band.min}}" min="0" />
+              <input type="number" name="system.range.rangeBands.{{row.key}}.max" value="{{row.band.max}}" min="0" />
+              <input type="text" name="system.range.rangeBands.{{row.key}}.damageFormula" value="{{row.band.damageFormula}}" placeholder="—" />
+            {{/each}}
+          </div>
+        {{/if}}
+
+        <fieldset class="paper-box">
+          <legend>{{localize "STARFRONTIERS.Item.Avoidance"}}</legend>
+          <div class="compact-grid two-columns">
+            <label class="checkbox-line">
+              <span>{{localize "STARFRONTIERS.Weapon.AvoidanceEnabled"}}</span>
+              <input type="checkbox" name="system.avoidance.enabled" {{checked system.avoidance.enabled}} />
+            </label>
+            <label>
+              <span>{{localize "STARFRONTIERS.Weapon.AvoidanceAbility"}}</span>
+              <select name="system.avoidance.ability">{{selectOptions avoidanceAbilityChoices selected=system.avoidance.ability}}</select>
+            </label>
+          </div>
+          <div class="compact-grid two-columns">
+            <label>
+              <span>{{localize "STARFRONTIERS.Weapon.AvoidanceOnSuccessEffect"}}</span>
+              <input type="text" name="system.avoidance.onSuccessEffect" value="{{system.avoidance.onSuccessEffect}}" />
+            </label>
+            <label>
+              <span>{{localize "STARFRONTIERS.Weapon.AvoidanceFailNote"}}</span>
+              <input type="text" name="system.avoidance.failNote" value="{{system.avoidance.failNote}}" />
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="race-editor-block">
+          <div class="race-editor-block__header">
+            <span>{{localize "STARFRONTIERS.Weapon.ModeOnHitEffects"}}</span>
+            <button type="button" data-action="addCreatureAttackEffect">
+              <i class="fa-solid fa-plus"></i>
+              <span>{{localize "STARFRONTIERS.Item.AddEffect"}}</span>
+            </button>
+          </div>
+          {{#if creatureAttackOnHitEffectRows.length}}
+            <div class="linked-ability-list">
+              {{#each creatureAttackOnHitEffectRows as |effectRow|}}
+                <div class="linked-ability-row">
+                  <div class="linked-ability-row__body">
+                    <button
+                      type="button"
+                      class="linked-ability-row__toggle"
+                      data-action="openEffect"
+                      data-effect-id="{{effectRow.effectId}}"
+                      data-effect-ref="{{effectRow.id}}"
+                    >{{effectRow.name}}</button>
+                    {{#if effectRow.sourceName}}
+                      <span class="linked-ability-row__meta">{{effectRow.sourceName}}</span>
+                    {{/if}}
+                  </div>
+                  <button
+                    type="button"
+                    data-action="removeCreatureAttackEffect"
+                    data-effect-id="{{effectRow.id}}"
+                    title="{{localize "STARFRONTIERS.Weapon.RemoveOnHitEffect"}}"
+                  >
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
+              {{/each}}
+            </div>
+          {{else}}
+            <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Weapon.NoOnHitEffects"}}</p>
+          {{/if}}
+        </div>
+      </fieldset>
+    {{/if}}
   </main>
 </section>

@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.2.9";
+export const CURRENT_SCHEMA_VERSION = "0.3.0";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -507,6 +507,50 @@ const MIGRATIONS = [
           if (updates.length) {
             await tokenDoc.actor.updateEmbeddedDocuments("Item", updates);
           }
+        }
+      }
+    }
+  },
+  {
+    version: "0.3.0",
+    description: "Creature inline attacks migrate to embedded creatureAttack items; reactionSpeed backfilled from legacy dex.value.",
+    async migrate() {
+      async function migrateCreature(actor) {
+        if (actor.type !== "creature") return;
+
+        const inlineAttacks = actor._source?.system?.attacks ?? actor.system?.attacks ?? [];
+        if (Array.isArray(inlineAttacks) && inlineAttacks.length) {
+          const toCreate = inlineAttacks.map((atk) => ({
+            name: atk.label || game.i18n.localize("STARFRONTIERS.Creature.NaturalAttack"),
+            type: "creatureAttack",
+            system: {
+              attackScore: Number(actor._source?.system?.attackScore ?? actor.system?.attackScore ?? 50),
+              damageFormula: atk.damage || "1d10",
+              damageType: atk.damageType || "inertia",
+              targets: 1,
+              notes: atk.notes || "",
+              isNatural: true
+            }
+          }));
+          await actor.createEmbeddedDocuments("Item", toCreate);
+          await actor.update({ "system.attacks": [] });
+        }
+
+        const reactionSpeed = actor._source?.system?.reactionSpeed;
+        if (reactionSpeed === undefined || reactionSpeed === null) {
+          const legacy = Number(actor._source?.system?.abilities?.dex?.value ?? 30);
+          await actor.update({ "system.reactionSpeed": legacy });
+        }
+      }
+
+      for (const actor of game.actors) {
+        await migrateCreature(actor);
+      }
+
+      for (const scene of game.scenes ?? []) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor) continue;
+          await migrateCreature(tokenDoc.actor);
         }
       }
     }

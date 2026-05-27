@@ -1,0 +1,234 @@
+<section class="star-frontiers-creature-sheet {{themeClass}}" data-rules-edition="{{rulesEdition}}" autocomplete="off">
+  <header class="creature-header">
+    <button
+      type="button"
+      class="creature-portrait actor-profile-image"
+      data-action="editProfileImage"
+      title="{{localize "STARFRONTIERS.Character.ChangeProfileImage"}}"
+      aria-label="{{localize "STARFRONTIERS.Character.ChangeProfileImage"}}"
+    >
+      <img src="{{actor.img}}" alt="" />
+    </button>
+    <div class="creature-header__identity">
+      <label class="field-line creature-name">
+        <span>{{localize "STARFRONTIERS.Creature.Name"}}</span>
+        <input type="text" name="name" value="{{actor.name}}" />
+      </label>
+      <label class="field-line creature-descriptor">
+        <span>{{localize "STARFRONTIERS.Creature.Descriptor"}}</span>
+        <input type="text" name="system.descriptor" value="{{system.descriptor}}" placeholder="{{localize "STARFRONTIERS.Creature.DescriptorPlaceholder"}}" />
+      </label>
+    </div>
+  </header>
+
+  <main class="creature-grid">
+    <fieldset class="paper-box full-width">
+      <legend>{{localize "STARFRONTIERS.Creature.Identity"}}</legend>
+      <div class="compact-grid three-columns">
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.Size"}}</span>
+          <select name="system.size">{{selectOptions sizeChoices selected=system.size localize=true}}</select>
+        </label>
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.Ecology"}}</span>
+          <select name="system.ecology">{{selectOptions ecologyChoices selected=system.ecology localize=true}}</select>
+        </label>
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.Temperament"}}</span>
+          <select name="system.reactionDisposition">{{selectOptions reactionDispositionChoices selected=system.reactionDisposition localize=true}}</select>
+        </label>
+      </div>
+      <div class="compact-grid two-columns">
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.NativeWorld"}}</span>
+          <input type="text" name="system.nativeWorld" value="{{system.nativeWorld}}" />
+        </label>
+        <div class="creature-number-field">
+          <button type="button" class="creature-number-field__label" data-action="rollNumberAppearing" title="{{localize "STARFRONTIERS.Creature.RollNumberHint"}}">
+            <i class="fa-solid fa-dice-d10"></i>
+            <span>{{localize "STARFRONTIERS.Creature.Number"}}</span>
+          </button>
+          <input type="text" name="system.groupSize.formula" value="{{system.groupSize.formula}}" placeholder="2-6" />
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="paper-box full-width">
+      <legend>{{localize "STARFRONTIERS.Creature.Movement"}}</legend>
+      <div class="compact-grid three-columns">
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.MoveCategory"}}</span>
+          <select name="system.movementCategory">{{selectOptions movementCategoryChoices selected=system.movementCategory localize=true}}</select>
+        </label>
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.MoveMode"}}</span>
+          <select name="system.movementMode">{{selectOptions movementModeChoices selected=system.movementMode localize=true}}</select>
+        </label>
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.MetersPerTurn"}}</span>
+          <input type="number" name="system.movement" value="{{system.movement}}" min="0" />
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="paper-box full-width">
+      <legend>{{localize "STARFRONTIERS.Creature.Combat"}}</legend>
+      <div class="compact-grid four-columns">
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.IM"}}</span>
+          <input type="number" name="system.initiativeMod" value="{{system.initiativeMod}}" min="0" />
+        </label>
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.RS"}}</span>
+          <input type="number" name="system.reactionSpeed" value="{{system.reactionSpeed}}" min="1" max="100" />
+        </label>
+        <label class="creature-stamina-field">
+          <span>{{localize "STARFRONTIERS.Creature.Stamina"}}</span>
+          <span class="creature-stamina-pair">
+            <input type="number" name="system.abilities.sta.value" value="{{staminaValue}}" />
+            <span class="creature-stamina-pair__slash">/</span>
+            <input type="number" name="system.abilities.sta.max" value="{{staminaMax}}" />
+          </span>
+        </label>
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.AttacksPerTurn"}}</span>
+          <input type="number" name="system.numAttacksPerTurn" value="{{system.numAttacksPerTurn}}" min="0" />
+        </label>
+      </div>
+      <div class="creature-init-row">
+        <button type="button" class="creature-init-button" data-action="rollCreatureInitiative">
+          <i class="fa-solid fa-dice-d10"></i>
+          <span>{{localize "STARFRONTIERS.Creature.RollInitiative"}}</span>
+        </button>
+      </div>
+    </fieldset>
+
+    <fieldset class="paper-box full-width">
+      <legend>{{localize "STARFRONTIERS.Creature.NaturalWeapons"}}</legend>
+      {{#if naturalWeapons.length}}
+        <div class="creature-attack-list">
+          {{#each naturalWeapons as |atk|}}
+            <div class="creature-attack-row" data-item-id="{{atk.id}}">
+              <button type="button" class="creature-attack-row__name" data-action="rollWeaponAttack" title="{{localize "STARFRONTIERS.Weapon.RollAttack"}}">
+                {{atk.name}}
+              </button>
+              <span class="creature-attack-row__score">{{atk.toHit}}</span>
+              {{#if atk.hasDamage}}
+                <button type="button" class="creature-attack-row__damage" data-action="rollWeaponDamage" title="{{localize "STARFRONTIERS.Weapon.RollDamage"}}">
+                  {{atk.damage}}
+                </button>
+              {{else}}
+                <span class="creature-attack-row__damage creature-attack-row__damage--empty">{{atk.damage}}</span>
+              {{/if}}
+              <span class="creature-attack-row__defense">{{atk.defenseLabel}}</span>
+              <div class="creature-attack-row__actions">
+                <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
+                  <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Creature.NoNaturalWeapons"}}</p>
+      {{/if}}
+      <div class="section-controls">
+        <button type="button" data-action="addNaturalWeapon">
+          <i class="fa-solid fa-plus"></i>
+          <span>{{localize "STARFRONTIERS.Creature.AddNaturalWeapon"}}</span>
+        </button>
+      </div>
+    </fieldset>
+
+    {{#if hasCarriedWeapons}}
+      <fieldset class="paper-box full-width">
+        <legend>{{localize "STARFRONTIERS.Creature.CarriedWeapons"}}</legend>
+        <div class="creature-attack-list">
+          {{#each carriedWeapons as |wpn|}}
+            <div class="creature-attack-row" data-item-id="{{wpn.id}}">
+              <button type="button" class="creature-attack-row__name" data-action="rollWeaponAttack" title="{{localize "STARFRONTIERS.Weapon.RollAttack"}}">
+                {{wpn.name}}
+              </button>
+              <span class="creature-attack-row__score">{{wpn.toHit}}</span>
+              {{#if wpn.hasDamage}}
+                <button type="button" class="creature-attack-row__damage" data-action="rollWeaponDamage" title="{{localize "STARFRONTIERS.Weapon.RollDamage"}}">
+                  {{wpn.damage}}
+                </button>
+              {{else}}
+                <span class="creature-attack-row__damage creature-attack-row__damage--empty">{{wpn.damage}}</span>
+              {{/if}}
+              <span class="creature-attack-row__defense">{{wpn.defenseLabel}}</span>
+              <div class="creature-attack-row__actions">
+                <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Item.Open"}}">
+                  <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+                <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          {{/each}}
+        </div>
+      </fieldset>
+    {{/if}}
+
+    <fieldset class="paper-box full-width">
+      <legend>{{localize "STARFRONTIERS.Creature.SpecialDefenses"}}</legend>
+      <div class="compact-grid three-columns">
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.ArmorPoints"}}</span>
+          <input type="number" name="system.defense.armorPoints" value="{{system.defense.armorPoints}}" min="0" />
+        </label>
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.Regenerate"}}</span>
+          <input type="number" name="system.defense.regenerate" value="{{system.defense.regenerate}}" min="0" />
+        </label>
+        <label>
+          <span>{{localize "STARFRONTIERS.Creature.SizeToHitMod"}}</span>
+          <input type="number" name="system.defense.sizeToHitMod" value="{{system.defense.sizeToHitMod}}" />
+        </label>
+      </div>
+      <div class="stacked">
+        <span>{{localize "STARFRONTIERS.Creature.DefenseNotes"}}</span>
+        <prose-mirror
+          name="system.defense.notes"
+          data-document-u-u-i-d="{{actor.uuid}}"
+          value="{{system.defense.notes}}"
+          collaborate="false"
+          toggled="true"
+        >
+          {{{enrichedDefenseNotes}}}
+        </prose-mirror>
+      </div>
+    </fieldset>
+
+    <fieldset class="paper-box full-width">
+      <legend>{{localize "STARFRONTIERS.Creature.Description"}}</legend>
+      <prose-mirror
+        name="system.description"
+        data-document-u-u-i-d="{{actor.uuid}}"
+        value="{{system.description}}"
+        collaborate="false"
+        toggled="true"
+      >
+        {{{enrichedDescription}}}
+      </prose-mirror>
+    </fieldset>
+
+    <fieldset class="paper-box full-width">
+      <legend>{{localize "STARFRONTIERS.Creature.GMNotes"}}</legend>
+      <prose-mirror
+        name="system.gmNotes"
+        data-document-u-u-i-d="{{actor.uuid}}"
+        value="{{system.gmNotes}}"
+        collaborate="false"
+        toggled="true"
+      >
+        {{{enrichedGmNotes}}}
+      </prose-mirror>
+    </fieldset>
+  </main>
+</section>

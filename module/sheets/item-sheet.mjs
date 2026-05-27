@@ -45,6 +45,8 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility,
       removeWeaponMode: StarFrontiersItemSheet.#onRemoveWeaponMode,
       removeWeaponModeEffect: StarFrontiersItemSheet.#onRemoveWeaponModeEffect,
+      addCreatureAttackEffect: StarFrontiersItemSheet.#onAddCreatureAttackEffect,
+      removeCreatureAttackEffect: StarFrontiersItemSheet.#onRemoveCreatureAttackEffect,
       removeSubskill: StarFrontiersItemSheet.#onRemoveSubskill,
       toggleLinkedRaceAbilityExpanded: StarFrontiersItemSheet.#onToggleLinkedRaceAbilityExpanded,
       clearGearRequiredSkill: StarFrontiersItemSheet.#onClearGearRequiredSkill,
@@ -78,8 +80,10 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       ? "STARFRONTIERS.Item.Race"
       : item.type === "trainedAbility"
         ? "STARFRONTIERS.Item.RacialAbility"
-        : "STARFRONTIERS.Item.Name";
-    context.showCost = !["race", "skill", "trainedAbility"].includes(item.type);
+        : item.type === "creatureAttack"
+          ? "STARFRONTIERS.Item.CreatureAttackName"
+          : "STARFRONTIERS.Item.Name";
+    context.showCost = !["race", "skill", "trainedAbility", "creatureAttack"].includes(item.type);
     context.showMass = ["weapon", "ammo","armor", "screen", "gear", "computer", "powerSource", "consumable"].includes(item.type);
     context.choices = this.#prepareChoices();
     context.linkedAmmo = await this.#resolveLinkedAmmo(item);
@@ -108,6 +112,12 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       context.modeDefenseTypeChoices = {};
       context.weaponAmmoPerShotLabel = "";
       context.weaponModeAmmoPerShotLabel = "";
+    }
+    if (item.type === "creatureAttack") {
+      context.avoidanceAbilityChoices = StarFrontiersItemSheet.#prepareAvoidanceAbilityChoices();
+      context.creatureAttackOnHitEffectRows = await this.#prepareCreatureAttackOnHitEffectRows(item);
+    } else {
+      context.creatureAttackOnHitEffectRows = [];
     }
     context.linkedRacialAbilities = item.type === "race" ? await this.#resolveLinkedRacialAbilities(item) : [];
     context.bonusPickRows = item.type === "race" ? Array.from(item.system.bonusPicks ?? []) : [];
@@ -213,12 +223,22 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
   }
 
   #prepareRangeRows(item) {
-    if (item.type !== "weapon") return [];
-    return Object.entries(item.system.rangeBands).map(([key, band]) => ({
-      key,
-      label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
-      band
-    }));
+    if (item.type === "weapon") {
+      return Object.entries(item.system.rangeBands).map(([key, band]) => ({
+        key,
+        label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
+        band
+      }));
+    }
+    if (item.type === "creatureAttack") {
+      const bands = item.system.range?.rangeBands ?? {};
+      return Object.entries(bands).map(([key, band]) => ({
+        key,
+        label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
+        band
+      }));
+    }
+    return [];
   }
 
   #prepareChoices() {
@@ -243,6 +263,21 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       weaponSkill: this.#choices(["", "dex", "str", "beam", "gyrojet", "projectile", "thrown", "melee"], "STARFRONTIERS.Choice.WeaponSkill"),
       weaponType: this.#choices(["melee", "beam", "projectile", "gyrojet", "grenade"], "STARFRONTIERS.Choice.WeaponType")
     };
+  }
+
+  async #prepareCreatureAttackOnHitEffectRows(item) {
+    if (item.type !== "creatureAttack") return [];
+    const rows = [];
+    for (const effectRef of item.system.onHitEffectIds ?? []) {
+      const effect = await this.#resolveEffectRef(effectRef);
+      rows.push({
+        id: effectRef,
+        name: effect?.name ?? game.i18n.localize("STARFRONTIERS.Item.UnknownEffect"),
+        effectId: effect?.id ?? "",
+        sourceName: effect?.parent && effect.parent !== item ? (effect.parent.name ?? "") : ""
+      });
+    }
+    return rows;
   }
 
   async #prepareWeaponModeRows(item) {
@@ -812,6 +847,36 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       .filter((effectId) => !modes.some((mode) => Array.from(mode.onHitEffectIds ?? []).includes(effectId)));
     if (embeddedEffectIds.length) {
       await this.item.deleteEmbeddedDocuments("ActiveEffect", embeddedEffectIds);
+    }
+  }
+
+  static async #onAddCreatureAttackEffect(event, target) {
+    if (this.item.type !== "creatureAttack") return;
+    this._rememberScrollPosition(5);
+
+    const [effect] = await this.item.createEmbeddedDocuments("ActiveEffect", [{
+      name: game.i18n.localize("STARFRONTIERS.Item.NewEffect"),
+      transfer: false
+    }]);
+    if (!effect) return;
+
+    const current = Array.from(this.item.system.onHitEffectIds ?? []);
+    await this.item.update({ "system.onHitEffectIds": [...current, effect.id] });
+    effect.sheet?.render(true);
+  }
+
+  static async #onRemoveCreatureAttackEffect(event, target) {
+    target ??= event.currentTarget;
+    if (this.item.type !== "creatureAttack") return;
+    const effectId = String(target.dataset.effectId ?? "");
+    if (!effectId) return;
+    this._rememberScrollPosition();
+
+    const current = Array.from(this.item.system.onHitEffectIds ?? []).filter((entry) => entry !== effectId);
+    await this.item.update({ "system.onHitEffectIds": current });
+
+    if (this.item.effects.get(effectId)) {
+      await this.item.deleteEmbeddedDocuments("ActiveEffect", [effectId]);
     }
   }
 
