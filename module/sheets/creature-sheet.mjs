@@ -3,28 +3,12 @@ import * as AttackPipeline from "../combat/attack-pipeline.mjs";
 import { ScrollPreservingSheetMixin } from "./scroll-preserving-sheet-mixin.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
-const { HandlebarsApplicationMixin } = foundry.applications.api;
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 const SIZE_KEYS = ["tiny", "small", "medium", "large", "giant", "huge"];
 const ECOLOGY_KEYS = ["", "herbivore", "carnivore", "omnivore", "other"];
 const MOVE_CATEGORY_KEYS = ["", "verySlow", "slow", "medium", "fast", "veryFast"];
 const MOVE_MODE_KEYS = ["", "walk", "swim", "fly", "burrow", "swing", "climb", "stationary", "other"];
-const CREATURE_DEFENSE_KEYS = [
-  "acid",
-  "albedo",
-  "gauss",
-  "gaussAS",
-  "inertia",
-  "ir",
-  "laser",
-  "needler",
-  "other",
-  "poison",
-  "reactionSpeed",
-  "sonic",
-  "sonicAS",
-  "stamina"
-];
 
 function buildChoices(keys, prefix) {
   return keys.reduce((acc, key) => {
@@ -50,13 +34,6 @@ function blankMovementEntry() {
   };
 }
 
-function blankSpecialAttack() {
-  return {
-    label: "",
-    detail: ""
-  };
-}
-
 function getCreatureDefenseChoiceLabel(value) {
   const keys = [
     `STARFRONTIERS.Choice.DamageType.${value}`,
@@ -66,12 +43,190 @@ function getCreatureDefenseChoiceLabel(value) {
   return match ? game.i18n.localize(match) : value;
 }
 
-function buildCreatureDefenseChoices(selected = []) {
-  const values = new Set(CREATURE_DEFENSE_KEYS);
-  for (const value of selected) {
-    if (value) values.add(String(value));
+function hasMeaningfulHtml(value) {
+  return String(value ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .trim()
+    .length > 0;
+}
+
+class StarFrontiersCreatureRichTextEditor extends ApplicationV2 {
+  static DEFAULT_OPTIONS = {
+    id: "star-frontiers-creature-rich-text-editor-{id}",
+    tag: "form",
+    classes: ["star-frontiers", "creature-rich-text-editor"],
+    position: {
+      width: 900,
+      height: 680
+    },
+    window: {
+      resizable: true,
+      contentClasses: ["standard-form"]
+    },
+    form: {
+      closeOnSubmit: false,
+      handler: StarFrontiersCreatureRichTextEditor.#onSubmit
+    },
+    actions: {
+      cancelRichTextEdit: StarFrontiersCreatureRichTextEditor.#onCancel
+    }
+  };
+
+  #actor;
+  #discarding = false;
+  #editorElement = null;
+  #fieldPath;
+  #initialValue;
+  #label;
+  #lastSavedValue;
+  #parentSheet;
+  #resolve;
+  #settled = false;
+
+  constructor({ actor, fieldPath, initialValue, label, parentSheet, resolve }, options = {}) {
+    super(options);
+    this.#actor = actor;
+    this.#fieldPath = fieldPath;
+    this.#initialValue = String(initialValue ?? "");
+    this.#lastSavedValue = this.#initialValue;
+    this.#label = label;
+    this.#parentSheet = parentSheet;
+    this.#resolve = resolve;
   }
-  return Object.fromEntries(Array.from(values).map((value) => [value, getCreatureDefenseChoiceLabel(value)]));
+
+  get title() {
+    return `${game.i18n.localize("STARFRONTIERS.Item.Edit")}: ${this.#label}`;
+  }
+
+  static prompt({ actor, fieldPath, initialValue, label, parentSheet }) {
+    return new Promise((resolve) => {
+      const app = new StarFrontiersCreatureRichTextEditor({
+        actor,
+        fieldPath,
+        initialValue,
+        label,
+        parentSheet,
+        resolve
+      });
+
+      void (async () => {
+        try {
+          await app.render({ force: true });
+          await app.#focusEditor();
+        } catch (error) {
+          console.error(error);
+          ui.notifications.error(game.i18n.format("STARFRONTIERS.Item.EditorOpenFailed", {
+            label
+          }));
+          app.#settle(null);
+          await app.close();
+        }
+      })();
+    });
+  }
+
+  async _renderHTML(context, options) {
+    const body = document.createElement("div");
+    body.className = "creature-rich-text-editor__body";
+
+    const labelEl = document.createElement("span");
+    labelEl.className = "creature-rich-text-editor__label";
+    labelEl.textContent = this.#label;
+
+    const editorHost = document.createElement("div");
+    editorHost.className = "creature-rich-text-editor__editor-host";
+    const editor = foundry.applications.elements.HTMLProseMirrorElement.create({
+      name: this.#fieldPath,
+      value: this.#initialValue,
+      documentUUID: this.#actor.uuid,
+      collaborate: false,
+      toggled: false
+    });
+    editor.classList.add("creature-rich-text-editor__editor");
+    editorHost.append(editor);
+
+    const footer = document.createElement("footer");
+    footer.className = "form-footer";
+
+    const save = document.createElement("button");
+    save.type = "submit";
+    save.innerHTML = `<span>${game.i18n.localize("EDITOR.SaveAndClose")}</span>`;
+
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.dataset.action = "cancelRichTextEdit";
+    cancel.innerHTML = `<span>${game.i18n.localize("Cancel")}</span>`;
+
+    footer.append(save, cancel);
+    body.append(labelEl, editorHost, footer);
+    return body;
+  }
+
+  _replaceHTML(result, content, options) {
+    content.replaceChildren(result);
+    this.#editorElement = content.querySelector("prose-mirror.creature-rich-text-editor__editor");
+    this.#editorElement?.addEventListener("save", () => {
+      if (this.#discarding || this.#settled) return;
+      void this.#save();
+    });
+  }
+
+  async #focusEditor() {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (this.#settled) return;
+    this.#editorElement?.focus?.();
+  }
+
+  #getValue() {
+    return String(this.#editorElement?.value ?? this.#initialValue);
+  }
+
+  async #save({ close = false } = {}) {
+    const value = this.#getValue();
+    if (!close && value === this.#lastSavedValue) return;
+    this.#parentSheet?._rememberScrollPosition?.();
+    try {
+      await this.#actor.update({ [this.#fieldPath]: value });
+    } catch (error) {
+      console.error(error);
+      ui.notifications.error(game.i18n.format("STARFRONTIERS.Item.EditorSaveFailed", {
+        label: this.#label
+      }));
+      return;
+    }
+    this.#initialValue = value;
+    this.#lastSavedValue = value;
+    this.#parentSheet?.render?.(false);
+    if (close) {
+      this.#settle(value);
+      await this.close({ submitted: true });
+    }
+  }
+
+  #settle(value) {
+    if (this.#settled) return;
+    this.#settled = true;
+    this.#resolve(value);
+  }
+
+  static async #onSubmit(event, form, formData) {
+    await this.#save({ close: true });
+  }
+
+  static async #onCancel(event, target) {
+    event.preventDefault();
+    this.#discarding = true;
+    this.#settle(null);
+    await this.close();
+  }
+
+  async close(options = {}) {
+    if (!options.submitted) this.#discarding = true;
+    this.#editorElement = null;
+    this.#settle(null);
+    return super.close(options);
+  }
 }
 
 export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(HandlebarsApplicationMixin(ActorSheetV2)) {
@@ -95,9 +250,8 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
       deleteItem: StarFrontiersCreatureSheet.#onDeleteItem,
       addNaturalWeapon: StarFrontiersCreatureSheet.#onAddNaturalWeapon,
       addMovement: StarFrontiersCreatureSheet.#onAddMovement,
+      editRichTextField: StarFrontiersCreatureSheet.#onEditRichTextField,
       removeMovement: StarFrontiersCreatureSheet.#onRemoveMovement,
-      addSpecialAttack: StarFrontiersCreatureSheet.#onAddSpecialAttack,
-      removeSpecialAttack: StarFrontiersCreatureSheet.#onRemoveSpecialAttack,
       rollWeaponAttack: StarFrontiersCreatureSheet.#onRollWeaponAttack,
       rollWeaponDamage: StarFrontiersCreatureSheet.#onRollWeaponDamage,
       rollCreatureInitiative: StarFrontiersCreatureSheet.#onRollInitiative,
@@ -131,10 +285,17 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
     }
     naturalWeapons.sort(StarFrontiersCreatureSheet.#compareBySort);
     carriedWeapons.sort(StarFrontiersCreatureSheet.#compareBySort);
+    const creatureArmors = actor.items
+      .filter((item) => item.type === "armor")
+      .sort(StarFrontiersCreatureSheet.#compareBySort);
 
     context.naturalWeapons = naturalWeapons.map((item) => StarFrontiersCreatureSheet.#buildAttackRow(actor, item));
     context.carriedWeapons = carriedWeapons.map((item) => StarFrontiersCreatureSheet.#buildAttackRow(actor, item));
     context.hasCarriedWeapons = carriedWeapons.length > 0;
+    context.creatureArmors = creatureArmors.map((item) => ({
+      id: item.id,
+      name: item.name
+    }));
 
     context.sizeChoices = SIZE_CHOICES;
     context.ecologyChoices = ECOLOGY_CHOICES;
@@ -151,28 +312,19 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
           notes: String(entry.notes ?? "")
         }))
       : [];
-    context.specialDefenseChoices = buildCreatureDefenseChoices([
-      ...Array.from(actor.system.defense?.immunities ?? []),
-      ...Array.from(actor.system.defense?.halves ?? [])
-    ]);
 
     context.staminaValue = Number(actor.system.abilities?.sta?.value ?? 0);
     context.staminaMax = Number(actor.system.abilities?.sta?.max ?? context.staminaValue);
 
-    context.specialAttackRows = [];
-    for (let index = 0; index < (actor.system.specialAttacks ?? []).length; index++) {
-      const entry = actor.system.specialAttacks[index] ?? blankSpecialAttack();
-      context.specialAttackRows.push({
-        index,
-        label: String(entry.label ?? ""),
-        detail: String(entry.detail ?? ""),
-        enrichedDetail: await StarFrontiersCreatureSheet.#enrichHtml(actor, entry.detail ?? "")
-      });
-    }
-
+    context.specialAttackValue = StarFrontiersCreatureSheet.#getSpecialAttackValue(actor);
+    context.specialDefenseValue = StarFrontiersCreatureSheet.#getSpecialDefenseValue(actor);
+    context.hasSpecialAttackContent = hasMeaningfulHtml(context.specialAttackValue);
+    context.hasSpecialDefenseContent = hasMeaningfulHtml(context.specialDefenseValue);
+    context.enrichedSpecialAttack = await StarFrontiersCreatureSheet.#enrichHtml(actor, context.specialAttackValue);
+    context.enrichedSpecialDefense = await StarFrontiersCreatureSheet.#enrichHtml(actor, context.specialDefenseValue);
+    context.hasDescriptionContent = hasMeaningfulHtml(actor.system.description ?? "");
     context.enrichedDescription = await StarFrontiersCreatureSheet.#enrichHtml(actor, actor.system.description ?? "");
     context.enrichedGmNotes = await StarFrontiersCreatureSheet.#enrichHtml(actor, actor.system.gmNotes ?? "");
-    context.enrichedDefenseNotes = await StarFrontiersCreatureSheet.#enrichHtml(actor, actor.system.defense?.notes ?? "");
 
     return context;
   }
@@ -227,6 +379,111 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
     return Number(a?.sort ?? 0) - Number(b?.sort ?? 0);
   }
 
+  static #hasStoredOrTokenDeltaPath(actor, path) {
+    return foundry.utils.hasProperty(actor._source ?? {}, path)
+      || foundry.utils.hasProperty(actor.token?.delta?._source ?? {}, path)
+      || foundry.utils.hasProperty(actor.token?.delta ?? {}, path);
+  }
+
+  static #getStoredOrLegacyHtml(actor, path, legacyValue) {
+    const liveValue = String(foundry.utils.getProperty(actor, path) ?? "");
+    if (liveValue || StarFrontiersCreatureSheet.#hasStoredOrTokenDeltaPath(actor, path)) return liveValue;
+    return legacyValue;
+  }
+
+  static #getSpecialAttackValue(actor) {
+    const entries = Array.from(actor.system.specialAttacks ?? []);
+    const legacyValue = entries.map((entry) => {
+      const label = String(entry?.label ?? "").trim();
+      const detail = String(entry?.detail ?? "");
+      if (!label && !hasMeaningfulHtml(detail)) return "";
+      const safeLabel = label ? foundry.utils.escapeHTML(label) : "";
+      if (safeLabel && hasMeaningfulHtml(detail)) return `<p><strong>${safeLabel}</strong></p>${detail}`;
+      if (safeLabel) return `<p><strong>${safeLabel}</strong></p>`;
+      return detail;
+    }).filter(Boolean).join("");
+
+    return StarFrontiersCreatureSheet.#getStoredOrLegacyHtml(actor, "system.specialAttack", legacyValue);
+  }
+
+  static #getSpecialDefenseValue(actor) {
+    const defense = actor.system.defense ?? {};
+    const detailRows = [];
+    const immunities = Array.from(defense.immunities ?? []).map((value) => getCreatureDefenseChoiceLabel(value));
+    const halves = Array.from(defense.halves ?? []).map((value) => getCreatureDefenseChoiceLabel(value));
+    const armorPoints = Number(defense.armorPoints ?? 0);
+    const regenerate = Number(defense.regenerate ?? 0);
+    const sizeToHitMod = Number(defense.sizeToHitMod ?? 0);
+
+    if (immunities.length) {
+      detailRows.push({
+        label: game.i18n.localize("STARFRONTIERS.Creature.Immunities"),
+        value: immunities.join(", ")
+      });
+    }
+    if (halves.length) {
+      detailRows.push({
+        label: game.i18n.localize("STARFRONTIERS.Creature.Halves"),
+        value: halves.join(", ")
+      });
+    }
+    if (armorPoints > 0) {
+      detailRows.push({
+        label: game.i18n.localize("STARFRONTIERS.Creature.ArmorPoints"),
+        value: String(armorPoints)
+      });
+    }
+    if (regenerate > 0) {
+      detailRows.push({
+        label: game.i18n.localize("STARFRONTIERS.Creature.Regenerate"),
+        value: String(regenerate)
+      });
+    }
+    if (sizeToHitMod !== 0) {
+      detailRows.push({
+        label: game.i18n.localize("STARFRONTIERS.Creature.SizeToHitMod"),
+        value: sizeToHitMod > 0 ? `+${sizeToHitMod}` : String(sizeToHitMod)
+      });
+    }
+
+    const legacyBlocks = [];
+    const notes = String(defense.notes ?? "");
+    if (hasMeaningfulHtml(notes)) legacyBlocks.push(notes);
+    if (detailRows.length) {
+      legacyBlocks.push(`<ul>${detailRows.map((row) =>
+        `<li><strong>${foundry.utils.escapeHTML(row.label)}:</strong> ${foundry.utils.escapeHTML(row.value)}</li>`
+      ).join("")}</ul>`);
+    }
+
+    return StarFrontiersCreatureSheet.#getStoredOrLegacyHtml(
+      actor,
+      "system.specialDefense",
+      legacyBlocks.join("")
+    );
+  }
+
+  static #getRichTextFieldValue(actor, fieldPath) {
+    switch (String(fieldPath ?? "")) {
+      case "system.specialAttack":
+        return StarFrontiersCreatureSheet.#getSpecialAttackValue(actor);
+      case "system.specialDefense":
+        return StarFrontiersCreatureSheet.#getSpecialDefenseValue(actor);
+      default:
+        return String(foundry.utils.getProperty(actor, fieldPath) ?? "");
+    }
+  }
+
+  static async #promptRichTextValue(actor, fieldPath, label, parentSheet) {
+    const initialValue = StarFrontiersCreatureSheet.#getRichTextFieldValue(actor, fieldPath);
+    return StarFrontiersCreatureRichTextEditor.prompt({
+      actor,
+      fieldPath,
+      initialValue,
+      label,
+      parentSheet
+    });
+  }
+
   async _onRender(context, options) {
     await super._onRender(context, options);
   }
@@ -236,11 +493,16 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
       return super._onDropDocument(event, document);
     }
 
-    if (document.type === "creatureAttack" || document.type === "weapon") {
+    if (document.type === "creatureAttack" || document.type === "weapon" || document.type === "armor") {
       this._rememberScrollPosition();
       if (document.parent === this.document) return super._onDropDocument(event, document);
       const data = document.toObject();
       delete data._id;
+      if (document.type === "armor") {
+        data.system = foundry.utils.mergeObject(data.system ?? {}, {
+          carryState: "carried"
+        }, { inplace: false, overwrite: true });
+      }
       const [created] = await this.document.createEmbeddedDocuments("Item", [data]);
       return created;
     }
@@ -266,6 +528,16 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
     if (!item) return;
     this._rememberScrollPosition();
     await this.document.deleteEmbeddedDocuments("Item", [item.id]);
+  }
+
+  static async #onEditRichTextField(event, target) {
+    target ??= event.currentTarget;
+    const actor = this.document;
+    const fieldPath = String(target.dataset.field ?? "").trim();
+    if (!fieldPath) return;
+    const labelKey = String(target.dataset.labelKey ?? "").trim();
+    const label = labelKey ? game.i18n.localize(labelKey) : fieldPath;
+    await StarFrontiersCreatureSheet.#promptRichTextValue(actor, fieldPath, label, this);
   }
 
   static async #onAddNaturalWeapon(event, target) {
@@ -298,23 +570,6 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
     this._rememberScrollPosition();
     movement.splice(index, 1);
     await this.document.update({ "system.movement": movement });
-  }
-
-  static async #onAddSpecialAttack(event, target) {
-    this._rememberScrollPosition();
-    const entries = Array.from(this.document.system.specialAttacks ?? []).map((entry) => ({ ...entry }));
-    entries.push(blankSpecialAttack());
-    await this.document.update({ "system.specialAttacks": entries });
-  }
-
-  static async #onRemoveSpecialAttack(event, target) {
-    target ??= event.currentTarget;
-    const index = Number(target.dataset.index ?? -1);
-    const entries = Array.from(this.document.system.specialAttacks ?? []).map((entry) => ({ ...entry }));
-    if (index < 0 || index >= entries.length) return;
-    this._rememberScrollPosition();
-    entries.splice(index, 1);
-    await this.document.update({ "system.specialAttacks": entries });
   }
 
   static async #onRollWeaponAttack(event, target) {

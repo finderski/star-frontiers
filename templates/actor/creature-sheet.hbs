@@ -14,11 +14,11 @@
 
       <div class="creature-line creature-line--type">
         <label class="inline-field">
-          <span>{{localize "STARFRONTIERS.Creature.Size"}}</span>
+          <span class="smaller">{{localize "STARFRONTIERS.Creature.Size"}}</span>
           <select name="system.size">{{selectOptions sizeChoices selected=system.size localize=true}}</select>
         </label>
         <label class="inline-field">
-          <span>{{localize "STARFRONTIERS.Creature.Type"}}</span>
+          <span class="smaller">{{localize "STARFRONTIERS.Creature.Type"}}</span>
           <select name="system.ecology">{{selectOptions ecologyChoices selected=system.ecology localize=true}}</select>
         </label>
         {{#if (eq system.ecology "other")}}
@@ -46,11 +46,11 @@
           <input type="text" name="system.groupSize.formula" value="{{system.groupSize.formula}}" placeholder="2-6" />
         </div>
         <label class="inline-field inline-field--grow">
-          <span>{{localize "STARFRONTIERS.Creature.NativeWorld"}}</span>
+          <span class="smaller">{{localize "STARFRONTIERS.Creature.NativeWorld"}}</span>
           <input type="text" name="system.nativeWorld" value="{{system.nativeWorld}}" />
         </label>
         <label class="inline-field inline-field--grow">
-          <span>{{localize "STARFRONTIERS.Creature.Habitat"}}</span>
+          <span class="smaller">{{localize "STARFRONTIERS.Creature.Habitat"}}</span>
           <input
             type="text"
             name="system.habitat"
@@ -156,6 +156,22 @@
               <div class="smallerLabel">{{localize "STARFRONTIERS.Creature.Max"}}</div>
           </div>
         </label>
+        <div class="creature-roll-row">
+          <div class="roll-label-group roll-label-group--left">
+            <button
+              type="button"
+              class="creature-field__roll-label"
+              data-action="rollCreatureInitiative"
+              title="{{localize "STARFRONTIERS.Creature.RollInitiativePublic"}}"
+            >
+              <i class="fa-solid fa-dice-d10"></i> {{localize "STARFRONTIERS.Creature.RollInitiative"}}
+            </button>
+            <div class="roll-label-actions">
+              <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollCreatureInitiative" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Creature.RollInitiativeBlind"}}"></button>
+              <button type="button" class="roll-label-action roll-label-action--gm" data-action="rollCreatureInitiative" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Creature.RollInitiativeWhisper"}}"></button>
+            </div>
+          </div>
+        </div>
         <label class="inline-field small">
           <span>{{localize "STARFRONTIERS.Creature.Attack"}}</span>
           <input class="smallField" type="number" name="system.attackScore" value="{{system.attackScore}}" min="0" max="100" />
@@ -165,23 +181,6 @@
           <input class="smallField" type="number" name="system.numAttacksPerTurn" value="{{system.numAttacksPerTurn}}" min="0" />
         </label>
       </div>
-      <div class="creature-roll-row">
-        <div class="roll-label-group roll-label-group--left">
-          <button
-            type="button"
-            class="creature-field__roll-label"
-            data-action="rollCreatureInitiative"
-            title="{{localize "STARFRONTIERS.Creature.RollInitiativePublic"}}"
-          >
-            <i class="fa-solid fa-dice-d10"></i> {{localize "STARFRONTIERS.Creature.RollInitiative"}}
-          </button>
-          <div class="roll-label-actions">
-            <button type="button" class="roll-label-action roll-label-action--blind" data-action="rollCreatureInitiative" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Creature.RollInitiativeBlind"}}"></button>
-            <button type="button" class="roll-label-action roll-label-action--gm" data-action="rollCreatureInitiative" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Creature.RollInitiativeWhisper"}}"></button>
-          </div>
-        </div>
-      </div>
-
       <div class="creature-subsection">
         <div class="creature-subsection__header">
           <h3>{{localize "STARFRONTIERS.Creature.NaturalWeapons"}}</h3>
@@ -283,95 +282,85 @@
       <legend>{{localize "STARFRONTIERS.Creature.Special"}}</legend>
       <div class="creature-specials">
         <div class="creature-special-block">
-          <div class="creature-subsection__header">
-            <h3>{{localize "STARFRONTIERS.Creature.SpecialAttacks"}}</h3>
-            <button type="button" data-action="addSpecialAttack">
-              <i class="fa-solid fa-plus"></i>
-              <span>{{localize "STARFRONTIERS.Creature.AddSpecialAttack"}}</span>
-            </button>
-          </div>
-          {{#if specialAttackRows.length}}
-            <div class="creature-special-attack-list">
-              {{#each specialAttackRows as |entry|}}
-                <div class="creature-special-attack-row">
-                  <div class="creature-special-attack-row__body">
-                    <label class="field-line">
-                      <span>{{localize "STARFRONTIERS.Creature.SpecialAttackLabel"}}</span>
-                      <input type="text" name="system.specialAttacks.{{entry.index}}.label" value="{{entry.label}}" />
-                    </label>
-                    <div class="stacked">
-                      <span>{{localize "STARFRONTIERS.Creature.SpecialAttackDetail"}}</span>
-                      <prose-mirror
-                        name="system.specialAttacks.{{entry.index}}.detail"
-                        data-document-u-u-i-d="{{@root.actor.uuid}}"
-                        value="{{entry.detail}}"
-                        collaborate="false"
-                        toggled="true"
-                      >
-                        {{{entry.enrichedDetail}}}
-                      </prose-mirror>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    class="creature-row-remove"
-                    data-action="removeSpecialAttack"
-                    data-index="{{entry.index}}"
-                    title="{{localize "STARFRONTIERS.Item.Delete"}}"
-                  >
-                    <i class="fa-solid fa-trash"></i>
-                  </button>
-                </div>
-              {{/each}}
+          <div class="creature-rich-field">
+            <div class="creature-rich-field__header">
+              <span>{{localize "STARFRONTIERS.Creature.SpecialAttack"}}</span>
+              <button
+                type="button"
+                class="creature-rich-field__edit"
+                data-action="editRichTextField"
+                data-field="system.specialAttack"
+                data-label-key="STARFRONTIERS.Creature.SpecialAttack"
+                title="{{localize "STARFRONTIERS.Item.Edit"}}"
+              >
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>{{localize "STARFRONTIERS.Item.Edit"}}</span>
+              </button>
             </div>
-          {{else}}
-            <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Creature.NoSpecialAttacks"}}</p>
-          {{/if}}
+            <div class="creature-rich-display{{#unless hasSpecialAttackContent}} creature-rich-display--empty{{/unless}}">
+              {{#if hasSpecialAttackContent}}
+                {{{enrichedSpecialAttack}}}
+              {{else}}
+                <span class="creature-rich-display__placeholder">&mdash;</span>
+              {{/if}}
+            </div>
+          </div>
         </div>
 
         <div class="creature-special-block">
-          <div class="creature-subsection__header">
-            <h3>{{localize "STARFRONTIERS.Creature.SpecialDefenses"}}</h3>
-          </div>
-          <div class="creature-line creature-line--defense-selects">
-            <label class="stacked creature-multi-field">
-              <span>{{localize "STARFRONTIERS.Creature.Immunities"}}</span>
-              <select class="multiSelect" name="system.defense.immunities" multiple size="6">
-                {{selectOptions specialDefenseChoices selected=system.defense.immunities}}
-              </select>
-            </label>
-            <label class="stacked creature-multi-field">
-              <span>{{localize "STARFRONTIERS.Creature.Halves"}}</span>
-              <select class="multiSelect" name="system.defense.halves" multiple size="6">
-                {{selectOptions specialDefenseChoices selected=system.defense.halves}}
-              </select>
-            </label>
-          </div>
-          <div class="creature-line creature-line--defense-stats">
-            <label class="inline-field">
-              <span>{{localize "STARFRONTIERS.Creature.ArmorPoints"}}</span>
-              <input type="number" name="system.defense.armorPoints" value="{{system.defense.armorPoints}}" min="0" />
-            </label>
-            <label class="inline-field">
-              <span>{{localize "STARFRONTIERS.Creature.Regenerate"}}</span>
-              <input type="number" name="system.defense.regenerate" value="{{system.defense.regenerate}}" min="0" />
-            </label>
-            <label class="inline-field">
-              <span>{{localize "STARFRONTIERS.Creature.SizeToHitMod"}}</span>
-              <input type="number" name="system.defense.sizeToHitMod" value="{{system.defense.sizeToHitMod}}" />
-            </label>
+          <div class="creature-rich-field">
+            <div class="creature-rich-field__header">
+              <span>{{localize "STARFRONTIERS.Creature.SpecialDefense"}}</span>
+              <button
+                type="button"
+                class="creature-rich-field__edit"
+                data-action="editRichTextField"
+                data-field="system.specialDefense"
+                data-label-key="STARFRONTIERS.Creature.SpecialDefense"
+                title="{{localize "STARFRONTIERS.Item.Edit"}}"
+              >
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>{{localize "STARFRONTIERS.Item.Edit"}}</span>
+              </button>
+            </div>
+            <div class="creature-rich-display{{#unless hasSpecialDefenseContent}} creature-rich-display--empty{{/unless}}">
+              {{#if hasSpecialDefenseContent}}
+                {{{enrichedSpecialDefense}}}
+              {{else}}
+                <span class="creature-rich-display__placeholder">&mdash;</span>
+              {{/if}}
+            </div>
           </div>
           <div class="stacked">
-            <span>{{localize "STARFRONTIERS.Creature.DefenseNotes"}}</span>
-            <prose-mirror
-              name="system.defense.notes"
-              data-document-u-u-i-d="{{actor.uuid}}"
-              value="{{system.defense.notes}}"
-              collaborate="false"
-              toggled="true"
-            >
-              {{{enrichedDefenseNotes}}}
-            </prose-mirror>
+            <div class="ammo-drop-zone creature-armor-drop-zone" data-drop-type="armor">
+              <span>{{localize "STARFRONTIERS.Creature.Armor"}}</span>
+              <div>
+                <span>{{localize "STARFRONTIERS.Character.DropArmorHere"}}</span>
+              </div>
+            </div>
+            {{#if creatureArmors.length}}
+              <div class="creature-armor-list">
+                {{#each creatureArmors as |armor|}}
+                  <div class="creature-armor-row" data-item-id="{{armor.id}}">
+                    <button
+                      type="button"
+                      class="creature-armor-row__name"
+                      data-action="openItem"
+                      data-item-drag="true"
+                      draggable="true"
+                      title="{{localize "STARFRONTIERS.Item.Open"}}"
+                    >{{armor.name}}</button>
+                    <div class="creature-armor-row__actions">
+                      <button type="button" data-action="deleteItem" title="{{localize "STARFRONTIERS.Item.Delete"}}">
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                {{/each}}
+              </div>
+            {{else}}
+              <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Creature.NoArmor"}}</p>
+            {{/if}}
           </div>
         </div>
       </div>
@@ -379,15 +368,28 @@
 
     <fieldset class="paper-box full-width">
       <legend>{{localize "STARFRONTIERS.Creature.Description"}}</legend>
-      <prose-mirror
-        name="system.description"
-        data-document-u-u-i-d="{{actor.uuid}}"
-        value="{{system.description}}"
-        collaborate="false"
-        toggled="true"
-      >
-        {{{enrichedDescription}}}
-      </prose-mirror>
+      <div class="creature-rich-field creature-rich-field--standalone">
+        <div class="creature-rich-field__header creature-rich-field__header--end">
+          <button
+            type="button"
+            class="creature-rich-field__edit"
+            data-action="editRichTextField"
+            data-field="system.description"
+            data-label-key="STARFRONTIERS.Creature.Description"
+            title="{{localize "STARFRONTIERS.Item.Edit"}}"
+          >
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>{{localize "STARFRONTIERS.Item.Edit"}}</span>
+          </button>
+        </div>
+        <div class="creature-rich-display{{#unless hasDescriptionContent}} creature-rich-display--empty{{/unless}}">
+          {{#if hasDescriptionContent}}
+            {{{enrichedDescription}}}
+          {{else}}
+            <span class="creature-rich-display__placeholder">&mdash;</span>
+          {{/if}}
+        </div>
+      </div>
     </fieldset>
 
     <fieldset class="paper-box full-width">

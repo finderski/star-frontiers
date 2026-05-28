@@ -53,6 +53,8 @@
       "creature": {
         "htmlFields": [
           "description",
+          "specialAttack",
+          "specialDefense",
           "defense.notes",
           "goal.notes",
           "gmNotes",

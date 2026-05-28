@@ -192,6 +192,11 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
   padding: 18px;
 }
 
+.star-frontiers-sheet .smaller {
+  font-family: var(--fieldset);
+  font-size: 0.9em;
+}
+
 /* --- 3b. Form fields (input, textarea, select) --- */
 
 .star-frontiers-sheet input,
@@ -3002,42 +3007,167 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   gap: 0.75rem;
 }
 
-.star-frontiers-creature-sheet .creature-special-attack-list {
+.star-frontiers-creature-sheet .creature-rich-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.star-frontiers-creature-sheet .creature-rich-field__header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.star-frontiers-creature-sheet .creature-rich-field__header > span {
+  font-family: var(--fieldset);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+
+.star-frontiers-creature-sheet .creature-rich-field__header--end {
+  justify-content: flex-end;
+}
+
+.star-frontiers-creature-sheet .creature-rich-field__edit {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.star-frontiers-creature-sheet .creature-rich-display {
+  border: 1px solid var(--sf-row-line);
+  border-radius: 8px;
+  font-family: var(--input);
+  line-height: 1.4;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.star-frontiers-creature-sheet .creature-rich-display > * {
+  margin: 0 0 0.4rem;
+}
+
+.star-frontiers-creature-sheet .creature-rich-display > *:last-child {
+  margin-bottom: 0;
+}
+
+.star-frontiers-creature-sheet .creature-rich-display ul,
+.star-frontiers-creature-sheet .creature-rich-display ol {
+  margin-left: 1.25rem;
+}
+
+.star-frontiers-creature-sheet .creature-rich-display--empty {
+  align-items: center;
+  color: var(--sf-muted);
+  display: flex;
+}
+
+.star-frontiers-creature-sheet .creature-rich-display__placeholder {
+  font-style: italic;
+}
+
+.creature-rich-text-editor .window-content {
+  min-height: 0;
+}
+
+.creature-rich-text-editor__body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  height: 100%;
+  min-height: 0;
 }
 
-.star-frontiers-creature-sheet .creature-special-attack-row {
+.creature-rich-text-editor__label {
+  font-family: var(--fieldset);
+  font-size: 1rem;
+}
+
+.creature-rich-text-editor__editor-host {
   display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-  border: 1px solid var(--sf-row-line);
-  border-radius: 8px;
-  padding: 0.75rem;
-}
-
-.star-frontiers-creature-sheet .creature-special-attack-row__body {
   flex: 1 1 auto;
+  min-height: 360px;
   min-width: 0;
 }
 
-.star-frontiers-creature-sheet .creature-line--defense-selects .creature-multi-field {
-  flex: 1 1 16rem;
-}
-
-.star-frontiers-creature-sheet .creature-line--defense-selects select {
-  height: auto;
-  min-height: 8rem;
-}
-
-.star-frontiers-creature-sheet .creature-line--combat .inline-field,
-.star-frontiers-creature-sheet .creature-line--defense-stats .inline-field {
+.creature-rich-text-editor__editor {
+  border: 1px solid var(--sf-line, rgba(0, 0, 0, 0.4));
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 360px;
+  min-width: 0;
 }
 
-.star-frontiers-creature-sheet .creature-line--defense-stats {
-  margin-top: 0.25rem;
+.creature-rich-text-editor__editor .menu-container {
+  margin-bottom: 0.35rem;
+}
+
+.creature-rich-text-editor__editor menu {
+  background: unset;
+}
+
+.creature-rich-text-editor__editor .editor-content {
+  font-family: var(--input);
+  min-height: 260px;
+}
+
+.star-frontiers-creature-sheet .creature-armor-drop-zone {
+  margin: 0;
+}
+
+.star-frontiers-creature-sheet .creature-armor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.star-frontiers-creature-sheet .creature-armor-row {
+  align-items: center;
+  border: 1px solid var(--sf-row-line);
+  border-radius: 8px;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.star-frontiers-creature-sheet .creature-armor-row__name {
+  border: 0;
+  border-bottom: 2px solid var(--sf-line);
+  border-radius: 0;
+  box-shadow: none;
+  flex: 1 1 auto;
+  font-family: var(--input);
+  font-size: 1rem;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 2px 4px;
+  text-align: left;
+}
+
+.star-frontiers-creature-sheet .creature-armor-row__name:hover,
+.star-frontiers-creature-sheet .creature-armor-row__name:focus-visible {
+  background: var(--sf-button-hover);
+  border-bottom-color: var(--sf-focus);
+}
+
+.star-frontiers-creature-sheet .creature-armor-row__actions {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.star-frontiers-creature-sheet .creature-armor-row__actions button {
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+}
+
+.star-frontiers-creature-sheet .creature-line--combat .inline-field {
+  flex: 1 1 auto;
 }
 
 

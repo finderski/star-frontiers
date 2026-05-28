@@ -293,6 +293,8 @@ export class StarFrontiersCreatureData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       description: htmlField(),
+      specialAttack: htmlField(),
+      specialDefense: htmlField(),
       ecology: textField({ choices: ["", "herbivore", "carnivore", "omnivore", "other"] }),
       ecologyOther: textField(),
       size: textField({ initial: "medium", choices: ["tiny", "small", "medium", "large", "giant", "huge"] }),
