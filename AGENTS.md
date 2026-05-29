@@ -108,7 +108,7 @@
 
 ## Schema versioning
 
-- Current schema version: **0.3.1** (stored in world setting `schemaVersion`).
+- Current schema version: **0.3.2** (stored in world setting `schemaVersion`).
 - Migration runner is in `module/migration/migrations.mjs`. Add a new entry to `MIGRATIONS` and bump `CURRENT_SCHEMA_VERSION` when fields are renamed, removed, or restructured.
 - During development (pre-1.0), prefer patch bumps (`0.2.0 → 0.2.1`) for incremental schema fixes rather than jumping minor versions. Reserve minor bumps for end-of-phase milestones.
 - Character sheet now exposes `system.psa` as the Expanded Rules Career PSA selector, with choices limited to Military, Technological, and Biosocial.
@@ -121,6 +121,7 @@
 - **0.2.9** — Weapon ammo loaded state split from availability. Adds `weapon.system.ammo.loadedSourceId` (actual loaded source) and `weapon.system.ammo.internalCharge` (built-in initial clip/charge). Migration backfills existing weapons: `clipItem` becomes the loaded source; otherwise weapons with capacity become internally charged; no-ammo weapons become unloaded. Walks world items, world actors + actor.items, unlinked scene tokens, and invalid item collections.
 - **0.3.0** — Creature actors gain a dedicated `reactionSpeed` field (backfilled from legacy `abilities.dex.value`) plus `descriptor` and `groupSize.formula`. Inline `system.attacks[]` entries are migrated to embedded `creatureAttack` items (`label → name`, `damage → damageFormula`, `damageType` preserved, `system.attackScore` copied per-creature) and the inline array is emptied. Migration walks world Actors and unlinked scene tokens; world Items are unaffected (creatures are actors). The `system.attacks[]` array is deprecated but kept in schema for backward compatibility.
 - **0.3.1** — Creature stat blocks switch from one movement triple to `system.movement[]` entries (`mode`, `modeOther`, `category`, `ratePerTurn`, `ratePerHour`, `notes`), add `system.ecologyOther`, `system.habitat`, and `system.specialAttacks[]`, and remove `descriptor` from the live schema. `creatureAttack.system.attackScore` is retired; the creature actor's `system.attackScore` is the single ATTACK score for all attacks. Migration converts old scalar movement data into the new array, copies the highest legacy creatureAttack `attackScore` up onto the creature when needed, and unsets legacy `movementMode`, `movementCategory`, and `descriptor`.
+- **0.3.2** — Armor and Screen item sheets now share `system.reductions[]` as the live damage-protection authoring model. Armor gains nullable `system.maxAbsorbed` (`null` = no threshold / natural armor) plus `system.accumulatedDamage`; Screen keeps `screenType` / `capacity` / `seuPerHit` / `active` / `powerSourceRef` but migrates legacy `system.defends` + scalar `system.reduction` into `system.reductions[]`. Migration walks world items, world actors + actor.items, unlinked scene tokens, and invalid item collections for legacy screen data.
 - **Always walk three places** for any document-data migration: world Items (`game.items`), world Actors (`game.actors` + `actor.items`), and unlinked scene tokens (`scene.tokens` filtered by `actorLink === false` → `tokenDoc.delta._source.items`, then update via `tokenDoc.actor.updateEmbeddedDocuments`). Also walk `invalidDocumentIds` if the migration is about choice-validated fields.
 - **New optional fields with schema defaults do not require a migration** — TypeDataModel fills in defaults for stored documents that predate the field. The encumbrance/equipment additions (carryState/quantity/mass on gear, consumable, ammo, powerSource, armor, screen, weapon) all rely on this — no migration was bumped.
 
@@ -271,6 +272,15 @@
 - **Item delete cleanup**: `#onDeleteItem` clears `defenses.suit` / `.screen` if it pointed to the deleted item. Without this, a dangling ref would render as "no worn item" because `actor.items.get(staleId)` returns null.
 - **Encumbrance**: armor and screen mass already counts via `computeCarriedMass` (any item where `carryState ∈ {ready, carried}`). Both default to `"carried"`, so the worn-or-not distinction doesn't affect encumbrance — it's always counted unless explicitly stowed.
 - Armor and screen items have a 2-state cycle button (`carried ↔ stored`), not the 3-state cycle other items use. The "worn" state is the character-side ref, not a fourth carry-state value. The schema still has `"ready"` as a valid stored value (for backward compat with old data); 0.2.2 normalizes it to `"carried"` and the cycle button never produces it.
+
+### Armor / Screen reductions
+- The reductions editor is a shared partial at `templates/item/parts/reductions-editor.hbs`, used by both armor and screen item sheets. `addReduction` / `removeReduction` handlers are item-type-agnostic and operate on `this.item.system.reductions` regardless of document type; do not fork them into per-type variants unless behavior truly diverges.
+- `system.reductions[]` is the live damage-protection authoring model for BOTH armor and screens. Each row is `{ damageType, mode, amount }`, where `mode` is one of `half`, `full`, or `flat`; `amount` is only meaningful for `flat`.
+- `armorType` and `screenType` stay as label/type helpers only. Multi-type protection is expressed by multiple `system.reductions[]` rows, not by turning those fields into structured multi-selects.
+- `armor.system.maxAbsorbed` is nullable by design. `null` means "no threshold / never degrades" (natural armor, creature hide, etc.); `0` is a real rules-distinct value meaning "broken instantly." Do not collapse those states.
+- `armor.system.accumulatedDamage` is informational state that always increments when the future damage pipeline lands, even if `maxAbsorbed === null`. The destruction check is what gets skipped for natural armor.
+- Screens and armor intentionally stay separate item types. Screens use the shared reductions authoring UI but still own `screenType`, `capacity`, `seuPerHit`, `active`, and `powerSourceRef`; armor owns `armorType`, `maxAbsorbed`, and `accumulatedDamage`.
+- Legacy `screen.system.defends` and scalar `screen.system.reduction` are deprecated compatibility fields after 0.3.2. The sheet no longer renders them; future runtime damage code should read `screen.system.reductions[]` instead.
 
 ### Encumbrance / equipment / carry state
 - Carry state is universal across physical inventory item types: weapon, armor, screen, ammo, powerSource, gear, consumable, and computer. Default is `"ready"` for weapons, `"carried"` for everything else.
@@ -444,6 +454,10 @@ This reflects the current local notes and implemented work, not a live Asana syn
   - more complete NPC/creature/robot/vehicle experiences
 
 ## Current next tasks
+- Armor/screen reductions runtime smoke-test (0.3.2):
+  - Open armor and screen item sheets in Foundry, add/remove reduction rows, and confirm scroll position holds on row mutations and preset application.
+  - Apply each preset once, confirm overwrite confirmation on existing rows, and verify screen presets do not disturb an already-linked power source.
+  - Open a pre-0.3.2 screen in a migrated world and confirm legacy `defends` + `reduction` data renders back through `system.reductions[]`.
 - Creature sheet smoke-test (0.3.1):
   - Author a `creatureAttack` item in the world Items directory and drag it onto multiple creatures; confirm it lands in Natural Weapons and rolls attack/damage.
   - Drag a `weapon` item onto a creature; confirm the Carried Weapons section appears, uses the creature's `system.attackScore` for attack rolls, and disappears when the weapon is removed.
@@ -472,7 +486,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Canvas UX:
   - smoke-test the token-hover range preview with single selected tokens, multiple ready weapons, out-of-range targets, and non-weapon actors
 - Damage application:
-  - "Apply damage to target" workflow — read target's `defenses.suit` / `.screen` refs, inspect `armor.system.reductions[]` and `screen.system.defends` / `.reduction` against the weapon's `damageType`, consume `screen.system.seuPerHit` per absorbed strike. Defense slot data is already in place.
+  - "Apply damage to target" workflow — read target's `defenses.suit` / `.screen` refs, inspect `armor.system.reductions[]` and `screen.system.reductions[]` against the weapon's `damageType`, consume `screen.system.seuPerHit` per absorbed strike, and tick `armor.system.accumulatedDamage` toward `maxAbsorbed` when applicable. Defense slot data is already in place.
 - Races:
   - decide whether race movement should hide `Hourly` in Basic mode or just remain visible as worldbuilding data
 - Equipment / encumbrance:
@@ -524,7 +538,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Do not repurpose `system.experience.earned` away from “available XP” without asking. The Personal File advancement controls now treat `earned` as the spendable pool, `spent` as the refund/undo pool, and `total` as the derived sum.
 - Do not store world-item IDs in `skill.system.subskillRefs` on actor-owned skills. After dropping a main skill and auto-creating its sub-skills, the refs must be rewritten to the new embedded item IDs. The cascade delete and level-sync both rely on `refs.includes(i.id)` where `i.id` is the embedded ID.
 - Do not add a fourth `"active"` / `"worn"` carry state for armor/screen — "worn" is tracked on the character via `defenses.suit/screen` refs, not on the item. Armor/screen carry-state is intentionally `carried ↔ stored` only.
-- Do not merge `armor` and `screen` into one item type. They have genuinely different mechanics (per-damage-type reductions vs. defends-set + SEU absorption with power source). The shared item sheet already factors common fields (cost, mass, description, image).
+- Do not merge `armor` and `screen` into one item type. They share the reductions editor, but their runtime models are still different: armor degrades via `maxAbsorbed` / `accumulatedDamage`, while screens consume SEU and may link to a `powerSource`.
 - Do not treat `powerSource` items as ammo. Beltpacks/backpacks/parabatteries deplete via `system.remaining`, not `shots`; powerclips are the `ammo` items with `ammoType: "seu"`.
 - Do not clean up `linkedWeaponRefs` / `linkedScreenRefs` opportunistically in unrelated code paths. Bidirectional power-source links should only be updated in the explicit link/unlink/reload flows and `#onDeleteItem`, so both sides stay atomic.
 - Do not count `program`, `vehicle`, or non-portable `computer` items in `computeCarriedMass`.

@@ -1,4 +1,4 @@
-import { ITEM_TYPE_LABELS, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
+import { DAMAGE_TYPE_CHOICES, ITEM_TYPE_LABELS, STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
 import { ScrollPreservingSheetMixin } from "./scroll-preserving-sheet-mixin.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -14,6 +14,70 @@ const POWER_SOURCE_PORT_DEFAULTS = {
   parabatteryT3: { weapon: 0, screen: 0, vehicle: 1 },
   parabatteryT4: { weapon: 0, screen: 0, vehicle: 1 },
   "": { weapon: 1, screen: 0, vehicle: 0 }
+};
+
+const ARMOR_REDUCTION_PRESETS = {
+  skeinsuit: {
+    maxAbsorbed: 50,
+    reductions: [
+      { damageType: "projectile", mode: "half", amount: null },
+      { damageType: "gyrojet", mode: "half", amount: null },
+      { damageType: "fragGrenade", mode: "half", amount: null },
+      { damageType: "melee", mode: "half", amount: null },
+      { damageType: "explosive", mode: "half", amount: null }
+    ]
+  },
+  albedoSuit: {
+    maxAbsorbed: 100,
+    reductions: [
+      { damageType: "laser", mode: "full", amount: null }
+    ]
+  }
+};
+
+const SCREEN_REDUCTION_PRESETS = {
+  albedoScreen: {
+    screenType: "albedo",
+    capacity: 50,
+    seuPerHit: 0,
+    reductions: [
+      { damageType: "laser", mode: "full", amount: null }
+    ]
+  },
+  inertiaScreen: {
+    screenType: "inertia",
+    capacity: 50,
+    seuPerHit: 2,
+    reductions: [
+      { damageType: "projectile", mode: "half", amount: null },
+      { damageType: "gyrojet", mode: "half", amount: null },
+      { damageType: "fragGrenade", mode: "half", amount: null },
+      { damageType: "melee", mode: "half", amount: null },
+      { damageType: "explosive", mode: "half", amount: null }
+    ]
+  },
+  gaussScreen: {
+    screenType: "gauss",
+    capacity: 50,
+    seuPerHit: 2,
+    reductions: [
+      { damageType: "electrical", mode: "full", amount: null }
+    ]
+  },
+  sonicScreen: {
+    screenType: "sonic",
+    capacity: 50,
+    seuPerHit: 2,
+    reductions: [
+      { damageType: "sonic", mode: "full", amount: null }
+    ]
+  },
+  holoScreen: {
+    screenType: "holo",
+    capacity: 50,
+    seuPerHit: 0,
+    reductions: []
+  }
 };
 
 export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(HandlebarsApplicationMixin(ItemSheetV2)) {
@@ -34,14 +98,18 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     actions: {
       addBonusPick: StarFrontiersItemSheet.#onAddBonusPick,
       addEffect: StarFrontiersItemSheet.#onAddEffect,
+      addReduction: StarFrontiersItemSheet.#onAddReduction,
       addWeaponMode: StarFrontiersItemSheet.#onAddWeaponMode,
       addWeaponModeEffect: StarFrontiersItemSheet.#onAddWeaponModeEffect,
+      applyArmorPreset: StarFrontiersItemSheet.#onApplyArmorPreset,
+      applyScreenPreset: StarFrontiersItemSheet.#onApplyScreenPreset,
       clearAmmo: StarFrontiersItemSheet.#onClearAmmo,
       clearRequiredSkill: StarFrontiersItemSheet.#onClearRequiredSkill,
       deleteEffect: StarFrontiersItemSheet.#onDeleteEffect,
       editImage: StarFrontiersItemSheet.#onEditImage,
       openEffect: StarFrontiersItemSheet.#onOpenEffect,
       removeBonusPick: StarFrontiersItemSheet.#onRemoveBonusPick,
+      removeReduction: StarFrontiersItemSheet.#onRemoveReduction,
       removeLinkedRaceAbility: StarFrontiersItemSheet.#onRemoveLinkedRaceAbility,
       removeWeaponMode: StarFrontiersItemSheet.#onRemoveWeaponMode,
       removeWeaponModeEffect: StarFrontiersItemSheet.#onRemoveWeaponModeEffect,
@@ -191,6 +259,34 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     } else {
       context.linkedScreenPowerSource = null;
     }
+    if (item.type === "armor" || item.type === "screen") {
+      context.reductionRows = StarFrontiersItemSheet.#prepareReductionRows(item);
+      context.damageTypeChoices = this.#choices(DAMAGE_TYPE_CHOICES, "STARFRONTIERS.Choice.DamageType");
+      context.reductionModeChoices = StarFrontiersItemSheet.#prepareReductionModeChoices();
+      context.armorHasThreshold = item.type === "armor" && item.system.maxAbsorbed !== null && item.system.maxAbsorbed !== undefined;
+      context.armorPresetChoices = item.type === "armor"
+        ? {
+            skeinsuit: game.i18n.localize("STARFRONTIERS.Item.Preset.Skeinsuit"),
+            albedoSuit: game.i18n.localize("STARFRONTIERS.Item.Preset.AlbedoSuit")
+          }
+        : {};
+      context.screenPresetChoices = item.type === "screen"
+        ? {
+            albedoScreen: game.i18n.localize("STARFRONTIERS.Item.Preset.AlbedoScreen"),
+            inertiaScreen: game.i18n.localize("STARFRONTIERS.Item.Preset.InertiaScreen"),
+            gaussScreen: game.i18n.localize("STARFRONTIERS.Item.Preset.GaussScreen"),
+            sonicScreen: game.i18n.localize("STARFRONTIERS.Item.Preset.SonicScreen"),
+            holoScreen: game.i18n.localize("STARFRONTIERS.Item.Preset.HoloScreen")
+          }
+        : {};
+    } else {
+      context.reductionRows = [];
+      context.damageTypeChoices = {};
+      context.reductionModeChoices = {};
+      context.armorHasThreshold = false;
+      context.armorPresetChoices = {};
+      context.screenPresetChoices = {};
+    }
     context.itemEffects = item.type === "trainedAbility"
       ? Array.from(item.effects ?? []).map(e => ({
           id: e.id,
@@ -320,6 +416,14 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     return rows;
   }
 
+  static #prepareReductionRows(item) {
+    return Array.from(item.system.reductions ?? []).map((reduction) => ({
+      damageType: String(reduction?.damageType ?? ""),
+      mode: String(reduction?.mode ?? ""),
+      amount: reduction?.amount ?? ""
+    }));
+  }
+
   static #prepareAvoidanceAbilityChoices() {
     return {
       "": game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceAbilityNone"),
@@ -332,6 +436,15 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       per: game.i18n.localize("STARFRONTIERS.Ability.per"),
       ldr: game.i18n.localize("STARFRONTIERS.Ability.ldr"),
       im: game.i18n.localize("STARFRONTIERS.Ability.im")
+    };
+  }
+
+  static #prepareReductionModeChoices() {
+    return {
+      "": game.i18n.localize("STARFRONTIERS.Choice.DefenseMode.None"),
+      half: game.i18n.localize("STARFRONTIERS.Item.ReductionMode.half"),
+      full: game.i18n.localize("STARFRONTIERS.Item.ReductionMode.full"),
+      flat: game.i18n.localize("STARFRONTIERS.Item.ReductionMode.flat")
     };
   }
 
@@ -353,7 +466,21 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     }));
   }
 
+  static #copyReductions(reductions = []) {
+    return Array.from(reductions ?? []).map((reduction) => ({
+      damageType: String(reduction?.damageType ?? ""),
+      mode: String(reduction?.mode ?? ""),
+      amount: reduction?.amount === null || reduction?.amount === undefined || reduction?.amount === ""
+        ? null
+        : Number(reduction.amount)
+    }));
+  }
+
   #prepareItemSubmitData(data) {
+    if (this.item.type === "armor" || this.item.type === "screen") {
+      this.#prepareReductionSubmitData(data);
+    }
+
     if (this.item.type !== "weapon") return;
 
     const rawModes = foundry.utils.getProperty(data, "system.mechanics.modes");
@@ -398,6 +525,46 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     foundry.utils.setProperty(data, "system.activeModeKey", String(modes[activeModeIndex]?.key ?? ""));
   }
 
+  #prepareReductionSubmitData(data) {
+    const rawReductions = foundry.utils.getProperty(data, "system.reductions");
+    if (rawReductions !== undefined) {
+      const existingReductions = Array.from(this.item.system.reductions ?? []);
+      const reductions = Array.isArray(rawReductions)
+        ? rawReductions
+        : Object.keys(rawReductions)
+            .sort((a, b) => Number(a) - Number(b))
+            .map((key) => rawReductions[key]);
+
+      for (let index = 0; index < reductions.length; index++) {
+        const reduction = reductions[index];
+        const existing = existingReductions[index] ?? {};
+        reduction.damageType = String(reduction?.damageType ?? "").trim();
+        reduction.mode = String(reduction?.mode ?? "").trim();
+        const rawAmount = reduction?.amount;
+        reduction.amount = rawAmount !== ""
+          && rawAmount !== null
+          && rawAmount !== undefined
+          ? Number(rawAmount)
+          : rawAmount === undefined
+            ? (existing.amount ?? null)
+          : null;
+      }
+
+      foundry.utils.setProperty(data, "system.reductions", reductions);
+    }
+
+    if (this.item.type === "armor") {
+      const rawMaxAbsorbed = foundry.utils.getProperty(data, "system.maxAbsorbed");
+      foundry.utils.setProperty(
+        data,
+        "system.maxAbsorbed",
+        rawMaxAbsorbed === "" || rawMaxAbsorbed === null || rawMaxAbsorbed === undefined
+          ? null
+          : Number(rawMaxAbsorbed)
+      );
+    }
+  }
+
   async _onRender(context, options) {
     await super._onRender(context, options);
     const weaponTypeEl = this.element.querySelector('select[name="system.weaponType"]');
@@ -433,6 +600,22 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
           this._rememberScrollPosition();
           await this.item.update({ "system.ports": ports });
         }
+      });
+    }
+    const armorPresetEl = this.element.querySelector("[data-action='applyArmorPreset']");
+    if (armorPresetEl && this.item.type === "armor") {
+      armorPresetEl.addEventListener("change", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void StarFrontiersItemSheet.#onApplyArmorPreset.call(this, event, event.currentTarget);
+      });
+    }
+    const screenPresetEl = this.element.querySelector("[data-action='applyScreenPreset']");
+    if (screenPresetEl && this.item.type === "screen") {
+      screenPresetEl.addEventListener("change", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void StarFrontiersItemSheet.#onApplyScreenPreset.call(this, event, event.currentTarget);
       });
     }
   }
@@ -1199,6 +1382,83 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     await this.item.update({ "system.contents": contents });
     ui.notifications.info(game.i18n.format("STARFRONTIERS.Item.KitContentLinked", { name: document.name }));
     return true;
+  }
+
+  static async #confirmReductionPresetOverwrite(target) {
+    const existing = Array.from(this.item.system.reductions ?? []);
+    if (!existing.length) return true;
+
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: {
+        title: game.i18n.localize("STARFRONTIERS.Item.PresetConfirmTitle")
+      },
+      content: `<p>${game.i18n.localize("STARFRONTIERS.Item.PresetConfirmBody")}</p>`,
+      modal: true,
+      rejectClose: false
+    });
+
+    if (!confirmed && target) target.value = "";
+    return confirmed;
+  }
+
+  static async #onAddReduction(event, target) {
+    this._rememberScrollPosition();
+    const reductions = StarFrontiersItemSheet.#copyReductions(this.item.system.reductions ?? []);
+    reductions.push({ damageType: "", mode: "half", amount: null });
+    await this.item.update({ "system.reductions": reductions });
+  }
+
+  static async #onRemoveReduction(event, target) {
+    target ??= event.currentTarget;
+    const index = Number(target.dataset.index ?? -1);
+    if (index < 0) return;
+    this._rememberScrollPosition();
+    const reductions = StarFrontiersItemSheet.#copyReductions(this.item.system.reductions ?? []);
+    if (index >= reductions.length) return;
+    reductions.splice(index, 1);
+    await this.item.update({ "system.reductions": reductions });
+  }
+
+  static async #onApplyArmorPreset(event, target) {
+    target ??= event.currentTarget;
+    const preset = String(target?.value ?? "");
+    if (!preset) return;
+
+    const data = ARMOR_REDUCTION_PRESETS[preset];
+    if (!data) {
+      target.value = "";
+      return;
+    }
+    if (!(await StarFrontiersItemSheet.#confirmReductionPresetOverwrite.call(this, target))) return;
+
+    this._rememberScrollPosition();
+    await this.item.update({
+      "system.maxAbsorbed": data.maxAbsorbed,
+      "system.reductions": StarFrontiersItemSheet.#copyReductions(data.reductions)
+    });
+    target.value = "";
+  }
+
+  static async #onApplyScreenPreset(event, target) {
+    target ??= event.currentTarget;
+    const preset = String(target?.value ?? "");
+    if (!preset) return;
+
+    const data = SCREEN_REDUCTION_PRESETS[preset];
+    if (!data) {
+      target.value = "";
+      return;
+    }
+    if (!(await StarFrontiersItemSheet.#confirmReductionPresetOverwrite.call(this, target))) return;
+
+    this._rememberScrollPosition();
+    await this.item.update({
+      "system.screenType": data.screenType,
+      "system.capacity": data.capacity,
+      "system.seuPerHit": data.seuPerHit,
+      "system.reductions": StarFrontiersItemSheet.#copyReductions(data.reductions)
+    });
+    target.value = "";
   }
 
   static async #onRemoveSubskill(event, target) {

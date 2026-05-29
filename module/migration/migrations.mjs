@@ -1,6 +1,6 @@
 import { SYSTEM_ID } from "../config.mjs";
 
-export const CURRENT_SCHEMA_VERSION = "0.3.1";
+export const CURRENT_SCHEMA_VERSION = "0.3.2";
 const BASELINE_SCHEMA_VERSION = "0.0.0";
 
 const MIGRATIONS = [
@@ -622,6 +622,94 @@ const MIGRATIONS = [
         for (const tokenDoc of scene.tokens) {
           if (tokenDoc.actorLink || !tokenDoc.actor) continue;
           await migrateCreature(tokenDoc.actor);
+        }
+      }
+    }
+  },
+  {
+    version: "0.3.2",
+    description: "Armor/screen reductions editor: convert legacy screen defends/reduction data into reductions[] and add nullable armor threshold fields.",
+    async migrate() {
+      const LEGACY_SCREEN_MODE_MAP = {
+        half: "half",
+        full: "full",
+        absorbsN: "flat"
+      };
+
+      function hasReductionRows(systemSource = {}) {
+        return Array.isArray(systemSource?.reductions) && systemSource.reductions.length > 0;
+      }
+
+      function buildScreenReductionRows(systemSource = {}, itemName = "", ownerLabel = "") {
+        if (hasReductionRows(systemSource)) return null;
+
+        const reduction = String(systemSource?.reduction ?? "");
+        const mode = LEGACY_SCREEN_MODE_MAP[reduction] ?? "";
+        const defends = Array.from(systemSource?.defends ?? [])
+          .map((damageType) => String(damageType ?? "").trim())
+          .filter(Boolean);
+
+        if (!mode || !defends.length) return null;
+
+        if (reduction === "absorbsN") {
+          const ownerSuffix = ownerLabel ? ` (${ownerLabel})` : "";
+          console.warn(
+            `[Star Frontiers] Screen "${itemName}"${ownerSuffix} used legacy reduction="absorbsN". It was migrated to flat reductions with blank amounts; set the amount manually.`
+          );
+        }
+
+        return defends.map((damageType) => ({
+          damageType,
+          mode,
+          amount: null
+        }));
+      }
+
+      async function migrateScreenItem(item, systemSource = item?._source?.system, ownerLabel = "") {
+        if (item?.type !== "screen") return;
+        const reductions = buildScreenReductionRows(systemSource ?? {}, item.name ?? "Unknown Screen", ownerLabel);
+        if (!reductions) return;
+        await item.update({ "system.reductions": reductions });
+      }
+
+      async function migrateInvalidCollection(collection, ownerLabel = "") {
+        for (const id of collection.invalidDocumentIds ?? new Set()) {
+          const item = collection.get(id, { invalid: true });
+          if (item?.type !== "screen") continue;
+          await migrateScreenItem(item, item._source?.system, ownerLabel);
+        }
+      }
+
+      for (const item of game.items) {
+        await migrateScreenItem(item, item._source?.system, "world item");
+      }
+      await migrateInvalidCollection(game.items, "world item");
+
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          await migrateScreenItem(item, item._source?.system, `owned by ${actor.name}`);
+        }
+        await migrateInvalidCollection(actor.items, `owned by ${actor.name}`);
+      }
+
+      for (const scene of game.scenes ?? []) {
+        for (const tokenDoc of scene.tokens) {
+          if (tokenDoc.actorLink || !tokenDoc.actor) continue;
+          const rawItems = tokenDoc.delta?._source?.items ?? [];
+          const updates = [];
+          for (const itemSrc of rawItems) {
+            if (itemSrc?.type !== "screen") continue;
+            const reductions = buildScreenReductionRows(
+              itemSrc.system ?? {},
+              itemSrc.name ?? "Unknown Screen",
+              `unlinked token in scene "${scene.name}"`
+            );
+            if (!reductions) continue;
+            updates.push({ _id: itemSrc._id, "system.reductions": reductions });
+          }
+          if (updates.length) {
+            await tokenDoc.actor.updateEmbeddedDocuments("Item", updates);
+          }
         }
       }
     }

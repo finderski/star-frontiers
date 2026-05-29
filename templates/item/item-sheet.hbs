@@ -451,25 +451,90 @@
     {{#if is.armor}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.ArmorData"}}</legend>
-        <div class="compact-grid two-columns">
-          <label><span>{{localize "STARFRONTIERS.Item.ArmorType"}}</span><input type="text" name="system.armorType" value="{{system.armorType}}" /></label>
-          {{#if expandedRules}}
-            <label><span>{{localize "STARFRONTIERS.Item.Mass"}}</span><input type="number" name="system.mass" value="{{system.mass}}" min="0" step="0.1" /></label>
-          {{/if}}
+        <div class="item-inline-row">
+          <label class="item-inline-field item-inline-field--grow">
+            <span>{{localize "STARFRONTIERS.Item.ArmorType"}}</span>
+            <input
+              type="text"
+              name="system.armorType"
+              value="{{system.armorType}}"
+              placeholder="{{localize "STARFRONTIERS.Item.ArmorTypePlaceholder"}}"
+            />
+          </label>
+          <label class="item-inline-field">
+            <span>{{localize "STARFRONTIERS.Item.MaxAbsorbed"}}</span>
+            <input
+              type="number"
+              name="system.maxAbsorbed"
+              value="{{system.maxAbsorbed}}"
+              min="0"
+              step="1"
+              placeholder="{{localize "STARFRONTIERS.Item.MaxAbsorbedNullPlaceholder"}}"
+            />
+            <small class="form-hint">{{localize "STARFRONTIERS.Item.MaxAbsorbedHint"}}</small>
+          </label>
+          <label class="item-inline-field item-inline-field--readout">
+            <span>{{localize "STARFRONTIERS.Item.Absorbed"}}</span>
+            <span class="item-readout">
+              {{#if armorHasThreshold}}
+                {{system.accumulatedDamage}} / {{system.maxAbsorbed}}
+              {{else}}
+                {{system.accumulatedDamage}} {{localize "STARFRONTIERS.Item.AbsorbedNoThreshold"}}
+              {{/if}}
+            </span>
+          </label>
         </div>
+
+        <div class="item-inline-row">
+          <label class="item-inline-field">
+            <span>{{localize "STARFRONTIERS.Item.ApplyPreset"}}</span>
+            <select data-action="applyArmorPreset">
+              <option value="">{{localize "STARFRONTIERS.Item.PresetSelect"}}</option>
+              {{selectOptions armorPresetChoices}}
+            </select>
+            <small class="form-hint">{{localize "STARFRONTIERS.Item.PresetHint"}}</small>
+          </label>
+        </div>
+
+        {{> "systems/star-frontiers/templates/item/parts/reductions-editor.hbs"}}
       </fieldset>
     {{/if}}
 
     {{#if is.screen}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.ScreenData"}}</legend>
-        <div class="compact-grid five-columns">
-          <label><span>{{localize "STARFRONTIERS.Item.ScreenType"}}</span><select name="system.screenType">{{selectOptions choices.screenType selected=system.screenType}}</select></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Reduction"}}</span><select name="system.reduction">{{selectOptions choices.screenReduction selected=system.reduction}}</select></label>
-          <label><span>{{localize "STARFRONTIERS.Item.Capacity"}}</span><input type="number" name="system.capacity" value="{{system.capacity}}" min="0" /></label>
-          <label><span>{{localize "STARFRONTIERS.Item.SEUPerHit"}}</span><input type="number" name="system.seuPerHit" value="{{system.seuPerHit}}" min="0" /></label>
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Active"}}</span><input type="checkbox" name="system.active" {{checked system.active}} /></label>
+        <div class="item-inline-row">
+          <label class="item-inline-field item-inline-field--grow">
+            <span>{{localize "STARFRONTIERS.Item.ScreenType"}}</span>
+            <select name="system.screenType">{{selectOptions choices.screenType selected=system.screenType}}</select>
+          </label>
+          <label class="item-inline-field">
+            <span>{{localize "STARFRONTIERS.Item.Capacity"}}</span>
+            <input type="number" name="system.capacity" value="{{system.capacity}}" min="0" />
+          </label>
+          <label class="item-inline-field">
+            <span>{{localize "STARFRONTIERS.Item.SEUPerHit"}}</span>
+            <input type="number" name="system.seuPerHit" value="{{system.seuPerHit}}" min="0" />
+          </label>
+          <label class="item-inline-field checkbox-line">
+            <span>{{localize "STARFRONTIERS.Item.Active"}}</span>
+            <input type="checkbox" name="system.active" {{checked system.active}} />
+          </label>
         </div>
+
+        <div class="item-inline-row">
+          <label class="item-inline-field">
+            <span>{{localize "STARFRONTIERS.Item.ApplyPreset"}}</span>
+            <select data-action="applyScreenPreset">
+              <option value="">{{localize "STARFRONTIERS.Item.PresetSelect"}}</option>
+              {{selectOptions screenPresetChoices}}
+            </select>
+            <small class="form-hint">{{localize "STARFRONTIERS.Item.PresetHint"}}</small>
+          </label>
+        </div>
+
+        {{> "systems/star-frontiers/templates/item/parts/reductions-editor.hbs"}}
+
         <div class="ammo-drop-zone" data-drop-type="powerSource">
           <span>{{localize "STARFRONTIERS.Item.PowerSource"}}</span>
           <div>

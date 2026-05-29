@@ -2173,6 +2173,108 @@ label.hasHint:focus-within .form-hint {
   display: block;
 }
 
+.item-inline-row {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.item-inline-field {
+  align-items: flex-start;
+  display: flex;
+  flex: 1 1 160px;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.item-inline-field.checkbox-line {
+  align-items: center;
+  display: grid;
+  flex: 0 0 132px;
+  gap: 5px 8px;
+  grid-template-columns: 1fr 24px;
+  text-align: right;
+}
+
+.item-inline-field.checkbox-line input {
+  align-self: center;
+  justify-self: end;
+  margin: 0;
+}
+
+.item-inline-field--grow {
+  flex: 2 1 240px;
+}
+
+.item-inline-field--readout {
+  flex: 0 1 180px;
+}
+
+.item-readout {
+  align-items: center;
+  border: 1px solid var(--sf-line);
+  color: var(--sf-ink);
+  display: flex;
+  font-family: var(--body);
+  min-height: 34px;
+  padding: 6px 10px;
+  width: 100%;
+}
+
+.star-frontiers-item-sheet .paper-box > .form-hint,
+.star-frontiers-item-sheet .item-inline-field > .form-hint,
+.star-frontiers-item-sheet .reduction-editor > .form-hint {
+  background: transparent;
+  border: 0;
+  display: block;
+  left: auto;
+  max-width: none;
+  padding: 0;
+  position: static;
+  top: auto;
+  z-index: auto;
+}
+
+.reduction-editor__list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.reduction-row {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.reduction-row__field {
+  align-items: flex-start;
+  display: flex;
+  flex: 1 1 160px;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.reduction-row__field--grow {
+  flex: 2 1 220px;
+}
+
+.reduction-row__remove {
+  align-self: flex-end;
+  flex: 0 0 auto;
+}
+
+.reduction-editor__add {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
 
 /* =====================================================================
  * 12. Item sheet — weapon-specific

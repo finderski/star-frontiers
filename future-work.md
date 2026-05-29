@@ -513,3 +513,62 @@ i18n key: `"DuplicateMode": "Duplicate this mode"`.
 ### Dependencies
 
 - None — the Weapon Modes editor is already in place.
+
+---
+
+## 13. Spacesuit Armor (Knight Hawks) — Percent-Chance Protection Mode
+
+**Source:** Knight Hawks Expansion, Personal Space Equipment / Weapons vs. Armor chart.
+**Status:** Concept only. Out of scope for the 0.3.1 armor sheet pass per Rich's "no Knight Hawks until later" directive.
+
+### Context
+
+Knight Hawks introduces spacesuit armor with a percentage-based protection mode that differs fundamentally from the Alpha Dawn `half / full / flat` reductions:
+
+> When the suit has a percentage chance to protect the wearer, the character being hit must roll d100. If the number rolled is less than or equal to the suit's protection percentage, the weapon does not penetrate the armor. If the roll is unsuccessful, the weapon has punctured the armor, but causes only half of its normal damage to the character.
+
+The Weapons vs. Armor chart lists per-weapon-type percentages: Axe/Knife/Club/Gas Grenade/Needler/Sonic → "cannot penetrate" (100%); Spear/Sword 70%; Bullets 65%; Laser 50%; Frag Grenade 35%; Gyrojet 35%; Electric Sword 30%; Vibroknife 25%; Electrostunner / Shock Gloves / Stunstick / Tangier Grenade → "full penetration" (0%).
+
+There's also a stacking rule: a defensive suit worn UNDER spacesuit armor compounds — "a character wearing a skeinsuit underneath an armored spacesuit will take only one-fourth of the normal damage from a bullet."
+
+### Work
+
+1. **Add `percent` mode to the armor reduction schema.** The `mode` choices become `["", "half", "full", "flat", "percent"]`. When mode is `percent`, the `amount` field is the protection percentage (0–100).
+2. **Damage pipeline gains a "percent-chance negate" branch.** On a hit against a target wearing percent-mode armor for that damage type, the pipeline rolls d100. ≤ percentage → no damage; > percentage → half damage (and armor takes a "puncture" — `accumulatedDamage` increments).
+3. **Stacking math.** If both a suit and underlying armor apply to the same hit, the reductions compound (suit halves first, underlying armor halves again → quarter damage). The pipeline needs to apply reductions in the correct order: outer armor first, then inner.
+4. **Apply Preset for Spacesuit Armor.** Populates the reductions list with the 12-row Weapons vs. Armor chart.
+5. **Mass/Dex penalty.** Spacesuit armor "reduces a character's Dexterity and Reaction Speed by 10, and cuts that character's movement rate in half." That's an Active Effect on the armor item that transfers to the actor when worn. The `transfer:true` AE pattern from the racial-ability work applies directly.
+
+### Dependencies
+
+- Damage Application Pipeline (item #2) — required.
+- 0.3.1 Armor sheet pass (in flight) — provides the reductions editor scaffold this builds on.
+
+---
+
+## 14. Zebulon's Defensive Suits — Threshold-Per-Turn and Amplify Modes
+
+**Source:** Zebulon's Guide to Frontier Space, defensive suits section.
+**Status:** Concept only. Out of scope for the 0.3.1 armor sheet pass.
+
+### Context
+
+Zebulon's adds defensive suits with mechanics that don't fit the current `half / full / flat / percent` model:
+
+- **Gridsuit.** Absorbs up to 30 points of energy damage *per turn* from lasers, rafflurs, masers, bolt weapons, and electrical attacks before it lets damage through to the wearer. Excess damage in the same turn passes through. The suit is destroyed after 100 points of damage from projectile or gyrojet weapons (a separate threshold, different damage types than the absorb). So one suit has TWO thresholds: per-turn absorb cap (energy) and lifetime threshold (ballistic).
+- **Maser Mesh.** Full maser mesh fully nullifies maser damage; partial maser mesh halves it. *Crucially:* "A character wearing maser mesh is vulnerable to electrical attacks and receives an additional 50% damage from them." This is a **negative reduction** — a damage amplifier, not a reducer.
+- **Dead Suit.** Masks heat emissions — no damage protection, but a detection-evasion effect (out of scope of the reductions model; closer to an environmental effect).
+
+### Work
+
+1. **`thresholdPerTurn` field on reductions.** Allow a reduction row to have a per-turn cap separate from the lifetime `maxAbsorbed`. Schema gets a new optional field on each reduction row (or a parallel array).
+2. **Damage pipeline tracks per-turn absorption.** Reset at turn start (combat tracker hook). When a reduction with `thresholdPerTurn` is hit, increment a turn counter; if the hit's damage exceeds the remaining per-turn cap, the excess passes through and the suit still absorbs up to the cap.
+3. **`amplify` mode for reductions.** Add a new mode where `amount` is a multiplier (e.g. 1.5 = +50% damage taken). Damage pipeline multiplies incoming damage of that type by the amount. Surfaces in the editor as "Damage taken increased by X% (vulnerability)."
+4. **Apply Preset for Gridsuit and Maser Mesh.** Once the schema supports the new modes, presets become straightforward.
+5. **Dead Suit and detection-evasion effects.** Probably better modeled as an Active Effect on the suit item that grants the wearer a "Concealed from IR/heat scanners" condition — not a reduction. Out of scope of the reductions editor entirely.
+
+### Dependencies
+
+- Damage Application Pipeline (item #2) — required.
+- Combat tracker integration (for per-turn reset) — minor.
+- 0.3.1 Armor sheet pass (in flight) — provides the reductions editor scaffold this builds on.

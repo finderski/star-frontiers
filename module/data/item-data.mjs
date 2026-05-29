@@ -225,6 +225,8 @@ export class StarFrontiersArmorData extends StarFrontiersItemData {
         mode: textField({ choices: ["", "half", "full", "flat"] }),
         amount: numberField({ initial: null, min: 0, nullable: true })
       })),
+      maxAbsorbed: numberField({ initial: null, min: 0, nullable: true }),
+      accumulatedDamage: numberField({ initial: 0, min: 0 }),
       cost: numberField({ initial: 0, min: 0 }),
       mass: numberField({ initial: 0, min: 0, integer: false }),
       mechanics: schemaField({
@@ -241,6 +243,11 @@ export class StarFrontiersScreenData extends StarFrontiersItemData {
       carryState: textField({ initial: "carried", choices: ["ready", "carried", "stored"] }),
       mass: numberField({ initial: 0, min: 0, integer: false }),
       screenType: textField({ choices: ["", "albedo", "inertia", "gauss", "sonic", "chameleon", "holo"] }),
+      reductions: arrayField(schemaField({
+        damageType: textField(),
+        mode: textField({ choices: ["", "half", "full", "flat"] }),
+        amount: numberField({ initial: null, min: 0, nullable: true })
+      })),
       defends: setField(textField()),
       reduction: textField({ choices: ["", "half", "full", "absorbsN"] }),
       capacity: numberField({ initial: 0, min: 0 }),

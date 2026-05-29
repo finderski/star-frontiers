@@ -1,22 +1,27 @@
-// Star Frontiers Item Importer Macro
+// Star Frontiers Item/Creature Importer Macro
 // Paste this entire file into a FoundryVTT Script Macro.
-// Updated for current repo schema:
-// - Gear requiredSkillRef
-// - Gear kit contents with ref/name/quantity/remaining/consumeOnUse
-// - Power Source linkedWeaponRefs / linkedScreenRefs / linkedVehicleRefs
-// - Screen powerSourceRef
-// - Vehicle powerSourceRef
-// - Computer installedPrograms
-// - Race bundles with racialAbilities / racialAbilityItems / racialAbilityNames
-// - Skill bundles with subskills / subskillItems / subskillNames
-// - Optional folder creation: category -> subcategory
+// Supports:
+// - World Items: { items: [...] }
+// - Creature Actors: { creatures: [...] } or { actors: [...] }
+// - Single Item object: { name, type: "<item type>", system: {...} }
+// - Single Creature actor: { name, type: "creature", system: {...}, naturalWeapons: [...] }
+//
+// Creature import notes:
+// - Creature actors are created as Actor documents, not Item documents.
+// - Natural attacks are embedded Item documents of type "creatureAttack".
+// - Nested carriedWeapons / armors are embedded copies.
+// - weaponNames / armorNames copy matching existing World Items into the creature.
+// - createFolders creates both Item and Actor folders as needed.
 
 const ITEM_TYPES = new Set([
   "weapon", "ammo", "armor", "screen", "gear", "consumable", "powerSource",
-  "computer", "program", "race", "skill", "trainedAbility", "vehicle"
+  "computer", "program", "race", "skill", "trainedAbility", "vehicle", "creatureAttack"
 ]);
 
-const DEFAULT_IMG = "icons/svg/item-bag.svg";
+const ACTOR_TYPES = new Set(["creature"]);
+
+const DEFAULT_ITEM_IMG = "icons/svg/item-bag.svg";
+const DEFAULT_CREATURE_IMG = "icons/svg/mystery-man.svg";
 
 const TYPE_FOLDER_NAMES = {
   weapon: "Weapons",
@@ -31,7 +36,19 @@ const TYPE_FOLDER_NAMES = {
   race: "Races",
   skill: "Skills",
   trainedAbility: "Racial Abilities",
-  vehicle: "Vehicles"
+  vehicle: "Vehicles",
+  creatureAttack: "Creature Attacks"
+};
+
+const ACTOR_FOLDER_NAMES = {
+  creature: "Creatures"
+};
+
+const CREATURE_ECOLOGY_FOLDER_NAMES = {
+  herbivore: "Herbivores",
+  carnivore: "Carnivores",
+  omnivore: "Omnivores",
+  other: "Other"
 };
 
 const PSA_FOLDER_NAMES = {
@@ -51,10 +68,28 @@ const WEAPON_SKILL_FOLDER_NAMES = {
 
 function normalizePayload(raw) {
   const parsed = JSON.parse(raw);
-  if (Array.isArray(parsed)) return { items: parsed };
-  if (Array.isArray(parsed.items)) return parsed;
-  if (parsed.name && parsed.type) return { items: [parsed] };
-  throw new Error("Paste one item object, an array of items, or { items: [...] }.");
+  if (Array.isArray(parsed)) {
+    const items = parsed.filter((entry) => ITEM_TYPES.has(entry?.type));
+    const actors = parsed.filter((entry) => ACTOR_TYPES.has(entry?.type));
+    if (items.length + actors.length !== parsed.length) {
+      throw new Error("Array entries must be supported item objects or creature actor objects.");
+    }
+    return { items, actors };
+  }
+  if (Array.isArray(parsed.items) || Array.isArray(parsed.actors) || Array.isArray(parsed.creatures)) {
+    return {
+      items: parsed.items ?? [],
+      actors: [...(parsed.actors ?? []), ...(parsed.creatures ?? []).map((entry) => ({ ...entry, type: entry.type ?? "creature" }))]
+    };
+  }
+  if (parsed.name && parsed.type) {
+    if (ITEM_TYPES.has(parsed.type)) return { items: [parsed], actors: [] };
+    if (ACTOR_TYPES.has(parsed.type)) return { items: [], actors: [parsed] };
+  }
+  if (parsed.name && (parsed.naturalWeapons || parsed.creatureAttacks || parsed.system?.size || parsed.system?.ecology)) {
+    return { items: [], actors: [{ ...parsed, type: "creature" }] };
+  }
+  throw new Error("Paste one item, one creature, an array, or { items: [...], creatures: [...] }.");
 }
 
 function slugify(value) {
@@ -72,11 +107,17 @@ function cleanItem(input) {
   return {
     name: input.name,
     type: input.type,
-    img: input.img || DEFAULT_IMG,
+    img: input.img || DEFAULT_ITEM_IMG,
     folder: input.folder || null,
     system: deepClone(input.system ?? {}),
     effects: deepClone(input.effects ?? [])
   };
+}
+
+function cleanEmbeddedItem(input, forcedType = null) {
+  const data = cleanItem({ ...input, type: forcedType ?? input.type });
+  delete data.folder;
+  return data;
 }
 
 function cleanTrainedAbility(input, raceKey = "") {
@@ -89,13 +130,28 @@ function cleanSkill(input, category = null) {
   return cleanItem({ ...input, type: "skill", system });
 }
 
-function addToRegistry(registry, item) {
-  if (!item) return;
-  registry.set(item.name, item);
-  registry.set(String(item.name).toLowerCase(), item);
-  if (item.system?.key) registry.set(item.system.key, item);
-  if (item.uuid) registry.set(item.uuid, item);
-  if (item.id) registry.set(item.id, item);
+function cleanCreatureActor(input) {
+  if (!input.name) throw new Error("Each creature needs a name.");
+  const system = deepClone(input.system ?? {});
+  return {
+    name: input.name,
+    type: "creature",
+    img: input.img || DEFAULT_CREATURE_IMG,
+    folder: input.folder || null,
+    system,
+    prototypeToken: deepClone(input.prototypeToken ?? {}),
+    items: [],
+    effects: deepClone(input.effects ?? [])
+  };
+}
+
+function addToRegistry(registry, document) {
+  if (!document) return;
+  registry.set(document.name, document);
+  registry.set(String(document.name).toLowerCase(), document);
+  if (document.system?.key) registry.set(document.system.key, document);
+  if (document.uuid) registry.set(document.uuid, document);
+  if (document.id) registry.set(document.id, document);
 }
 
 function resolveItemByNameOrRef(registry, value, expectedType = null) {
@@ -126,25 +182,33 @@ function resolveRefByName(registry, name, expectedType = null, sourceItem = null
   return sourceItem ? refForItemInSameContext(sourceItem, item) : refForCreatedItem(item);
 }
 
-async function findFolderByName(name, parent = null) {
+async function findFolderByName(name, type, parent = null) {
   return game.folders.find((folder) =>
-    folder.type === "Item" && folder.name === name && ((folder.folder?.id ?? null) === (parent?.id ?? null))
+    folder.type === type && folder.name === name && ((folder.folder?.id ?? null) === (parent?.id ?? null))
   ) ?? null;
 }
 
-async function getOrCreateItemFolder(name, parent = null) {
+async function getOrCreateFolder(name, type, parent = null) {
   if (!name) return null;
-  const existing = await findFolderByName(name, parent);
+  const existing = await findFolderByName(name, type, parent);
   if (existing) return existing;
-  return await Folder.create({ name, type: "Item", parent: parent?.id ?? null, sorting: "a" });
+  return await Folder.create({ name, type, parent: parent?.id ?? null, sorting: "a" });
 }
 
-function getTopFolderName(input) {
+async function getOrCreateItemFolder(name, parent = null) {
+  return getOrCreateFolder(name, "Item", parent);
+}
+
+async function getOrCreateActorFolder(name, parent = null) {
+  return getOrCreateFolder(name, "Actor", parent);
+}
+
+function getTopItemFolderName(input) {
   if (input.folderPath?.length) return input.folderPath[0];
   return TYPE_FOLDER_NAMES[input.type] ?? "Items";
 }
 
-function getSubFolderName(input) {
+function getSubItemFolderName(input) {
   if (input.folderPath?.length > 1) return input.folderPath.slice(1).join("/");
   if (input.type === "weapon") {
     const skillKey = input.system?.weaponSkillKey || input.system?.weaponType || "";
@@ -165,14 +229,29 @@ function getSubFolderName(input) {
   if (input.type === "program") return "Computer Programs";
   if (input.type === "computer") return Number(input.system?.level ?? 0) >= 4 ? "Installed Computers" : "Portable Computers";
   if (input.type === "gear" && input.system?.isKit) return "Kits";
+  if (input.type === "creatureAttack") return "Natural Attacks";
   return null;
 }
 
-async function assignFolderData(itemData, input, createFolders) {
+function getTopActorFolderName(input) {
+  if (input.folderPath?.length) return input.folderPath[0];
+  return ACTOR_FOLDER_NAMES[input.type] ?? "Actors";
+}
+
+function getSubActorFolderName(input) {
+  if (input.folderPath?.length > 1) return input.folderPath.slice(1).join("/");
+  if (input.type === "creature") {
+    const ecology = input.system?.ecology ?? "";
+    return CREATURE_ECOLOGY_FOLDER_NAMES[ecology] ?? null;
+  }
+  return null;
+}
+
+async function assignItemFolderData(itemData, input, createFolders) {
   if (!createFolders || itemData.folder) return itemData;
-  const topFolder = await getOrCreateItemFolder(getTopFolderName(input));
+  const topFolder = await getOrCreateItemFolder(getTopItemFolderName(input));
   let folder = topFolder;
-  const subName = getSubFolderName(input);
+  const subName = getSubItemFolderName(input);
   if (subName) {
     for (const part of String(subName).split("/").filter(Boolean)) {
       folder = await getOrCreateItemFolder(part, folder);
@@ -182,8 +261,22 @@ async function assignFolderData(itemData, input, createFolders) {
   return itemData;
 }
 
+async function assignActorFolderData(actorData, input, createFolders) {
+  if (!createFolders || actorData.folder) return actorData;
+  const topFolder = await getOrCreateActorFolder(getTopActorFolderName(input));
+  let folder = topFolder;
+  const subName = getSubActorFolderName(input);
+  if (subName) {
+    for (const part of String(subName).split("/").filter(Boolean)) {
+      folder = await getOrCreateActorFolder(part, folder);
+    }
+  }
+  if (folder) actorData.folder = folder.id;
+  return actorData;
+}
+
 async function createNormalItem(input, registry, options) {
-  const data = await assignFolderData(cleanItem(input), input, options.createFolders);
+  const data = await assignItemFolderData(cleanItem(input), input, options.createFolders);
   const item = await Item.create(data);
   addToRegistry(registry, item);
   return item;
@@ -194,10 +287,10 @@ async function createRaceBundle(input, registry, linkQueue, options) {
   const racialAbilityInputs = input.racialAbilities ?? input.racialAbilityItems ?? [];
   const raceSystem = deepClone(input.system ?? {});
   raceSystem.racialAbilityRefs = [];
-  const raceData = await assignFolderData({
+  const raceData = await assignItemFolderData({
     name: input.name,
     type: "race",
-    img: input.img || DEFAULT_IMG,
+    img: input.img || DEFAULT_ITEM_IMG,
     system: raceSystem,
     effects: deepClone(input.effects ?? [])
   }, input, options.createFolders);
@@ -211,7 +304,7 @@ async function createRaceBundle(input, registry, linkQueue, options) {
       folderPath: abilityInput.folderPath ?? ["Racial Abilities", race.name],
       system: { raceKey, ...(abilityInput.system ?? {}) }
     };
-    const abilityData = await assignFolderData(cleanTrainedAbility(childInput, raceKey), childInput, options.createFolders);
+    const abilityData = await assignItemFolderData(cleanTrainedAbility(childInput, raceKey), childInput, options.createFolders);
     const ability = await Item.create(abilityData);
     createdAbilities.push(ability);
     addToRegistry(registry, ability);
@@ -239,7 +332,7 @@ async function createSkillBundle(input, registry, linkQueue, options) {
       folderPath: subInput.folderPath ?? ["Skills", PSA_FOLDER_NAMES[psa] ?? "Other", "Sub-skills"],
       system: { psa, ...(subInput.system ?? {}), category: "subskill" }
     };
-    const subskillData = await assignFolderData(cleanSkill(childInput, "subskill"), childInput, options.createFolders);
+    const subskillData = await assignItemFolderData(cleanSkill(childInput, "subskill"), childInput, options.createFolders);
     const subskill = await Item.create(subskillData);
     createdSubskills.push(subskill);
     addToRegistry(registry, subskill);
@@ -249,10 +342,10 @@ async function createSkillBundle(input, registry, linkQueue, options) {
   skillSystem.category = skillSystem.category || "main";
   skillSystem.subskillRefs = [];
   const mainInput = { ...input, type: "skill", folderPath: input.folderPath ?? ["Skills", PSA_FOLDER_NAMES[psa] ?? "Other"], system: skillSystem };
-  const mainData = await assignFolderData({
+  const mainData = await assignItemFolderData({
     name: input.name,
     type: "skill",
-    img: input.img || DEFAULT_IMG,
+    img: input.img || DEFAULT_ITEM_IMG,
     system: skillSystem,
     effects: deepClone(input.effects ?? [])
   }, mainInput, options.createFolders);
@@ -279,6 +372,91 @@ function makeKitContentEntry(registry, sourceItem, inputEntry) {
     ? Boolean(linked && ["consumable", "ammo", "powerSource"].includes(linked.type))
     : Boolean(inputEntry.consumeOnUse ?? (linked && ["consumable", "ammo", "powerSource"].includes(linked.type)));
   return { ref: linked ? refForItemInSameContext(sourceItem, linked) : "", name: name || linked?.name || "", quantity, remaining, consumeOnUse };
+}
+
+function cleanCreatureAttackInput(input) {
+  const system = deepClone(input.system ?? {});
+  if (input.damageFormula !== undefined && system.damageFormula === undefined) system.damageFormula = input.damageFormula;
+  if (input.damageType !== undefined && system.damageType === undefined) system.damageType = input.damageType;
+  if (input.targets !== undefined && system.targets === undefined) system.targets = input.targets;
+  if (input.notes !== undefined && system.notes === undefined) system.notes = input.notes;
+  if (input.avoidance !== undefined && system.avoidance === undefined) system.avoidance = input.avoidance;
+  if (input.range !== undefined && system.range === undefined) system.range = input.range;
+  if (input.onHitEffectIds !== undefined && system.onHitEffectIds === undefined) system.onHitEffectIds = input.onHitEffectIds;
+  system.isNatural = system.isNatural ?? true;
+  return cleanEmbeddedItem({
+    name: input.name ?? input.label ?? "Natural Attack",
+    type: "creatureAttack",
+    img: input.img || DEFAULT_ITEM_IMG,
+    system,
+    effects: deepClone(input.effects ?? [])
+  }, "creatureAttack");
+}
+
+function copyWorldItemForEmbedding(item) {
+  const data = item.toObject();
+  delete data._id;
+  delete data.folder;
+  return data;
+}
+
+function prepareCreatureEmbeddedItems(input, registry) {
+  const embedded = [];
+
+  const naturalInputs = [
+    ...(input.naturalWeapons ?? []),
+    ...(input.creatureAttacks ?? []),
+    ...(input.naturalAttacks ?? [])
+  ];
+  for (const attackInput of naturalInputs) {
+    embedded.push(cleanCreatureAttackInput(attackInput));
+  }
+
+  for (const name of input.naturalWeaponNames ?? input.creatureAttackNames ?? []) {
+    const item = resolveItemByNameOrRef(registry, name, "creatureAttack");
+    if (item) embedded.push(copyWorldItemForEmbedding(item));
+  }
+
+  for (const weaponInput of input.carriedWeapons ?? input.weapons ?? []) {
+    if (typeof weaponInput === "string") {
+      const item = resolveItemByNameOrRef(registry, weaponInput, "weapon");
+      if (item) embedded.push(copyWorldItemForEmbedding(item));
+    } else {
+      embedded.push(cleanEmbeddedItem({ ...weaponInput, type: "weapon" }, "weapon"));
+    }
+  }
+
+  for (const name of input.weaponNames ?? input.carriedWeaponNames ?? []) {
+    const item = resolveItemByNameOrRef(registry, name, "weapon");
+    if (item) embedded.push(copyWorldItemForEmbedding(item));
+  }
+
+  for (const armorInput of input.armors ?? input.armorItems ?? []) {
+    if (typeof armorInput === "string") {
+      const item = resolveItemByNameOrRef(registry, armorInput, "armor");
+      if (item) embedded.push(copyWorldItemForEmbedding(item));
+    } else {
+      const armorData = cleanEmbeddedItem({ ...armorInput, type: "armor" }, "armor");
+      armorData.system = foundry.utils.mergeObject(armorData.system ?? {}, { carryState: "carried" }, { inplace: false, overwrite: true });
+      embedded.push(armorData);
+    }
+  }
+
+  for (const name of input.armorNames ?? []) {
+    const item = resolveItemByNameOrRef(registry, name, "armor");
+    if (item) embedded.push(copyWorldItemForEmbedding(item));
+  }
+
+  return embedded;
+}
+
+async function createCreatureActor(input, registry, options) {
+  const actorData = cleanCreatureActor(input);
+  actorData.items = prepareCreatureEmbeddedItems(input, registry);
+  await assignActorFolderData(actorData, { ...input, type: "creature" }, options.createFolders);
+  const actor = await Actor.create(actorData);
+  addToRegistry(registry, actor);
+  return actor;
 }
 
 async function applyNameBasedLinks(item, input, registry) {
@@ -386,56 +564,72 @@ async function applyNameBasedLinks(item, input, registry) {
   if (Object.keys(updates).length) await item.update(updates);
 }
 
-async function importItems(raw, options = {}) {
+async function importStarFrontiers(raw, options = {}) {
   const payload = normalizePayload(raw);
-  const created = [];
+  const createdItems = [];
+  const createdActors = [];
   const linkQueue = [];
   const registry = new Map();
+
   for (const item of game.items ?? []) addToRegistry(registry, item);
-  for (const input of payload.items) {
+  for (const actor of game.actors ?? []) addToRegistry(registry, actor);
+
+  for (const input of payload.items ?? []) {
     if (input.type === "race" && (input.racialAbilities?.length || input.racialAbilityItems?.length || input.racialAbilityNames?.length)) {
-      created.push(...await createRaceBundle(input, registry, linkQueue, options));
+      createdItems.push(...await createRaceBundle(input, registry, linkQueue, options));
       continue;
     }
     if (input.type === "skill" && (input.subskills?.length || input.subskillItems?.length || input.subskillNames?.length)) {
-      created.push(...await createSkillBundle(input, registry, linkQueue, options));
+      createdItems.push(...await createSkillBundle(input, registry, linkQueue, options));
       continue;
     }
     const item = await createNormalItem(input, registry, options);
-    created.push(item);
+    createdItems.push(item);
     linkQueue.push({ input, item });
   }
+
   for (const entry of linkQueue) await applyNameBasedLinks(entry.item, entry.input, registry);
-  ui.notifications.info(`Created ${created.length} Star Frontiers item${created.length === 1 ? "" : "s"}.`);
-  console.log("Star Frontiers imported items:", created);
+
+  for (const input of payload.actors ?? []) {
+    if (input.type !== "creature") throw new Error(`${input.name ?? "Actor"} has unsupported actor type: ${input.type}`);
+    const actor = await createCreatureActor(input, registry, options);
+    createdActors.push(actor);
+  }
+
+  const itemCount = createdItems.length;
+  const actorCount = createdActors.length;
+  ui.notifications.info(`Created ${itemCount} item${itemCount === 1 ? "" : "s"} and ${actorCount} actor${actorCount === 1 ? "" : "s"}.`);
+  console.log("Star Frontiers imported items:", createdItems);
+  console.log("Star Frontiers imported actors:", createdActors);
 }
 
 const content = `
 <form>
   <div class="form-group stacked">
-    <label>Paste Star Frontiers item JSON</label>
+    <label>Paste Star Frontiers JSON</label>
     <textarea name="payload" style="height: 460px; font-family: monospace;" spellcheck="false"></textarea>
-    <p class="notes">Accepts one item object, an array of items, or {"items":[...]}.</p>
+    <p class="notes">Accepts one item, one creature, an array, or {"items":[...], "creatures":[...]}.</p>
   </div>
   <div class="form-group">
     <label>
       <input type="checkbox" name="createFolders" checked />
-      Create/use item folders
+      Create/use folders
     </label>
   </div>
 </form>
 `;
 
 await foundry.applications.api.DialogV2.prompt({
-  window: { title: "Import Star Frontiers Items" },
+  window: { title: "Import Star Frontiers Data" },
   content,
   ok: {
     label: "Import",
     icon: "fa-solid fa-file-import",
     callback: async (event, button) => {
-      const raw = button.form.elements.payload.value;
-      const createFolders = Boolean(button.form.elements.createFolders?.checked);
-      await importItems(raw, { createFolders });
+      const root = button.form ?? button.element ?? button;
+      const raw = root.querySelector?.("[name='payload']")?.value ?? button.form?.elements?.payload?.value ?? "";
+      const createFolders = Boolean(root.querySelector?.("[name='createFolders']")?.checked ?? button.form?.elements?.createFolders?.checked);
+      await importStarFrontiers(raw, { createFolders });
     }
   },
   rejectClose: false,

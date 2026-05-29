@@ -174,7 +174,11 @@ function applySheetTheme(theme = game.settings.get(SYSTEM_ID, "sheetTheme")) {
   document.body?.setAttribute("data-star-frontiers-theme", safeTheme);
 }
 
-Hooks.once("init", () => {
+Hooks.once("init", async () => {
+  await foundry.applications.handlebars.loadTemplates([
+    "systems/star-frontiers/templates/item/parts/reductions-editor.hbs"
+  ]);
+
   registerMigrationSettings();
   Handlebars.registerHelper("eq", (a, b) => a === b);
   Handlebars.registerHelper("gt", (a, b) => Number(a) > Number(b));

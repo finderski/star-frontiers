@@ -3,6 +3,21 @@ export const SYSTEM_ID = "star-frontiers";
 export const RULES_EDITIONS = ["basic", "expanded"];
 export const SHEET_THEMES = ["paper", "retro"];
 export const DEFAULT_CHARACTER_TOKEN_IMAGE = "systems/star-frontiers/assets/images/sheet-icons/robber-mask.svg";
+export const DAMAGE_TYPE_CHOICES = [
+  "",
+  "projectile",
+  "gyrojet",
+  "fragGrenade",
+  "melee",
+  "laser",
+  "sonic",
+  "electrical",
+  "needler",
+  "acid",
+  "fire",
+  "extreme-heat",
+  "explosive"
+];
 
 export const ITEM_TYPE_LABELS = {
   ammo: "STARFRONTIERS.Item.Type.Ammo",

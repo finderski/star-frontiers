@@ -1,0 +1,47 @@
+<fieldset class="paper-box full-width reduction-editor">
+  <legend>{{localize "STARFRONTIERS.Item.Reductions"}}</legend>
+  <p class="form-hint">{{localize "STARFRONTIERS.Item.ReductionsHint"}}</p>
+
+  {{#if reductionRows.length}}
+    <div class="reduction-editor__list">
+      {{#each reductionRows as |row index|}}
+        <div class="reduction-row">
+          <label class="reduction-row__field reduction-row__field--grow">
+            <span>{{localize "STARFRONTIERS.Item.DamageType"}}</span>
+            <select name="system.reductions.{{index}}.damageType">
+              {{selectOptions ../damageTypeChoices selected=row.damageType}}
+            </select>
+          </label>
+          <label class="reduction-row__field">
+            <span>{{localize "STARFRONTIERS.Item.ReductionModeLabel"}}</span>
+            <select name="system.reductions.{{index}}.mode">
+              {{selectOptions ../reductionModeChoices selected=row.mode}}
+            </select>
+          </label>
+          {{#if (eq row.mode "flat")}}
+            <label class="reduction-row__field">
+              <span>{{localize "STARFRONTIERS.Item.ReductionAmount"}}</span>
+              <input type="number" name="system.reductions.{{index}}.amount" value="{{row.amount}}" min="0" step="1" />
+            </label>
+          {{/if}}
+          <button
+            type="button"
+            class="reduction-row__remove"
+            data-action="removeReduction"
+            data-index="{{index}}"
+            title="{{localize "STARFRONTIERS.Item.RemoveReduction"}}"
+          >
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      {{/each}}
+    </div>
+  {{else}}
+    <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoReductions"}}</p>
+  {{/if}}
+
+  <button type="button" class="reduction-editor__add" data-action="addReduction">
+    <i class="fa-solid fa-plus"></i>
+    <span>{{localize "STARFRONTIERS.Item.AddReduction"}}</span>
+  </button>
+</fieldset>
