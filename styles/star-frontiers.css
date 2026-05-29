@@ -2189,6 +2189,19 @@ label.hasHint:focus-within .form-hint {
   gap: 5px;
   min-width: 0;
 }
+label.armor-inline-field {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  flex-flow: row nowrap;
+  max-width: max-content;
+}
+
+.twelve-character-wide {
+  width:max-content;
+  min-width: 50px;
+  max-width: 120px;
+}
 
 .item-inline-field.checkbox-line {
   align-items: center;

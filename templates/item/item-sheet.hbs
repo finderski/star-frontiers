@@ -452,6 +452,7 @@
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.ArmorData"}}</legend>
         <div class="item-inline-row">
+          <!-- 
           <label class="item-inline-field item-inline-field--grow">
             <span>{{localize "STARFRONTIERS.Item.ArmorType"}}</span>
             <input
@@ -461,9 +462,12 @@
               placeholder="{{localize "STARFRONTIERS.Item.ArmorTypePlaceholder"}}"
             />
           </label>
-          <label class="item-inline-field">
+          -->
+          <label class="armor-inline-field">
             <span>{{localize "STARFRONTIERS.Item.MaxAbsorbed"}}</span>
+            <i class="fa-solid fa-circle-info" data-tooltip="{{localize "STARFRONTIERS.Item.MaxAbsorbedHint"}}"></i>
             <input
+              class="twelve-character-wide"
               type="number"
               name="system.maxAbsorbed"
               value="{{system.maxAbsorbed}}"
@@ -471,28 +475,29 @@
               step="1"
               placeholder="{{localize "STARFRONTIERS.Item.MaxAbsorbedNullPlaceholder"}}"
             />
-            <small class="form-hint">{{localize "STARFRONTIERS.Item.MaxAbsorbedHint"}}</small>
+            <!--<small class="form-hint">{{localize "STARFRONTIERS.Item.MaxAbsorbedHint"}}</small>-->
           </label>
-          <label class="item-inline-field item-inline-field--readout">
+          <label class="armor-inline-field item-inline-field--readout">
             <span>{{localize "STARFRONTIERS.Item.Absorbed"}}</span>
             <span class="item-readout">
               {{#if armorHasThreshold}}
                 {{system.accumulatedDamage}} / {{system.maxAbsorbed}}
               {{else}}
-                {{system.accumulatedDamage}} {{localize "STARFRONTIERS.Item.AbsorbedNoThreshold"}}
+                {{system.accumulatedDamage}}
               {{/if}}
             </span>
           </label>
         </div>
 
         <div class="item-inline-row">
-          <label class="item-inline-field">
+          <label class="armor-inline-field">
             <span>{{localize "STARFRONTIERS.Item.ApplyPreset"}}</span>
+            <i class="fa-solid fa-circle-info" data-tooltip="{{localize "STARFRONTIERS.Item.PresetHint"}}"></i>
             <select data-action="applyArmorPreset">
               <option value="">{{localize "STARFRONTIERS.Item.PresetSelect"}}</option>
               {{selectOptions armorPresetChoices}}
             </select>
-            <small class="form-hint">{{localize "STARFRONTIERS.Item.PresetHint"}}</small>
+            <!--<small class="form-hint">{{localize "STARFRONTIERS.Item.PresetHint"}}</small>-->
           </label>
         </div>
 
