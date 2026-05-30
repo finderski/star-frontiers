@@ -21,6 +21,8 @@
 - This repo is using **Foundry v14 sheet APIs**, not legacy Application/FormApplication patterns.
 - Character and item sheets are Handlebars templates with V2 sheet classes:
   - character: [module/sheets/character-sheet.mjs](./module/sheets/character-sheet.mjs) + [templates/actor/character-sheet.hbs](./templates/actor/character-sheet.hbs)
+  - creature: [module/sheets/creature-sheet.mjs](./module/sheets/creature-sheet.mjs) + [templates/actor/creature-sheet.hbs](./templates/actor/creature-sheet.hbs)
+  - roster: [module/sheets/roster-sheet.mjs](./module/sheets/roster-sheet.mjs) + [templates/actor/roster-sheet.hbs](./templates/actor/roster-sheet.hbs)
   - item: [module/sheets/item-sheet.mjs](./module/sheets/item-sheet.mjs) + [templates/item/item-sheet.hbs](./templates/item/item-sheet.hbs)
 - Item and actor schemas live in `module/data/*.mjs`; avoid ad hoc `system.*` keys that are not in the schema.
 - Many text fields are HTML fields declared in `system.json`, so rich-text handling matters.
@@ -35,8 +37,11 @@
 - [module/data/item-data.mjs](./module/data/item-data.mjs): item data models for race/skill/weapon/etc.
 - [module/combat/attack-pipeline.mjs](./module/combat/attack-pipeline.mjs): shared attack/damage/avoidance pipeline, range helpers, ammo-loaded helpers, firing-mode/damage helpers, and combat chat-card creation.
 - [module/sheets/character-sheet.mjs](./module/sheets/character-sheet.mjs): character sheet behavior, drag/drop, stat generation, item CRUD, non-combat rolls, and thin action handlers that delegate combat to `attack-pipeline.mjs`.
+- [module/sheets/creature-sheet.mjs](./module/sheets/creature-sheet.mjs): creature stat-block sheet behavior, natural-attack management, Number Appearing roll, and creature-specific rich-text editing.
+- [module/sheets/roster-sheet.mjs](./module/sheets/roster-sheet.mjs): GM-only roster dashboard sheet that stores actor UUID refs, resolves live actor summaries, and enforces GM-only drop/open/remove flows.
 - [module/sheets/item-sheet.mjs](./module/sheets/item-sheet.mjs): generic item sheet behavior and weapon ammo linking.
 - [module/sheets/scroll-preserving-sheet-mixin.mjs](./module/sheets/scroll-preserving-sheet-mixin.mjs): shared V2 sheet helper that preserves scroll position across `submitOnChange` rerenders; future sheet classes should use this instead of rolling their own scroll hooks.
+- [templates/actor/roster-sheet.hbs](./templates/actor/roster-sheet.hbs): roster dashboard template with GM lock view, roster description, and tracked-actor rows.
 - [templates/chat/check-roll-card.hbs](./templates/chat/check-roll-card.hbs): generic check chat card.
 - [templates/chat/stat-roll-card.hbs](./templates/chat/stat-roll-card.hbs): stat generation chat card.
 - [templates/chat/weapon-attack-card.hbs](./templates/chat/weapon-attack-card.hbs): weapon attack chat card with damage follow-up button.
@@ -131,6 +136,10 @@
 
 - `system.psa` is the character’s Expanded Rules Career PSA. Do not add a separate `careerPsa` field; use `system.psa` for Military, Technological, and Biosocial.
 - Character-sheet PSA skill-group order is a presentation preference stored in `flags.star-frontiers.skillGroupOrder`, not in `system.*`. The skill items themselves remain the source of truth for PSA membership and subskill links.
+
+### Roster actors
+- Roster actors are GM-only dashboards. `system.description` is roster-level notes, while `system.entries[]` stores only source-actor UUID refs plus GM metadata (`role`, `tags`, `notes`, `pinned`, `sort`). Do not embed or copy source actors into roster data.
+- Roster sheet privacy is defense-in-depth: new roster actors default `ownership.default = NONE`, `preCreateActor` blocks non-GM creation, the sheet returns a locked context for non-GMs, and non-GM users must not resolve tracked `actorUuid` values into live Actor data.
 
 ### Creature stat blocks
 - Creature `system.ecology` stays the stored type/eating-habits selector, but the sheet labels it **Type**. When `system.ecology === "other"`, author the free-text override in `system.ecologyOther`; do not add a second parallel type field.
@@ -454,6 +463,9 @@ This reflects the current local notes and implemented work, not a live Asana syn
   - more complete NPC/creature/robot/vehicle experiences
 
 ## Current next tasks
+- Roster actor smoke-test:
+  - Create a roster as GM, verify players cannot create a useful roster or see linked actor data, and confirm the sheet renders only the GM-only lock message for non-GM users.
+  - Drop one each of `character`, `npc`, `creature`, `robot`, and `vehicle`; confirm duplicate-drop warnings, live summary rows, role/notes persistence, missing-actor fallback, and open/remove row actions.
 - Armor/screen reductions runtime smoke-test (0.3.2):
   - Open armor and screen item sheets in Foundry, add/remove reduction rows, and confirm scroll position holds on row mutations and preset application.
   - Apply each preset once, confirm overwrite confirmation on existing rows, and verify screen presets do not disturb an already-linked power source.
@@ -498,6 +510,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
   - build compendium content after core item/actor workflows settle
 
 ## Things not to change without asking
+- Do not relax the Roster actor privacy model. Roster entries are GM-only UUID references to live actors; non-GM users must not resolve or view tracked-actor summaries through the roster sheet.
 - Do not change `system` schema paths casually; existing sheet logic depends on them.
 - Do not merge `system.abilities.sta.value` and `system.stamina.value`.
 - Do not rename document/item types (`weapon`, `race`, `skill`, etc.) without a migration plan.

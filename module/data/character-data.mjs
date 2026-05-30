@@ -289,6 +289,22 @@ export class StarFrontiersNpcData extends StarFrontiersCharacterData {
   }
 }
 
+export class StarFrontiersRosterData extends foundry.abstract.TypeDataModel {
+  static defineSchema() {
+    return {
+      description: htmlField(),
+      entries: arrayField(schemaField({
+        actorUuid: textField(),
+        role: textField(),
+        tags: arrayField(textField()),
+        notes: htmlField(),
+        pinned: boolField(),
+        sort: numberField({ initial: 0, min: 0 })
+      }))
+    };
+  }
+}
+
 export class StarFrontiersCreatureData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Yazirian Battle Rage</title>
+  <desc id="desc">A parchment square icon with a bold dark silhouette of a snarling Yazirian head, flared mane, and crossed battle slashes.</desc>
+  <rect x="24" y="24" width="464" height="464" rx="42" fill="#efe2bd"/>
+  <rect x="35" y="35" width="442" height="442" rx="34" fill="none" stroke="#1e1715" stroke-width="10" opacity=".18"/>
+  <g fill="#1e1715" stroke="#1e1715" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 62 L289 111 L345 88 L349 151 L410 155 L381 209 L430 247 L371 276 L391 337 L331 324 L305 382 L256 344 L207 382 L181 324 L121 337 L141 276 L82 247 L131 209 L102 155 L163 151 L167 88 L223 111 Z"/>
+    <path d="M256 119 C306 119 345 159 345 215 C345 285 302 334 256 334 C210 334 167 285 167 215 C167 159 206 119 256 119 Z" fill="#efe2bd" stroke="#1e1715" stroke-width="12"/>
+    <path d="M178 204 C206 171 239 169 256 192 C273 169 306 171 334 204 C315 195 293 198 274 215 L256 233 L238 215 C219 198 197 195 178 204 Z"/>
+    <path d="M205 224 C220 214 238 217 247 230 C230 239 214 238 205 224 Z" fill="#efe2bd" stroke="none"/>
+    <path d="M307 224 C292 214 274 217 265 230 C282 239 298 238 307 224 Z" fill="#efe2bd" stroke="none"/>
+    <path d="M256 242 C274 244 289 255 293 274 C287 300 272 315 256 315 C240 315 225 300 219 274 C223 255 238 244 256 242 Z"/>
+    <path d="M236 272 C244 267 251 267 256 276 C261 267 268 267 276 272" fill="none" stroke="#efe2bd" stroke-width="8"/>
+    <path d="M224 291 C242 305 270 305 288 291" fill="none" stroke="#efe2bd" stroke-width="10"/>
+    <path d="M240 300 L247 319 L256 304 L265 319 L272 300" fill="#efe2bd" stroke="#efe2bd" stroke-width="4"/>
+    <path d="M171 188 C132 205 117 247 132 286 C152 258 166 226 171 188 Z" fill="#efe2bd" stroke="#1e1715" stroke-width="10"/>
+    <path d="M341 188 C380 205 395 247 380 286 C360 258 346 226 341 188 Z" fill="#efe2bd" stroke="#1e1715" stroke-width="10"/>
+    <path d="M112 390 L181 358" fill="none" stroke="#7b3f22" stroke-width="20"/>
+    <path d="M331 358 L400 390" fill="none" stroke="#7b3f22" stroke-width="20"/>
+    <path d="M151 421 L219 382" fill="none" stroke="#1e1715" stroke-width="14"/>
+    <path d="M293 382 L361 421" fill="none" stroke="#1e1715" stroke-width="14"/>
+  </g>
+</svg>

@@ -72,6 +72,12 @@
           "description",
           "cargo.notes"
         ]
+      },
+      "roster": {
+        "htmlFields": [
+          "description",
+          "entries.*.notes"
+        ]
       }
     },
     "Item": {

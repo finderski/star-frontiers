@@ -1,4 +1,5 @@
 import {
+  ACTOR_TYPE_LABELS,
   DEFAULT_CHARACTER_TOKEN_IMAGE,
   ITEM_TYPE_LABELS,
   SHEET_THEMES,
@@ -9,6 +10,7 @@ import {
   StarFrontiersCharacterData,
   StarFrontiersCreatureData,
   StarFrontiersNpcData,
+  StarFrontiersRosterData,
   StarFrontiersRobotData,
   StarFrontiersVehicleActorData
 } from "./module/data/character-data.mjs";
@@ -34,6 +36,7 @@ import {
 import {
   StarFrontiersCreatureSheet
 } from "./module/sheets/creature-sheet.mjs";
+import { StarFrontiersRosterSheet } from "./module/sheets/roster-sheet.mjs";
 import * as AttackPipeline from "./module/combat/attack-pipeline.mjs";
 import { StarFrontiersItemSheet } from "./module/sheets/item-sheet.mjs";
 import {
@@ -207,7 +210,13 @@ Hooks.once("init", async () => {
     npc: StarFrontiersNpcData,
     creature: StarFrontiersCreatureData,
     robot: StarFrontiersRobotData,
-    vehicle: StarFrontiersVehicleActorData
+    vehicle: StarFrontiersVehicleActorData,
+    roster: StarFrontiersRosterData
+  };
+
+  CONFIG.Actor.typeLabels = {
+    ...(CONFIG.Actor.typeLabels ?? {}),
+    ...ACTOR_TYPE_LABELS
   };
 
   CONFIG.Item.dataModels = {
@@ -372,6 +381,11 @@ Hooks.once("init", async () => {
     makeDefault: true,
     label: "STARFRONTIERS.Sheet.Creature"
   });
+  Actors.registerSheet(SYSTEM_ID, StarFrontiersRosterSheet, {
+    types: ["roster"],
+    makeDefault: true,
+    label: "STARFRONTIERS.Sheet.Roster"
+  });
 
   const Items = foundry.documents.collections.Items ?? globalThis.Items;
   Items.registerSheet(SYSTEM_ID, StarFrontiersItemSheet, {
@@ -428,6 +442,18 @@ Hooks.on("preCreateItem", (document, data, options, userId) => {
 });
 
 Hooks.on("preCreateActor", (document, data, options, userId) => {
+  if (document.type === "roster") {
+    const creator = game.users?.get?.(userId) ?? game.user;
+    if (!creator?.isGM) {
+      ui.notifications?.warn?.(game.i18n.localize("STARFRONTIERS.Roster.GMOnly"));
+      return false;
+    }
+
+    const ownership = foundry.utils.deepClone(data.ownership ?? {});
+    ownership.default = CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE;
+    document.updateSource({ ownership });
+  }
+
   const LINK_DEFAULTS = {
     character: true,
     npc: true,

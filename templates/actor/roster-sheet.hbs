@@ -1,0 +1,130 @@
+{{#unless isGM}}
+  <section class="star-frontiers-sheet star-frontiers-roster-sheet {{themeClass}}" autocomplete="off">
+    <div class="paper-box full-width roster-locked">
+      <p>{{localize "STARFRONTIERS.Roster.GMOnly"}}</p>
+    </div>
+  </section>
+{{else}}
+  <section class="star-frontiers-sheet star-frontiers-roster-sheet {{themeClass}}" autocomplete="off">
+    <!--
+    <header class="paper-box full-width roster-header">
+      <label class="field-line">
+        <span>{{localize "STARFRONTIERS.Item.Name"}}</span>
+        <input type="text" name="name" value="{{actor.name}}" />
+      </label>
+      <p class="roster-hint">{{localize "STARFRONTIERS.Roster.DropHint"}}</p>
+    </header>
+
+    <fieldset class="paper-box full-width roster-description">
+      <legend>{{localize "STARFRONTIERS.Roster.Description"}}</legend>
+      <prose-mirror
+        name="system.description"
+        data-document-u-u-i-d="{{actor.uuid}}"
+        value="{{system.description}}"
+        collaborate="false"
+        toggled="true"
+      >
+        {{{enrichedDescription}}}
+      </prose-mirror>
+    </fieldset>
+    -->
+
+    <fieldset class="paper-box full-width roster-entries">
+      <legend>{{localize "STARFRONTIERS.Roster.TrackedActors"}}</legend>
+
+      <div class="roster-drop-zone">
+        {{localize "STARFRONTIERS.Roster.DropActor"}}
+      </div>
+
+      {{#if entryRows.length}}
+        <div class="roster-list">
+          {{#each entryRows as |row|}}
+            <article class="roster-row {{#if row.missing}}roster-row--missing{{/if}}" data-index="{{row.index}}">
+              <div class="roster-row__portrait">
+                {{#if row.img}}
+                  <img src="{{row.img}}" alt="" />
+                {{else}}
+                  <div class="roster-row__portrait-fallback">{{localize "STARFRONTIERS.Roster.MissingActor"}}</div>
+                {{/if}}
+              </div>
+
+              <div class="roster-row__body">
+                <div class="roster-row__header">
+                  <div class="roster-row__identity">
+                    <div class="roster-row__name">{{row.name}}</div>
+                    <div class="roster-row__meta">
+                      <span>{{row.typeLabel}}</span>
+                      {{#if row.role}}
+                        <span>&bull;</span>
+                        <span>{{row.role}}</span>
+                      {{/if}}
+                    </div>
+                    {{#if row.summary}}
+                      <div class="roster-row__summary">{{row.summary}}</div>
+                    {{/if}}
+                    {{#if row.missing}}
+                      <div class="roster-row__uuid">{{row.actorUuid}}</div>
+                    {{/if}}
+                  </div>
+
+                  <div class="roster-row__actions">
+                    {{#unless row.missing}}
+                      <button type="button" data-action="openTrackedActor" title="{{localize "STARFRONTIERS.Roster.OpenActor"}}">
+                        <i class="fa-solid fa-up-right-from-square"></i>
+                        <!--<span>{{localize "STARFRONTIERS.Roster.OpenActor"}}</span>-->
+                      </button>
+                    {{/unless}}
+                    <button type="button" data-action="removeRosterEntry" title="{{localize "STARFRONTIERS.Roster.RemoveActor"}}">
+                      <i class="fa-solid fa-trash"></i>
+                      <!--<span>{{localize "STARFRONTIERS.Roster.RemoveActor"}}</span>-->
+                    </button>
+                  </div>
+                </div>
+
+                {{#if row.stats.length}}
+                  <div class="roster-row__stats">
+                    {{#each row.stats as |stat|}}
+                      <span class="roster-row__stat">
+                        <strong>{{stat.label}}:</strong>
+                        <span>{{stat.value}}</span>
+                      </span>
+                    {{/each}}
+                    <span class="roster-row__stat">
+                      <strong>{{localize "STARFRONTIERS.Roster.ActiveEffects"}}:</strong>
+                      <span>{{row.effectsCount}}</span>
+                    </span>
+                  </div>
+                {{/if}}
+
+                {{#if row.defensesLabel}}
+                  <div class="roster-row__line">
+                    <strong>{{localize "STARFRONTIERS.Roster.Defenses"}}:</strong>
+                    <span>{{row.defensesLabel}}</span>
+                  </div>
+                {{/if}}
+
+                <div class="roster-row__fields">
+                  <!--
+                  <label class="stacked">
+                    <span>{{localize "STARFRONTIERS.Roster.Role"}}</span>
+                    <input type="text" name="system.entries.{{row.index}}.role" value="{{row.role}}" placeholder="{{localize "STARFRONTIERS.Roster.RolePlaceholder"}}" />
+                  </label>
+                  -->
+                  <label class="stacked roster-row__notes">
+                    <span>{{localize "STARFRONTIERS.Roster.Notes"}}</span>
+                    <textarea name="system.entries.{{row.index}}.notes" placeholder="{{localize "STARFRONTIERS.Roster.NotesPlaceholder"}}">{{row.notes}}</textarea>
+                  </label>
+                  <input type="hidden" name="system.entries.{{row.index}}.actorUuid" value="{{row.actorUuid}}" />
+                  <input type="hidden" name="system.entries.{{row.index}}.sort" value="{{row.sort}}" />
+                  <input type="hidden" name="system.entries.{{row.index}}.pinned" value="{{row.pinned}}" />
+                </div>
+              </div>
+            </article>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Roster.Empty"}}</p>
+      {{/if}}
+    </fieldset>
+  </section>
+{{/unless}}

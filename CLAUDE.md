@@ -141,7 +141,7 @@ const roll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
 star-frontiers.mjs              Entry point — init hook, dataModel/sheet registration, settings, chat hooks
 module/config.mjs               SYSTEM_ID, ITEM_TYPE_LABELS, STAR_FRONTIERS_CONFIG (CONFIG.SF values)
 module/data/fields.mjs          Thin wrappers: textField(), numberField(), boolField(), schemaField(), etc.
-module/data/character-data.mjs  Actor TypeDataModels: Character, Npc, Creature, Robot, VehicleActor
+module/data/character-data.mjs  Actor TypeDataModels: Character, Npc, Creature, Robot, VehicleActor, Roster
 module/data/item-data.mjs       Item TypeDataModels: Race, Skill, TrainedAbility, Weapon, Armor, Screen,
                                   Ammo, PowerSource, Gear, Consumable, CreatureAttack, Vehicle, Computer, Program
 module/combat/attack-pipeline.mjs  Shared attack/damage/avoidance pipeline and range/ammo helpers
@@ -150,10 +150,13 @@ module/sheets/character-sheet.mjs  StarFrontiersCharacterSheet (ActorSheetV2) �
 module/sheets/creature-sheet.mjs StarFrontiersCreatureSheet (ActorSheetV2) — single-page stat-block
                                   sheet for `creature` actors; natural-attack + carried-weapon sections,
                                   Number Appearing roll, initiative button; delegates combat to attack-pipeline
+module/sheets/roster-sheet.mjs   StarFrontiersRosterSheet (ActorSheetV2) — GM-only linked-actor
+                                  dashboard that stores actor UUID refs and resolves live summary rows
 module/sheets/item-sheet.mjs    StarFrontiersItemSheet (ItemSheetV2) — generic item sheet, ammo linking
 module/migration/migrations.mjs Schema migration runner — current version 0.3.2
 templates/actor/character-sheet.hbs   Main character sheet (single PARTS template)
 templates/actor/creature-sheet.hbs    Creature statblock sheet (single PARTS template)
+templates/actor/roster-sheet.hbs      GM-only roster dashboard sheet
 templates/item/item-sheet.hbs         Item sheet (single PARTS template, subtype-conditional sections)
 templates/chat/check-roll-card.hbs    Ability check / damage / initiative chat card
 templates/chat/stat-roll-card.hbs     Stats generation chat card
@@ -174,7 +177,7 @@ thePlan/                        Design documents — PLAN.md, PHASES.md, DATA-MO
 
 ## Document types declared
 
-**Actor subtypes:** `character` · `npc` · `creature` · `robot` · `vehicle`
+**Actor subtypes:** `character` · `npc` · `creature` · `robot` · `vehicle` · `roster`
 
 **Item subtypes:** `race` · `skill` · `trainedAbility` · `weapon` · `armor` · `screen` · `ammo` · `powerSource` · `gear` · `consumable` · `creatureAttack` · `vehicle` · `computer` · `program`
 
@@ -200,6 +203,7 @@ All declared in `system.json` `documentTypes` from day one. Stub schemas are in 
 ## Implementation status
 
 ### Done
+- **0.3.2 — Added the GM-only Roster actor dashboard.** Actor subtype `roster` now maps to `StarFrontiersRosterData` (`system.description`, `system.entries[]`) and uses `StarFrontiersRosterSheet` for a compact GM-facing linked-actor tracker. Roster entries store only source `actorUuid` plus GM metadata (`role`, `tags`, `notes`, `pinned`, `sort`); the sheet resolves live actor summaries for `character`, `npc`, `creature`, `robot`, and `vehicle` rows, warns on duplicate drops, shows missing-actor fallbacks, and opens/removes tracked actors from the row controls. Privacy is defense-in-depth: `preCreateActor` blocks non-GM roster creation and defaults new roster ownership to `NONE`, the sheet does not resolve tracked UUIDs for non-GMs, and non-GM renders get a locked GM-only view instead of actor data. No schema migration/version bump was needed because this was additive.
 - **0.3.2 — Creature Number Appearing whisper fix + token-targeting toggle.** The creature sheet's Number Appearing roll now routes its chat payload through the shared `AttackPipeline.applyChatMessageMode(..., "gmroll")` path before `ChatMessage.create`, so the roll is actually whispered to GM instead of leaking publicly. The canvas double-right-click targeting shortcut also now toggles off when the current user already targets that token, while preserving the existing target-on behavior and `Shift` multi-target add flow for untargeted tokens.
 - **0.3.2 — Armor and Screen reductions editor.** Armor and Screen item sheets now share `templates/item/parts/reductions-editor.hbs` for per-damage-type reduction rows (`system.reductions[]`). Armor gained nullable `system.maxAbsorbed` (`null` = no threshold / natural armor) plus `system.accumulatedDamage`, Mass was removed from the duplicate Armor fieldset, and both item sheets gained one-shot Apply Preset dropdowns. Schema bumped to **0.3.2** with a migration that converts legacy `screen.system.defends` + scalar `screen.system.reduction` into `screen.system.reductions[]` across world items, actor-owned items, invalid item collections, and unlinked token delta items, while leaving screen power-source linking behavior unchanged.
 - **0.3.1 — Creature modal rich-text editor was moved to a purpose-built `ApplicationV2` window.** The Special Attack / Special Defense / Description `Edit` popups in `StarFrontiersCreatureSheet` no longer embed `HTMLProseMirrorElement` directly inside a `DialogV2` body or manually mount a detached ProseMirror editor. They now host Foundry's native `HTMLProseMirrorElement` inside `StarFrontiersCreatureRichTextEditor`, focus it after render, and save the element's current `.value` directly through `actor.update({ [fieldPath]: value })`. The ProseMirror toolbar save button updates the actor and parent sheet without closing the editor, while the footer button saves and closes. The read path now prefers live `actor.system` content and checks unlinked token delta storage before falling back to legacy `system.specialAttacks[]` / `system.defense.*`, so synthetic creature token edits are recalled correctly.
@@ -471,6 +475,7 @@ Use this exact shape when hand-authoring the Electrostunner until compendium con
 - **Needler / alternate-ammo future shape.** `mechanics.modes[]` is now the likely home for stun/blast/ammo-variant style toggles. Before adding needler dart variants or similar gear, decide whether that lives as weapon modes, linked ammo metadata, or both.
 - **Weapon modes editor runtime smoke test.** `npm run check` is green, but the new Weapon item-sheet Modes editor still needs a live Foundry pass: add/remove modes, rename the active mode key, toggle `Has Firing Modes` off/on without data loss, verify embedded Active Effect create/open/remove persistence, and confirm authored rounds-per-shot values consume correctly in play.
 - **Weapon-effect automation runtime smoke test.** `npm run check` is green, but the new on-hit / avoidance-failure AE application still needs a live Foundry pass: confirm local target-owner application, GM-socket handoff when the attacker lacks ownership, duration refresh on re-application, and no double-apply with multiple connected GMs.
+- **Roster actor runtime smoke test (0.3.2).** `npm run check` should cover syntax/i18n, but the new GM-only roster still needs a live Foundry pass: create a roster as GM, confirm non-GM users only see the lock view and cannot create useful rosters, drop one each of `character` / `npc` / `creature` / `robot` / `vehicle`, verify duplicate-drop warnings, role/notes persistence, missing-actor fallback after deleting a tracked actor, and the open/remove row actions.
 - **Armor/screen reductions runtime smoke test (0.3.2).** `npm run check` should cover syntax/i18n, but the shared reductions editor still needs a live Foundry pass: add/remove rows on both item types, confirm preset overwrite prompts and scroll preservation, verify each preset populates the expected rows, and confirm screen presets leave existing power-source links untouched.
 - **Creature sheet runtime smoke test (0.3.1).** `npm run check` is green, but the revised creature stat block still needs a live Foundry pass. Verify the new header layout (bare name, Type-other toggle, Number/Native World/Habitat line), movement add/remove rows, the modal `Edit` flow for Special Attack / Special Defense / Description, armor drops into the Special > Armor zone, roll-mode hover buttons on initiative and attack/damage, and the 0.3.0 + 0.3.1 migrations (inline attacks → creatureAttack items, reactionSpeed backfill, scalar movement → `system.movement[]`, legacy creatureAttack `attackScore` copied to the actor). Also confirm carried weapon attacks use the creature actor's ATTACK score instead of item-local math.
 - **Race movement presentation** — walking/running/hourly still need a final UX decision on the race item sheet (show units, and decide whether Hourly should remain visible in Basic mode or just be treated as optional worldbuilding data).

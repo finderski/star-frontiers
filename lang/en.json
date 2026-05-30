@@ -145,6 +145,16 @@
     "Common": {
       "DragToReorder": "Drag to reorder"
     },
+    "Actor": {
+      "Type": {
+        "character": "Character",
+        "npc": "NPC",
+        "creature": "Creature",
+        "robot": "Robot",
+        "vehicle": "Vehicle",
+        "roster": "Roster"
+      }
+    },
     "Creature": {
       "AddMovement": "Add Movement",
       "AddNaturalWeapon": "Add Natural Attack",
@@ -255,6 +265,48 @@
       "Temperament": "Temperament",
       "Type": "Type",
       "TypeOtherPlaceholder": "Enter custom type"
+    },
+    "Roster": {
+      "Title": "Roster",
+      "Description": "Description",
+      "DropHint": "Drop actors here to track them in this GM roster.",
+      "DropActor": "Drop a character, NPC, creature, robot, or vehicle here.",
+      "Empty": "No actors are currently tracked.",
+      "GMOnly": "Rosters are GM-only.",
+      "Health": "Health",
+      "DropActorOnly": "Only actors can be dropped onto a roster.",
+      "DropActorUnsupported": "That actor type cannot be tracked on a roster.",
+      "AlreadyTracked": "{actor} is already on this roster.",
+      "OpenActor": "Open Actor",
+      "RemoveActor": "Remove from Roster",
+      "MissingActor": "Missing Actor",
+      "Role": "Role",
+      "RolePlaceholder": "e.g. Captain",
+      "Notes": "GM Notes",
+      "NotesPlaceholder": "GM-only notes for this tracked actor.",
+      "ActiveEffects": "Effects",
+      "Defenses": "Defenses",
+      "Race": "Race",
+      "PSA": "PSA",
+      "Stamina": "STA",
+      "ReactionSpeed": "RS",
+      "StrSta": "STR/STA",
+      "DexRs": "DEX/RS",
+      "IntLog": "INT/LOG",
+      "PerLdr": "PER/LDR",
+      "ImRs": "IM/RS",
+      "NumberAppearing": "Number Appearing",
+      "NaturalAttacks": "Natural Attacks",
+      "SpecialAttack": "Special Attack",
+      "SpecialDefense": "Special Defense",
+      "SizeToHit": "Size To-Hit",
+      "Structure": "Structure",
+      "Level": "Level",
+      "FuelPower": "Fuel/Power",
+      "Speed": "Speed",
+      "TrackedActors": "Tracked Actors",
+      "Yes": "Yes",
+      "No": "No"
     },
     "Ability": {
       "None": "None",
@@ -778,7 +830,8 @@
     "Sheet": {
       "Character": "Star Frontiers Character Sheet",
       "Creature": "Star Frontiers Creature Sheet",
-      "Item": "Star Frontiers Item Sheet"
+      "Item": "Star Frontiers Item Sheet",
+      "Roster": "Star Frontiers Roster Sheet"
     },
     "Weapon": {
       "Ammo": "Ammo",

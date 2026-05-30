@@ -19,6 +19,15 @@ export const DAMAGE_TYPE_CHOICES = [
   "explosive"
 ];
 
+export const ACTOR_TYPE_LABELS = {
+  character: "STARFRONTIERS.Actor.Type.character",
+  npc: "STARFRONTIERS.Actor.Type.npc",
+  creature: "STARFRONTIERS.Actor.Type.creature",
+  robot: "STARFRONTIERS.Actor.Type.robot",
+  vehicle: "STARFRONTIERS.Actor.Type.vehicle",
+  roster: "STARFRONTIERS.Actor.Type.roster"
+};
+
 export const ITEM_TYPE_LABELS = {
   ammo: "STARFRONTIERS.Item.Type.Ammo",
   armor: "STARFRONTIERS.Item.Type.Armor",
