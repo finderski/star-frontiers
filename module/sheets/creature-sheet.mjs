@@ -639,15 +639,16 @@ export class StarFrontiersCreatureSheet extends ScrollPreservingSheetMixin(Handl
     }
 
     const roll = await (new Roll(formula)).evaluate({ allowInteractive: false });
-    await roll.toMessage({
+    const chatData = await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor }),
       flavor: game.i18n.format("STARFRONTIERS.Creature.NumberFlavor", {
         creature: actor.name,
         input: descriptor,
         formula
-      }),
-      whisper: ChatMessage.getWhisperRecipients("GM").map((u) => u.id)
-    });
+      })
+    }, { create: false });
+    AttackPipeline.applyChatMessageMode(chatData, "gmroll");
+    await ChatMessage.create(chatData);
   }
 
   static async #onEditProfileImage(event, target) {

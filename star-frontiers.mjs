@@ -148,6 +148,14 @@ function showRangePreview(hoveredToken) {
 
 function handleTokenDoubleRightClickTarget(token, event) {
   if (!token?.visible || !game.user) return;
+  const isCurrentlyTargeted = game.user.targets?.has?.(token) ?? false;
+  if (isCurrentlyTargeted) {
+    token.setTarget(false, {
+      releaseOthers: false,
+      groupSelection: false
+    });
+    return;
+  }
   const releaseOthers = !event?.shiftKey;
   token.setTarget(true, {
     releaseOthers,

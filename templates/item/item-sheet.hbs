@@ -2,7 +2,7 @@
   <header class="item-header">
     <div class="item-image" data-action="editImage" title="{{localize "STARFRONTIERS.Item.ChangeIcon"}}">
       {{#if imageUsesMask}}
-        <div class="item-image__icon" style="--item-img: url({{item.img}})"></div>
+        <div class="item-image__icon" style="--item-img: url('{{item.img}}')"></div>
       {{else}}
         <img class="item-image__art" src="{{item.img}}" alt="" />
       {{/if}}
