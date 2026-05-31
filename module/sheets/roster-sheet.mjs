@@ -367,7 +367,9 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
       toggleRosterEntry: StarFrontiersRosterSheet.#onToggleRosterEntry,
       toggleRosterNotes: StarFrontiersRosterSheet.#onToggleRosterNotes,
       openTrackedActor: StarFrontiersRosterSheet.#onOpenTrackedActor,
-      removeRosterEntry: StarFrontiersRosterSheet.#onRemoveRosterEntry
+      removeRosterEntry: StarFrontiersRosterSheet.#onRemoveRosterEntry,
+      refreshRoster: StarFrontiersRosterSheet.#onRefreshRoster,
+      toggleAllRosterRows: StarFrontiersRosterSheet.#onToggleAllRosterRows
     }
   };
 
@@ -388,6 +390,73 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
       dragHandle.addEventListener("dragstart", this.#onReorderDragStart.bind(this));
       dragHandle.addEventListener("click", (event) => event.stopPropagation());
     }
+
+    if (!this._rosterHooksRegistered) {
+      this.#registerRosterHooks();
+      this._rosterHooksRegistered = true;
+    }
+  }
+
+  async _onClose(options) {
+    this.#unregisterRosterHooks();
+    this._rosterHooksRegistered = false;
+    return super._onClose?.(options);
+  }
+
+  #registerRosterHooks() {
+    this._rosterActorHandler = this.#onTrackedActorChange.bind(this);
+    this._rosterDescendantHandler = this.#onTrackedDescendantChange.bind(this);
+    this._rosterHookIds = {
+      updateActor: Hooks.on("updateActor", this._rosterActorHandler),
+      deleteActor: Hooks.on("deleteActor", this._rosterActorHandler),
+      createItem: Hooks.on("createItem", this._rosterDescendantHandler),
+      updateItem: Hooks.on("updateItem", this._rosterDescendantHandler),
+      deleteItem: Hooks.on("deleteItem", this._rosterDescendantHandler),
+      createActiveEffect: Hooks.on("createActiveEffect", this._rosterDescendantHandler),
+      updateActiveEffect: Hooks.on("updateActiveEffect", this._rosterDescendantHandler),
+      deleteActiveEffect: Hooks.on("deleteActiveEffect", this._rosterDescendantHandler)
+    };
+  }
+
+  #unregisterRosterHooks() {
+    if (!this._rosterHookIds) return;
+    Hooks.off("updateActor", this._rosterHookIds.updateActor);
+    Hooks.off("deleteActor", this._rosterHookIds.deleteActor);
+    Hooks.off("createItem", this._rosterHookIds.createItem);
+    Hooks.off("updateItem", this._rosterHookIds.updateItem);
+    Hooks.off("deleteItem", this._rosterHookIds.deleteItem);
+    Hooks.off("createActiveEffect", this._rosterHookIds.createActiveEffect);
+    Hooks.off("updateActiveEffect", this._rosterHookIds.updateActiveEffect);
+    Hooks.off("deleteActiveEffect", this._rosterHookIds.deleteActiveEffect);
+    this._rosterHookIds = null;
+    this._rosterActorHandler = null;
+    this._rosterDescendantHandler = null;
+  }
+
+  #shouldRerenderForActor(actor) {
+    if (!actor) return false;
+    return this._trackedActorUuids?.has(actor.uuid) ?? false;
+  }
+
+  #shouldRerenderForItemOrEffect(documentOrParent) {
+    let cursor = documentOrParent;
+    while (cursor) {
+      if (cursor.documentName === "Actor") return this.#shouldRerenderForActor(cursor);
+      cursor = cursor.parent;
+    }
+    return false;
+  }
+
+  #onTrackedActorChange(actor) {
+    if (!this.#shouldRerenderForActor(actor)) return;
+    this._rememberScrollPosition();
+    this.render(false);
+  }
+
+  #onTrackedDescendantChange(document) {
+    if (!this.#shouldRerenderForItemOrEffect(document?.parent ?? document)) return;
+    this._rememberScrollPosition();
+    this.render(false);
   }
 
   async _onDrop(event) {
@@ -442,13 +511,17 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
       return {
         ...row,
         entryKey,
-        isExpanded: notesOpen || expandedEntries.has(entryKey),
+        isExpanded: expandedEntries.has(entryKey),
         notesOpen,
         hasNotes: Boolean(String(row.notes ?? "").trim()),
         hasEffects: Array.isArray(row.effects) && row.effects.length > 0
       };
     });
     this._orderedRosterEntryKeys = context.entryRows.map((row) => row.entryKey);
+    this._trackedActorUuids = new Set(
+      entries.map((entry) => String(entry.actorUuid ?? "")).filter(Boolean)
+    );
+    context.anyRowExpanded = context.entryRows.some((row) => row.isExpanded);
     return context;
   }
 
@@ -535,9 +608,11 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
     const handle = event.currentTarget;
     if (!event.dataTransfer) return;
 
-    const row = handle.closest("[data-entry-key]");
-    const entryKey = String(row?.dataset.entryKey ?? "");
+    const wrapper = handle.closest("[data-entry-key]");
+    const entryKey = String(wrapper?.dataset.entryKey ?? "");
     if (!entryKey) return;
+
+    const rowArticle = wrapper.querySelector?.(".roster-row") ?? wrapper;
 
     event.stopPropagation();
     event.dataTransfer.effectAllowed = "move";
@@ -546,6 +621,17 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
       rosterId: this.document.id,
       entryKey
     }));
+
+    try {
+      const rect = rowArticle.getBoundingClientRect?.();
+      if (rect) {
+        const offsetX = Math.max(event.clientX - rect.left, 0);
+        const offsetY = Math.max(event.clientY - rect.top, 0);
+        event.dataTransfer.setDragImage(rowArticle, offsetX, offsetY);
+      }
+    } catch {
+      /* setDragImage can fail in headless tests; ignore */
+    }
   }
 
   async #onReorderDrop(event, payload) {
@@ -603,7 +689,8 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
   }
 
   static #shouldSortBefore(event, element) {
-    const rect = element?.getBoundingClientRect?.();
+    const target = element?.querySelector?.(".roster-row") ?? element;
+    const rect = target?.getBoundingClientRect?.();
     if (!rect) return false;
     return event.clientY < rect.top + (rect.height / 2);
   }
@@ -634,10 +721,8 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
     if (!entryKey) return;
 
     const expandedEntries = this._expandedRosterEntries ??= new Set();
-    const openNotes = this._openRosterNotes ??= new Set();
     if (expandedEntries.has(entryKey)) {
       expandedEntries.delete(entryKey);
-      openNotes.delete(entryKey);
     } else {
       expandedEntries.add(entryKey);
     }
@@ -651,12 +736,10 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
     const entryKey = StarFrontiersRosterSheet.#getEntryKeyFromTarget(target);
     if (!entryKey) return;
 
-    const expandedEntries = this._expandedRosterEntries ??= new Set();
     const openNotes = this._openRosterNotes ??= new Set();
     if (openNotes.has(entryKey)) {
       openNotes.delete(entryKey);
     } else {
-      expandedEntries.add(entryKey);
       openNotes.add(entryKey);
     }
     this._rememberScrollPosition();
@@ -672,6 +755,34 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
     if (!entry?.actorUuid || !globalThis.fromUuid) return;
     const actor = await globalThis.fromUuid(entry.actorUuid);
     actor?.sheet?.render?.(true);
+  }
+
+  static #onRefreshRoster(event, target) {
+    if (!game.user?.isGM) return;
+    this._rememberScrollPosition();
+    this.render(false);
+  }
+
+  static #onToggleAllRosterRows(event, target) {
+    if (!game.user?.isGM) return;
+
+    const expandedEntries = this._expandedRosterEntries ??= new Set();
+    const trackedKeys = Array.from(this.document.system.entries ?? [])
+      .map((entry) => String(entry.actorUuid ?? ""))
+      .filter(Boolean);
+
+    if (!trackedKeys.length) return;
+
+    const anyExpanded = trackedKeys.some((key) => expandedEntries.has(key));
+
+    if (anyExpanded) {
+      for (const key of trackedKeys) expandedEntries.delete(key);
+    } else {
+      for (const key of trackedKeys) expandedEntries.add(key);
+    }
+
+    this._rememberScrollPosition();
+    this.render(false);
   }
 
   static async #onRemoveRosterEntry(event, target) {
