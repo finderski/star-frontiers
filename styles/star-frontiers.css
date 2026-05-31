@@ -3393,6 +3393,10 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 }
 
 .star-frontiers-roster-sheet .roster-row__name {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   font-family: var(--fieldset);
   font-size: 1rem;
 }
@@ -3400,10 +3404,18 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 .star-frontiers-roster-sheet .roster-row__meta,
 .star-frontiers-roster-sheet .roster-row__summary,
 .star-frontiers-roster-sheet .roster-row__uuid,
-.star-frontiers-roster-sheet .roster-row__line {
+.star-frontiers-roster-sheet .roster-row__line,
+.star-frontiers-roster-sheet .roster-row__collapsed {
   color: var(--sf-muted);
   font-family: var(--body);
   font-size: 0.9rem;
+}
+
+.star-frontiers-roster-sheet .roster-row__collapsed,
+.star-frontiers-roster-sheet .roster-row__details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .star-frontiers-roster-sheet .roster-row__meta {
@@ -3419,15 +3431,65 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 .star-frontiers-roster-sheet .roster-row__stats {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+}
+
+.star-frontiers-roster-sheet .roster-row__expanded .roster-row__stats {
   gap: 6px 12px;
 }
 
-.star-frontiers-roster-sheet .roster-row__stat {
+.star-frontiers-roster-sheet .roster-row__effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.star-frontiers-roster-sheet .roster-row__expanded .roster-row__effects {
+  font-family: var(--input);
+}
+
+.star-frontiers-roster-sheet .roster-row__collapsed-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.star-frontiers-roster-sheet .roster-row__effect-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-self: end;
+}
+
+.star-frontiers-roster-sheet .roster-row__effect-icon {
+  border: 1px solid var(--sf-line);
+  border-radius: 4px;
+  display: block;
+  height: 26px;
+  object-fit: cover;
+  width: 26px;
+}
+
+.star-frontiers-roster-sheet .roster-row__expanded .roster-row__stat {
   font-family: var(--input);
   white-space: nowrap;
 }
 
+.star-frontiers-roster-sheet .roster-row__drag-handle {
+  align-items: center;
+  color: var(--sf-muted);
+  cursor: grab;
+  display: inline-flex;
+  font-size: 1rem;
+  justify-content: center;
+  min-width: 1.25rem;
+}
+
+.star-frontiers-roster-sheet .roster-row__drag-handle:active {
+  cursor: grabbing;
+}
+
 .star-frontiers-roster-sheet .roster-row__actions {
+  align-items: center;
   display: inline-flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -3440,13 +3502,40 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 }
 
 .star-frontiers-roster-sheet .roster-row__fields {
-  display: grid;
+  display: flex;
   gap: 10px;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr);
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.star-frontiers-roster-sheet .roster-row__role {
+  flex: 0 1 220px;
+}
+
+.star-frontiers-roster-sheet .roster-row__notes-block {
+  display: flex;
+  flex: 1 1 320px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.star-frontiers-roster-sheet .roster-row__notes-toggle {
+  align-self: flex-start;
+}
+
+.star-frontiers-roster-sheet .roster-row__fields label.roster-row__notes {
+  display: flex;
+  flex-flow: column;
+  gap: 4px;
+  justify-content: flex-start;
+  width: 100%;
+  align-items: flex-start;
 }
 
 .star-frontiers-roster-sheet .roster-row__notes textarea {
   min-height: 84px;
+  width: 100%;
 }
 
 
@@ -3533,7 +3622,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   }
 
   .star-frontiers-roster-sheet .roster-row__fields {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 
   .star-frontiers-roster-sheet .roster-row__actions {

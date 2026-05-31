@@ -140,6 +140,8 @@
 ### Roster actors
 - Roster actors are GM-only dashboards. `system.description` is roster-level notes, while `system.entries[]` stores only source-actor UUID refs plus GM metadata (`role`, `tags`, `notes`, `pinned`, `sort`). Do not embed or copy source actors into roster data.
 - Roster sheet privacy is defense-in-depth: new roster actors default `ownership.default = NONE`, `preCreateActor` blocks non-GM creation, the sheet returns a locked context for non-GMs, and non-GM users must not resolve tracked `actorUuid` values into live Actor data.
+- Roster row ordering is controlled by `system.entries[].sort`, and the current sheet UX is drag-handle reorder on the visible rows. Preserve that field as the ordering source of truth; do not add a second parallel flag/order field for roster layout.
+- Roster active-effect display must resolve currently applicable actor effects, not just `actor.effects`. Transferred item effects such as Battle Rage need to appear in the roster via `allApplicableEffects()` / equivalent applicable-effect resolution so the sheet reflects live state.
 
 ### Creature stat blocks
 - Creature `system.ecology` stays the stored type/eating-habits selector, but the sheet labels it **Type**. When `system.ecology === "other"`, author the free-text override in `system.ecologyOther`; do not add a second parallel type field.
@@ -465,7 +467,8 @@ This reflects the current local notes and implemented work, not a live Asana syn
 ## Current next tasks
 - Roster actor smoke-test:
   - Create a roster as GM, verify players cannot create a useful roster or see linked actor data, and confirm the sheet renders only the GM-only lock message for non-GM users.
-  - Drop one each of `character`, `npc`, `creature`, `robot`, and `vehicle`; confirm duplicate-drop warnings, live summary rows, role/notes persistence, missing-actor fallback, and open/remove row actions.
+  - Drop one each of `character`, `npc`, `creature`, `robot`, and `vehicle`; confirm duplicate-drop warnings, collapsed rows show stats instead of summary text, expand/collapse state works, GM Notes toggles open/closed, and open/remove row actions still work.
+  - Activate a transferred item effect such as Battle Rage on a tracked character and confirm the roster shows the live effect icon, then drag-reorder multiple rows and confirm the order persists after sheet rerender/reopen.
 - Armor/screen reductions runtime smoke-test (0.3.2):
   - Open armor and screen item sheets in Foundry, add/remove reduction rows, and confirm scroll position holds on row mutations and preset application.
   - Apply each preset once, confirm overwrite confirmation on existing rows, and verify screen presets do not disturb an already-linked power source.

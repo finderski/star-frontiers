@@ -5,6 +5,8 @@ const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
 const TRACKABLE_ACTOR_TYPES = new Set(["character", "npc", "creature", "robot", "vehicle"]);
+const ACTIVE_EFFECT_FALLBACK_ICON = "icons/svg/aura.svg";
+const ROSTER_REORDER_DRAG_TYPE = "sf-roster-reorder";
 const PSA_LABELS = {
   military: "STARFRONTIERS.Choice.PSA.military",
   technological: "STARFRONTIERS.Choice.PSA.technological",
@@ -63,8 +65,50 @@ function getRaceName(actor) {
   return actor.items?.get(raceRef)?.name ?? raceRef;
 }
 
-function getEffectsCount(actor) {
-  return Array.from(actor?.effects ?? []).filter((effect) => !effect.disabled).length;
+function getActiveEffects(actor) {
+  let effects = [];
+
+  if (typeof actor?.allApplicableEffects === "function") {
+    try {
+      effects = Array.from(actor.allApplicableEffects());
+    } catch {
+      effects = [];
+    }
+  }
+
+  if (!effects.length && actor?.appliedEffects) {
+    try {
+      effects = Array.from(actor.appliedEffects);
+    } catch {
+      effects = [];
+    }
+  }
+
+  if (!effects.length) {
+    effects = Array.from(actor?.effects ?? []);
+  }
+
+  const seen = new Set();
+  return effects
+    .filter((effect) => effect && !effect.disabled && effect.isSuppressed !== true && effect.suppressed !== true)
+    .map((effect) => {
+      const key = effect.uuid ?? `${effect.parent?.uuid ?? "effect-parent"}.${effect.id ?? effect.name ?? "effect"}`;
+      if (seen.has(key)) return null;
+      seen.add(key);
+
+      const sourceName = effect.parent && effect.parent !== actor
+        ? String(effect.parent.name ?? "").trim()
+        : "";
+
+      return {
+        id: String(effect.id ?? key),
+        key,
+        name: String(effect.name ?? "").trim() || game.i18n.localize("STARFRONTIERS.Roster.ActiveEffects"),
+        img: effect.img || effect.icon || ACTIVE_EFFECT_FALLBACK_ICON,
+        sourceName
+      };
+    })
+    .filter(Boolean);
 }
 
 function getGroupSizeLabel(actor) {
@@ -105,6 +149,7 @@ function getCharacterDefenseSummary(actor) {
 
 function buildCharacterRosterRow(actor, entry, index, expandedRules) {
   const abilities = actor.system.abilities ?? {};
+  const activeEffects = getActiveEffects(actor);
   const raceName = getRaceName(actor);
   const psa = String(actor.system.psa ?? "");
   const summaryParts = [];
@@ -127,11 +172,9 @@ function buildCharacterRosterRow(actor, entry, index, expandedRules) {
     role: String(entry.role ?? ""),
     notes: String(entry.notes ?? ""),
     summary: summaryParts.join(" • "),
+    headlineLabel: game.i18n.localize("STARFRONTIERS.Roster.Health"),
+    headlineValue: formatCurrentMax(actor.system.stamina?.value, actor.system.stamina?.max),
     stats: [
-      // { label: game.i18n.localize("STARFRONTIERS.Roster.Stamina"), value: formatCurrentMax(actor.system.stamina?.value, actor.system.stamina?.max) },
-      { label: game.i18n.localize("STARFRONTIERS.Roster.Health"), value: `${Number(actor.system.stamina?.value ?? 0)}` },
-      // { label: game.i18n.localize("STARFRONTIERS.Character.InitiativeModifier-abbr"), value: String(actor.system.derived?.initiativeMod ?? 0) },
-      // { label: game.i18n.localize("STARFRONTIERS.Roster.ReactionSpeed"), value: String(actor.system.abilities?.rs?.value ?? 0) },
       { label: game.i18n.localize("STARFRONTIERS.Roster.ImRs"), value: `${Number(actor.system.derived?.initiativeMod ?? 0)} / ${Number(abilities.rs?.value ?? 0)}` },
       { label: game.i18n.localize("STARFRONTIERS.Roster.StrSta"), value: `${Number(abilities.str?.value ?? 0)} / ${Number(abilities.sta?.value ?? 0)}` },
       { label: game.i18n.localize("STARFRONTIERS.Roster.DexRs"), value: `${Number(abilities.dex?.value ?? 0)} / ${Number(abilities.rs?.value ?? 0)}` },
@@ -139,11 +182,12 @@ function buildCharacterRosterRow(actor, entry, index, expandedRules) {
       { label: game.i18n.localize("STARFRONTIERS.Roster.PerLdr"), value: `${Number(abilities.per?.value ?? 0)} / ${Number(abilities.ldr?.value ?? 0)}` }
     ],
     defensesLabel: getCharacterDefenseSummary(actor),
-    effectsCount: getEffectsCount(actor)
+    effects: activeEffects
   };
 }
 
 function buildCreatureRosterRow(actor, entry, index) {
+  const activeEffects = getActiveEffects(actor);
   const sizeToHitMod = Number(actor.system.defense?.sizeToHitMod ?? 0);
   const specialAttack = hasMeaningfulHtml(actor.system.specialAttack ?? "")
     || Array.isArray(actor.system.specialAttacks) && actor.system.specialAttacks.length > 0;
@@ -162,6 +206,8 @@ function buildCreatureRosterRow(actor, entry, index) {
     role: String(entry.role ?? ""),
     notes: String(entry.notes ?? ""),
     summary: `${localizeCreatureSize(actor.system.size)} • ${localizeCreatureEcology(actor)} • ${game.i18n.localize("STARFRONTIERS.Roster.NumberAppearing")}: ${getGroupSizeLabel(actor)}`,
+    headlineLabel: game.i18n.localize("STARFRONTIERS.Roster.Stamina"),
+    headlineValue: formatCurrentMax(actor.system.abilities?.sta?.value, actor.system.abilities?.sta?.max),
     stats: [
       { label: game.i18n.localize("STARFRONTIERS.Roster.Stamina"), value: formatCurrentMax(actor.system.abilities?.sta?.value, actor.system.abilities?.sta?.max) },
       { label: game.i18n.localize("STARFRONTIERS.Character.InitiativeModifier-abbr"), value: String(actor.system.initiativeMod ?? 0) },
@@ -172,11 +218,12 @@ function buildCreatureRosterRow(actor, entry, index) {
       ...(sizeToHitMod ? [{ label: game.i18n.localize("STARFRONTIERS.Roster.SizeToHit"), value: sizeToHitMod > 0 ? `+${sizeToHitMod}` : String(sizeToHitMod) }] : [])
     ],
     defensesLabel: "",
-    effectsCount: getEffectsCount(actor)
+    effects: activeEffects
   };
 }
 
 function buildRobotRosterRow(actor, entry, index) {
+  const activeEffects = getActiveEffects(actor);
   const summary = String(actor.system.robotType ?? "").trim() || plainTextFromHtml(actor.system.mission ?? "");
   return {
     index,
@@ -192,16 +239,19 @@ function buildRobotRosterRow(actor, entry, index) {
     role: String(entry.role ?? ""),
     notes: String(entry.notes ?? ""),
     summary,
+    headlineLabel: game.i18n.localize("STARFRONTIERS.Roster.Structure"),
+    headlineValue: formatCurrentMax(actor.system.structuralPoints?.value, actor.system.structuralPoints?.max),
     stats: [
       { label: game.i18n.localize("STARFRONTIERS.Roster.Structure"), value: formatCurrentMax(actor.system.structuralPoints?.value, actor.system.structuralPoints?.max) },
       { label: game.i18n.localize("STARFRONTIERS.Roster.Level"), value: String(actor.system.level ?? 0) }
     ],
     defensesLabel: "",
-    effectsCount: getEffectsCount(actor)
+    effects: activeEffects
   };
 }
 
 function buildVehicleRosterRow(actor, entry, index) {
+  const activeEffects = getActiveEffects(actor);
   const units = String(actor.system.fuelOrPower?.units ?? "").trim();
   const fuelValue = formatCurrentMax(actor.system.fuelOrPower?.value, actor.system.fuelOrPower?.max);
   return {
@@ -218,17 +268,20 @@ function buildVehicleRosterRow(actor, entry, index) {
     role: String(entry.role ?? ""),
     notes: String(entry.notes ?? ""),
     summary: String(actor.system.template?.vehicleClass ?? "").trim(),
+    headlineLabel: game.i18n.localize("STARFRONTIERS.Roster.Structure"),
+    headlineValue: formatCurrentMax(actor.system.structuralPoints?.value, actor.system.structuralPoints?.max),
     stats: [
       { label: game.i18n.localize("STARFRONTIERS.Roster.Structure"), value: formatCurrentMax(actor.system.structuralPoints?.value, actor.system.structuralPoints?.max) },
       { label: game.i18n.localize("STARFRONTIERS.Roster.Speed"), value: String(actor.system.speed ?? 0) },
       { label: game.i18n.localize("STARFRONTIERS.Roster.FuelPower"), value: units ? `${fuelValue} ${units}` : fuelValue }
     ],
     defensesLabel: "",
-    effectsCount: getEffectsCount(actor)
+    effects: activeEffects
   };
 }
 
 function buildGenericRosterRow(actor, entry, index) {
+  const activeEffects = getActiveEffects(actor);
   return {
     index,
     actorUuid: entry.actorUuid,
@@ -243,9 +296,11 @@ function buildGenericRosterRow(actor, entry, index) {
     role: String(entry.role ?? ""),
     notes: String(entry.notes ?? ""),
     summary: plainTextFromHtml(actor.system.description ?? ""),
+    headlineLabel: "",
+    headlineValue: "",
     stats: [],
     defensesLabel: "",
-    effectsCount: getEffectsCount(actor)
+    effects: activeEffects
   };
 }
 
@@ -269,9 +324,11 @@ async function buildEntryRow(entry, index, expandedRules) {
       role: String(entry.role ?? ""),
       notes: String(entry.notes ?? ""),
       summary: String(entry.actorUuid ?? ""),
+      headlineLabel: "",
+      headlineValue: "",
       stats: [],
       defensesLabel: "",
-      effectsCount: 0
+      effects: []
     };
   }
 
@@ -307,6 +364,8 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
     },
     dragDrop: [{ dragSelector: null, dropSelector: ".star-frontiers-roster-sheet" }],
     actions: {
+      toggleRosterEntry: StarFrontiersRosterSheet.#onToggleRosterEntry,
+      toggleRosterNotes: StarFrontiersRosterSheet.#onToggleRosterNotes,
       openTrackedActor: StarFrontiersRosterSheet.#onOpenTrackedActor,
       removeRosterEntry: StarFrontiersRosterSheet.#onRemoveRosterEntry
     }
@@ -321,6 +380,22 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
 
   get isEditable() {
     return super.isEditable && Boolean(game.user?.isGM);
+  }
+
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    for (const dragHandle of this.element.querySelectorAll(".drag-handle[data-drag='roster-reorder']")) {
+      dragHandle.addEventListener("dragstart", this.#onReorderDragStart.bind(this));
+      dragHandle.addEventListener("click", (event) => event.stopPropagation());
+    }
+  }
+
+  async _onDrop(event) {
+    const payload = StarFrontiersRosterSheet.#parseDragPayload(event);
+    if (payload?.type === ROSTER_REORDER_DRAG_TYPE && payload.rosterId === this.document.id) {
+      return this.#onReorderDrop(event, payload);
+    }
+    return super._onDrop(event);
   }
 
   async _prepareContext(options) {
@@ -356,11 +431,24 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
     const entries = Array.from(context.actor.system.entries ?? []);
     const rows = await Promise.all(entries.map((entry, index) => buildEntryRow(entry, index, context.expandedRules)));
     rows.sort((a, b) =>
-      Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))
-      || Number(a.sort ?? 0) - Number(b.sort ?? 0)
+      Number(a.sort ?? 0) - Number(b.sort ?? 0)
       || String(a.name ?? "").localeCompare(String(b.name ?? ""))
     );
-    context.entryRows = rows;
+    const expandedEntries = this._expandedRosterEntries ?? new Set();
+    const openNotes = this._openRosterNotes ?? new Set();
+    context.entryRows = rows.map((row) => {
+      const entryKey = String(row.actorUuid ?? `missing-${row.index}`);
+      const notesOpen = openNotes.has(entryKey);
+      return {
+        ...row,
+        entryKey,
+        isExpanded: notesOpen || expandedEntries.has(entryKey),
+        notesOpen,
+        hasNotes: Boolean(String(row.notes ?? "").trim()),
+        hasEffects: Array.isArray(row.effects) && row.effects.length > 0
+      };
+    });
+    this._orderedRosterEntryKeys = context.entryRows.map((row) => row.entryKey);
     return context;
   }
 
@@ -443,10 +531,143 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
     return document;
   }
 
+  #onReorderDragStart(event) {
+    const handle = event.currentTarget;
+    if (!event.dataTransfer) return;
+
+    const row = handle.closest("[data-entry-key]");
+    const entryKey = String(row?.dataset.entryKey ?? "");
+    if (!entryKey) return;
+
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", JSON.stringify({
+      type: ROSTER_REORDER_DRAG_TYPE,
+      rosterId: this.document.id,
+      entryKey
+    }));
+  }
+
+  async #onReorderDrop(event, payload) {
+    event.preventDefault();
+    if (!game.user?.isGM) return;
+
+    const sourceKey = String(payload.entryKey ?? "");
+    const targetRow = event.target.closest?.("[data-entry-key]");
+    const targetKey = String(targetRow?.dataset.entryKey ?? "");
+    if (!sourceKey || !targetKey || sourceKey === targetKey) return;
+
+    const currentEntries = Array.from(this.document.system.entries ?? []).map((entry) => ({
+      actorUuid: String(entry.actorUuid ?? ""),
+      role: String(entry.role ?? ""),
+      tags: Array.from(entry.tags ?? []),
+      notes: String(entry.notes ?? ""),
+      pinned: Boolean(entry.pinned),
+      sort: Number(entry.sort ?? 0)
+    }));
+
+    const entryByKey = new Map(currentEntries.map((entry) => [String(entry.actorUuid ?? ""), entry]));
+    const orderedKeys = Array.isArray(this._orderedRosterEntryKeys) && this._orderedRosterEntryKeys.length
+      ? this._orderedRosterEntryKeys
+      : currentEntries
+          .slice()
+          .sort((a, b) => Number(a.sort ?? 0) - Number(b.sort ?? 0))
+          .map((entry) => String(entry.actorUuid ?? ""));
+
+    const orderedEntries = orderedKeys.map((key) => entryByKey.get(key)).filter(Boolean);
+    const sourceIndex = orderedEntries.findIndex((entry) => entry.actorUuid === sourceKey);
+    const targetIndex = orderedEntries.findIndex((entry) => entry.actorUuid === targetKey);
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const [sourceEntry] = orderedEntries.splice(sourceIndex, 1);
+    let insertIndex = orderedEntries.findIndex((entry) => entry.actorUuid === targetKey);
+    if (insertIndex === -1) return;
+    if (!StarFrontiersRosterSheet.#shouldSortBefore(event, targetRow)) insertIndex += 1;
+    orderedEntries.splice(insertIndex, 0, sourceEntry);
+
+    const nextEntries = orderedEntries.map((entry, index) => ({
+      ...entry,
+      sort: (index + 1) * 10
+    }));
+
+    this._rememberScrollPosition();
+    await this.document.update({ "system.entries": nextEntries });
+  }
+
+  static #parseDragPayload(event) {
+    try {
+      return JSON.parse(event.dataTransfer.getData("text/plain"));
+    } catch {
+      return null;
+    }
+  }
+
+  static #shouldSortBefore(event, element) {
+    const rect = element?.getBoundingClientRect?.();
+    if (!rect) return false;
+    return event.clientY < rect.top + (rect.height / 2);
+  }
+
+  static #getEntryKeyFromTarget(target) {
+    return String(target.closest("[data-entry-key]")?.dataset.entryKey ?? "");
+  }
+
+  static #cloneEntries(sheet) {
+    return Array.from(sheet.document.system.entries ?? []).map((entry) => ({
+      actorUuid: String(entry.actorUuid ?? ""),
+      role: String(entry.role ?? ""),
+      tags: Array.from(entry.tags ?? []),
+      notes: String(entry.notes ?? ""),
+      pinned: Boolean(entry.pinned),
+      sort: Number(entry.sort ?? 0)
+    }));
+  }
+
+  static #findEntryIndexByKey(sheet, entryKey) {
+    return Array.from(sheet.document.system.entries ?? []).findIndex((entry) => String(entry.actorUuid ?? "") === entryKey);
+  }
+
+  static #onToggleRosterEntry(event, target) {
+    if (!game.user?.isGM) return;
+    target ??= event.currentTarget;
+    const entryKey = StarFrontiersRosterSheet.#getEntryKeyFromTarget(target);
+    if (!entryKey) return;
+
+    const expandedEntries = this._expandedRosterEntries ??= new Set();
+    const openNotes = this._openRosterNotes ??= new Set();
+    if (expandedEntries.has(entryKey)) {
+      expandedEntries.delete(entryKey);
+      openNotes.delete(entryKey);
+    } else {
+      expandedEntries.add(entryKey);
+    }
+    this._rememberScrollPosition();
+    this.render(false);
+  }
+
+  static #onToggleRosterNotes(event, target) {
+    if (!game.user?.isGM) return;
+    target ??= event.currentTarget;
+    const entryKey = StarFrontiersRosterSheet.#getEntryKeyFromTarget(target);
+    if (!entryKey) return;
+
+    const expandedEntries = this._expandedRosterEntries ??= new Set();
+    const openNotes = this._openRosterNotes ??= new Set();
+    if (openNotes.has(entryKey)) {
+      openNotes.delete(entryKey);
+    } else {
+      expandedEntries.add(entryKey);
+      openNotes.add(entryKey);
+    }
+    this._rememberScrollPosition();
+    this.render(false);
+  }
+
   static async #onOpenTrackedActor(event, target) {
     if (!game.user?.isGM) return;
     target ??= event.currentTarget;
-    const index = Number(target.closest("[data-index]")?.dataset.index ?? -1);
+    const entryKey = StarFrontiersRosterSheet.#getEntryKeyFromTarget(target);
+    const index = StarFrontiersRosterSheet.#findEntryIndexByKey(this, entryKey);
     const entry = this.document.system.entries?.[index];
     if (!entry?.actorUuid || !globalThis.fromUuid) return;
     const actor = await globalThis.fromUuid(entry.actorUuid);
@@ -456,16 +677,12 @@ export class StarFrontiersRosterSheet extends ScrollPreservingSheetMixin(Handleb
   static async #onRemoveRosterEntry(event, target) {
     if (!game.user?.isGM) return;
     target ??= event.currentTarget;
-    const index = Number(target.closest("[data-index]")?.dataset.index ?? -1);
-    const entries = Array.from(this.document.system.entries ?? []).map((entry) => ({
-      actorUuid: String(entry.actorUuid ?? ""),
-      role: String(entry.role ?? ""),
-      tags: Array.from(entry.tags ?? []),
-      notes: String(entry.notes ?? ""),
-      pinned: Boolean(entry.pinned),
-      sort: Number(entry.sort ?? 0)
-    }));
+    const entryKey = StarFrontiersRosterSheet.#getEntryKeyFromTarget(target);
+    const index = StarFrontiersRosterSheet.#findEntryIndexByKey(this, entryKey);
+    const entries = StarFrontiersRosterSheet.#cloneEntries(this);
     if (index < 0 || index >= entries.length) return;
+    this._expandedRosterEntries?.delete?.(entryKey);
+    this._openRosterNotes?.delete?.(entryKey);
     this._rememberScrollPosition();
     entries.splice(index, 1);
     await this.document.update({ "system.entries": entries });
