@@ -1,0 +1,24 @@
+{{#unless omitShare}}
+  <div class="roll-label-group">
+    <button type="button" data-action="shareRacialAbility" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityPublic"}}">
+      <i class="fa-regular fa-comment-dots"></i>
+    </button>
+    <div class="roll-label-actions">
+      <button type="button" class="roll-label-action roll-label-action--blind" data-action="shareRacialAbility" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityBlind"}}"></button>
+      <button type="button" class="roll-label-action roll-label-action--gm" data-action="shareRacialAbility" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityWhisper"}}"></button>
+    </div>
+  </div>
+{{/unless}}
+{{#if row.hasEffect}}
+  <button type="button" class="racial-ability-effect-btn{{#if row.effectActive}} racial-ability-effect-btn--active{{/if}}" data-action="toggleRacialAbilityEffect" title="{{localize "STARFRONTIERS.Character.ToggleRacialEffect"}}">
+    <i class="fa-solid fa-fire-flame-curved"></i>
+  </button>
+{{/if}}
+<button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Character.OpenRacialAbility"}}">
+  <i class="fa-solid fa-pen-to-square"></i>
+</button>
+{{#if row.canRemove}}
+  <button type="button" data-action="removeRacialAbility" title="{{localize "STARFRONTIERS.Character.RemoveRacialAbility"}}">
+    <i class="fa-solid fa-trash"></i>
+  </button>
+{{/if}}

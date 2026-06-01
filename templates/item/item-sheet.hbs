@@ -413,6 +413,13 @@
             <input type="number" name="system.xpPerPoint" value="{{system.xpPerPoint}}" min="0" />
             <small class="form-hint">{{localize "STARFRONTIERS.Item.XPPerPointHint"}}</small>
           </label>
+          {{#if homebrewAdvancementEnabled}}
+            <label class="hasHint">
+              <span>{{localize "STARFRONTIERS.Item.AdvancementCost"}}</span>
+              <input type="number" name="system.advancementCost" value="{{system.advancementCost}}" min="0" />
+              <small class="form-hint">{{localize "STARFRONTIERS.Item.AdvancementCostHint"}}</small>
+            </label>
+          {{/if}}
         </div>
 
         <div class="race-editor-block">

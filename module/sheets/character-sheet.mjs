@@ -86,6 +86,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       toggleRacialAbilityEffect: StarFrontiersCharacterSheet.#onToggleRacialAbilityEffect,
       increaseRacialAbility: StarFrontiersCharacterSheet.#onIncreaseRacialAbility,
       decreaseRacialAbility: StarFrontiersCharacterSheet.#onDecreaseRacialAbility,
+      removeRacialAbility: StarFrontiersCharacterSheet.#onRemoveRacialAbility,
       rollSkill: StarFrontiersCharacterSheet.#onRollSkill,
       toggleAddItemMenu: StarFrontiersCharacterSheet.#onToggleAddItemMenu,
       toggleEquipmentRow: StarFrontiersCharacterSheet.#onToggleEquipmentRow,
@@ -232,6 +233,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
   }
 
   #prepareRacialAbilityRows(actor) {
+    const advancementEnabled = game.settings.get(SYSTEM_ID, "homebrewAdvancementAbilities");
     return actor.items
       .filter((item) => item.type === "trainedAbility")
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -252,6 +254,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
           canIncrease: availableXp > 0 && currentChance < cap,
           canDecrease: spentXp > 0 && currentChance > baseChance,
           hasEffect: Boolean(effect),
+          canRemove: advancementEnabled && StarFrontiersCharacterSheet.#isAdvancementAcquired(item),
           effectActive: effect ? !effect.disabled : false,
           effectStatusLabel: effect && !effect.disabled
             ? game.i18n.localize("STARFRONTIERS.Character.EffectActive")
@@ -828,6 +831,11 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       return created;
     }
 
+    if (document.documentName === "Item" && document.type === "trainedAbility") {
+      this._rememberScrollPosition();
+      return this.#handleTrainedAbilityDrop(document);
+    }
+
     if (document.documentName === "Item" && document.type === "weapon" && document.parent !== this.document) {
       this._rememberScrollPosition();
       const weaponData = document.toObject();
@@ -912,6 +920,66 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     }
 
     return super._onDropDocument(event, document);
+  }
+
+  async #handleTrainedAbilityDrop(document) {
+    if (document.parent === this.document) return document;
+
+    const homebrewEnabled = game.settings.get(SYSTEM_ID, "homebrewAdvancementAbilities");
+    if (!homebrewEnabled) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Character.TrainedAbilityDropRejected"));
+      return null;
+    }
+
+    const cost = Math.max(Number(document.system?.advancementCost ?? 0), 0);
+    const availableXp = Number(this.document.system.experience?.earned ?? 0);
+    const spentXp = Number(this.document.system.experience?.spent ?? 0);
+    if (cost > availableXp) {
+      ui.notifications.warn(game.i18n.format("STARFRONTIERS.Character.TrainedAbilityInsufficientXP", {
+        needed: cost,
+        have: availableXp
+      }));
+      return null;
+    }
+
+    const itemData = document.toObject();
+    delete itemData._id;
+    itemData.flags = foundry.utils.mergeObject(itemData.flags ?? {}, {
+      [SYSTEM_ID]: {
+        advancementAcquired: true,
+        advancementChargedXP: cost
+      }
+    }, { inplace: false, overwrite: true });
+
+    let created = null;
+    try {
+      if (cost > 0) {
+        await this.document.update({
+          "system.experience.earned": Math.max(availableXp - cost, 0),
+          "system.experience.spent": Math.max(spentXp + cost, 0)
+        });
+        this._rememberScrollPosition();
+      }
+
+      [created] = await this.document.createEmbeddedDocuments("Item", [itemData]);
+    } catch (error) {
+      if (cost > 0) {
+        await this.document.update({
+          "system.experience.earned": availableXp,
+          "system.experience.spent": spentXp
+        });
+      }
+      throw error;
+    }
+
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.document }),
+      content: game.i18n.format("STARFRONTIERS.Character.TrainedAbilityAcquired", {
+        ability: created?.name ?? document.name,
+        cost
+      })
+    });
+    return created ?? null;
   }
 
   async #handleDefenseSlotDrop(event, document, slot) {
@@ -1361,6 +1429,59 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     if (!item) return;
     this._rememberScrollPosition();
     await StarFrontiersCharacterSheet.#adjustRacialAbilityChance(this.document, item, -1);
+  }
+
+  static async #onRemoveRacialAbility(event, target) {
+    target ??= event.currentTarget;
+    const item = StarFrontiersCharacterSheet.#getItemFromTarget(this.document, target);
+    if (!item) return;
+    if (!StarFrontiersCharacterSheet.#isAdvancementAcquired(item)) {
+      ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Character.CannotRemoveRaceAbility"));
+      return;
+    }
+
+    const safeName = foundry.utils.escapeHTML(item.name);
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: {
+        title: game.i18n.localize("STARFRONTIERS.Character.RemoveAbilityConfirmTitle")
+      },
+      content: `<p>${game.i18n.format("STARFRONTIERS.Character.RemoveAbilityConfirmBody", { ability: safeName })}</p>`,
+      modal: true,
+      rejectClose: false
+    });
+    if (!confirmed) return;
+
+    this._rememberScrollPosition();
+    const refund = StarFrontiersCharacterSheet.#getAdvancementChargedXp(item);
+    const availableXp = Number(this.document.system.experience?.earned ?? 0);
+    const spentXp = Number(this.document.system.experience?.spent ?? 0);
+    const previousProgress = foundry.utils.deepClone(this.document.system.racialSkillProgress?.[item.id] ?? null);
+    const updates = {
+      [`system.racialSkillProgress.${item.id}`]: null
+    };
+    if (refund > 0) {
+      updates["system.experience.earned"] = Math.max(availableXp + refund, 0);
+      updates["system.experience.spent"] = Math.max(spentXp - refund, 0);
+    }
+    await this.document.update(updates);
+    this._rememberScrollPosition();
+    try {
+      await item.delete();
+    } catch (error) {
+      await this.document.update({
+        "system.experience.earned": availableXp,
+        "system.experience.spent": spentXp,
+        [`system.racialSkillProgress.${item.id}`]: previousProgress
+      });
+      throw error;
+    }
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.document }),
+      content: game.i18n.format("STARFRONTIERS.Character.TrainedAbilityRemoved", {
+        ability: item.name,
+        refund
+      })
+    });
   }
 
   static async #onRollSkill(event, target) {
@@ -2536,6 +2657,19 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       if (linked) return linked;
     }
     return item.effects.size === 1 ? item.effects.contents[0] : null;
+  }
+
+  static #isAdvancementAcquired(item) {
+    return Boolean(item?.getFlag?.(SYSTEM_ID, "advancementAcquired")
+      ?? foundry.utils.getProperty(item, `flags.${SYSTEM_ID}.advancementAcquired`));
+  }
+
+  static #getAdvancementChargedXp(item) {
+    return Math.max(Number(
+      item?.getFlag?.(SYSTEM_ID, "advancementChargedXP")
+      ?? foundry.utils.getProperty(item, `flags.${SYSTEM_ID}.advancementChargedXP`)
+      ?? 0
+    ), 0);
   }
 
   static #getAbilityCheckTarget(actor, ability) {

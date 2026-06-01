@@ -18,6 +18,7 @@
       "CurrentSta": "Current STA:",
       "CurrentStaminaSource": "Current Stamina",
       "DecreaseRacialAbility": "Decrease chance by 1",
+      "CannotRemoveRaceAbility": "This ability was granted by a race and cannot be removed individually. Change the character's race to remove it.",
       "EffectActive": "Effect active",
       "EffectReady": "Effect ready",
       "Defenses": "Defenses",
@@ -77,6 +78,9 @@
       "RollRacialAbilityBlind": "Private ability check to GM",
       "RollRacialAbilityWhisper": "Whisper ability check to GM",
       "OpenRacialAbility": "Open racial ability",
+      "RemoveAbilityConfirmBody": "Remove <strong>{ability}</strong> from this character? Any XP cost will be refunded.",
+      "RemoveAbilityConfirmTitle": "Remove ability?",
+      "RemoveRacialAbility": "Remove this advancement-acquired ability",
       "ShareRacialAbilityPublic": "Send to chat",
       "ShareRacialAbilityBlind": "Send to GM only",
       "ShareRacialAbilityWhisper": "Whisper to GM",
@@ -130,6 +134,10 @@
       "Target": "Target",
       "Total": "Total",
       "TotalMass": "Carried",
+      "TrainedAbilityAcquired": "Acquired ability: {ability} ({cost} XP).",
+      "TrainedAbilityDropRejected": "Racial / Trained Abilities can only be added by dropping a race. Enable the Advancement homebrew setting to drop them directly.",
+      "TrainedAbilityInsufficientXP": "Not enough XP: this ability costs {needed} XP, but the character has {have}.",
+      "TrainedAbilityRemoved": "Removed ability: {ability} (refunded {refund} XP).",
       "Using": "Using",
       "Value-abbr": "+{value}",
       "Walking": "Walking:",
@@ -768,13 +776,14 @@
       "VehicleClass": "Vehicle Class",
       "VehicleData": "Vehicle",
       "WeaponData": "Weapon",
+      "AdvancementCost": "Advancement Cost (XP)",
+      "AdvancementCostHint": "XP cost when this ability is added to a character via direct drop (homebrew advancement). Only consumed when the homebrew setting is on.",
       "WeaponDamageFormulaSeuHint": "This weapon has a variable SEU setting. The formula above is the damage per SEU; the weapon will roll this formula multiplied by the current SEU setting at damage time.",
       "WeaponSkill": "Skill",
       "WeaponType": "Type",
       "Weight": "Weight",
       "UnknownEffect": "Unknown Effect",
-      "XPPerPoint": "XP/Point"
-      ,
+      "XPPerPoint": "XP/Point",
       "XPPerPointHint": "XP cost to raise this ability by 1 percentage point. Set to 0 for abilities that improve without spending experience."
     },
     "Placeholder": {
@@ -808,6 +817,10 @@
       "ChargenWizardOnNew": {
         "Hint": "Open the character generation wizard for new characters once that workflow is implemented.",
         "Name": "Character Wizard on New Character"
+      },
+      "HomebrewAdvancementAbilities": {
+        "Hint": "When enabled, GMs can drag Racial / Trained Abilities directly onto a character sheet to grant them as advancement. The ability's Advancement Cost is moved from Available XP to Spent XP, and refunded if the advancement-granted ability is removed. When disabled, abilities can only be granted by dropping a race.",
+        "Name": "Homebrew: Racial / Trained Abilities via Advancement"
       },
       "EnableGmRollOverrides": {
         "Hint": "Show a GM-only testing field on modifier prompts so a specific d100 result can be forced instead of rolled normally.",

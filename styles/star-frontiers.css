@@ -1478,7 +1478,12 @@ button.roll-label-main:focus-visible {
   color: var(--sf-focus);
 }
 
-.racial-ability-chip__header,
+.racial-ability-chip__header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
 .racial-ability-chip__footer {
   align-items: center;
   display: flex;
@@ -1486,10 +1491,16 @@ button.roll-label-main:focus-visible {
   justify-content: space-between;
 }
 
+.racial-ability-chip__header > .racial-ability-chip__name {
+  flex: 1 1 auto;
+}
+
 .racial-ability-chip__chance,
 .racial-ability-chip__mode {
+  flex: 0 0 auto;
   font-family: var(--input);
   font-size: 0.9rem;
+  margin-left: auto;
   white-space: nowrap;
 }
 
@@ -1528,6 +1539,10 @@ button.roll-label-main:focus-visible {
   display: flex;
   gap: 4px 10px;
   margin-left: auto;
+}
+
+.racial-ability-chip__actions--inline {
+  flex: 0 0 auto;
 }
 
 .racial-ability-chip__actions .roll-label-group {

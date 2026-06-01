@@ -427,7 +427,7 @@
         {{#if racialAbilityRows.length}}
           <div class="racial-ability-chip-list">
             {{#each racialAbilityRows as |row|}}
-              <article class="racial-ability-chip" data-item-id="{{row.id}}">
+              <article class="racial-ability-chip{{#unless row.isActiveRoll}} racial-ability-chip--compact{{/unless}}" data-item-id="{{row.id}}">
                 <div class="racial-ability-chip__header">
                   <button
                     type="button"
@@ -438,28 +438,32 @@
                   >{{row.name}}</button>
                   {{#if row.isActiveRoll}}
                     <span class="racial-ability-chip__chance">{{row.currentChance}}% / {{row.cap}}%</span>
+                  {{else}}
+                    <div class="item-actions racial-ability-chip__actions racial-ability-chip__actions--inline">
+                      {{> "systems/star-frontiers/templates/actor/parts/racial-ability-actions.hbs" row=row}}
+                    </div>
                   {{/if}}
                 </div>
                 {{#if row.description}}
                   <p class="racial-ability-chip__description">{{row.description}}</p>
                 {{/if}}
-                <div class="racial-ability-chip__footer">
-                  {{#if row.hasEffect}}
-                    <span class="racial-ability-chip__status{{#if row.effectActive}} racial-ability-chip__status--active{{/if}}">
-                      {{row.effectStatusLabel}}
-                    </span>
-                  {{/if}}
-                  <div class="item-actions racial-ability-chip__actions">
-                    <div class="roll-label-group">
-                      <button type="button" data-action="shareRacialAbility" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityPublic"}}">
-                        <i class="fa-regular fa-comment-dots"></i>
-                      </button>
-                      <div class="roll-label-actions">
-                        <button type="button" class="roll-label-action roll-label-action--blind" data-action="shareRacialAbility" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityBlind"}}"></button>
-                        <button type="button" class="roll-label-action roll-label-action--gm" data-action="shareRacialAbility" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityWhisper"}}"></button>
+                {{#if row.isActiveRoll}}
+                  <div class="racial-ability-chip__footer">
+                    {{#if row.hasEffect}}
+                      <span class="racial-ability-chip__status{{#if row.effectActive}} racial-ability-chip__status--active{{/if}}">
+                        {{row.effectStatusLabel}}
+                      </span>
+                    {{/if}}
+                    <div class="item-actions racial-ability-chip__actions">
+                      <div class="roll-label-group">
+                        <button type="button" data-action="shareRacialAbility" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityPublic"}}">
+                          <i class="fa-regular fa-comment-dots"></i>
+                        </button>
+                        <div class="roll-label-actions">
+                          <button type="button" class="roll-label-action roll-label-action--blind" data-action="shareRacialAbility" data-roll-mode="blind" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityBlind"}}"></button>
+                          <button type="button" class="roll-label-action roll-label-action--gm" data-action="shareRacialAbility" data-roll-mode="gm" title="{{localize "STARFRONTIERS.Character.ShareRacialAbilityWhisper"}}"></button>
+                        </div>
                       </div>
-                    </div>
-                    {{#if row.isActiveRoll}}
                       <div class="roll-label-group">
                         <button type="button" data-action="rollRacialAbility" title="{{localize "STARFRONTIERS.Character.RollRacialAbilityPublic"}}">
                           <i class="fa-solid fa-dice-d10"></i>
@@ -475,17 +479,10 @@
                       <button type="button" data-action="increaseRacialAbility" title="{{localize "STARFRONTIERS.Character.IncreaseRacialAbility"}}"{{#unless row.canIncrease}} disabled{{/unless}}>
                         <i class="fa-solid fa-plus"></i>
                       </button>
-                    {{/if}}
-                    {{#if row.hasEffect}}
-                      <button type="button" class="racial-ability-effect-btn{{#if row.effectActive}} racial-ability-effect-btn--active{{/if}}" data-action="toggleRacialAbilityEffect" title="{{localize "STARFRONTIERS.Character.ToggleRacialEffect"}}">
-                        <i class="fa-solid fa-fire-flame-curved"></i>
-                      </button>
-                    {{/if}}
-                    <button type="button" data-action="openItem" title="{{localize "STARFRONTIERS.Character.OpenRacialAbility"}}">
-                      <i class="fa-solid fa-pen-to-square"></i>
-                    </button>
+                      {{> "systems/star-frontiers/templates/actor/parts/racial-ability-actions.hbs" row=row omitShare=true}}
+                    </div>
                   </div>
-                </div>
+                {{/if}}
               </article>
             {{/each}}
           </div>

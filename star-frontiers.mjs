@@ -187,7 +187,8 @@ function applySheetTheme(theme = game.settings.get(SYSTEM_ID, "sheetTheme")) {
 
 Hooks.once("init", async () => {
   await foundry.applications.handlebars.loadTemplates([
-    "systems/star-frontiers/templates/item/parts/reductions-editor.hbs"
+    "systems/star-frontiers/templates/item/parts/reductions-editor.hbs",
+    "systems/star-frontiers/templates/actor/parts/racial-ability-actions.hbs"
   ]);
 
   registerMigrationSettings();
@@ -359,6 +360,15 @@ Hooks.once("init", async () => {
     config: true,
     type: Boolean,
     default: true
+  });
+
+  game.settings.register(SYSTEM_ID, "homebrewAdvancementAbilities", {
+    name: "STARFRONTIERS.Settings.HomebrewAdvancementAbilities.Name",
+    hint: "STARFRONTIERS.Settings.HomebrewAdvancementAbilities.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
   });
 
   game.settings.register(SYSTEM_ID, "chargenWizardOnNew", {

@@ -144,6 +144,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     context.is = Object.fromEntries(Object.keys(ITEM_TYPE_LABELS).map((type) => [type, item.type === type]));
     context.rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
     context.expandedRules = context.rulesEdition === "expanded";
+    context.homebrewAdvancementEnabled = game.settings.get(SYSTEM_ID, "homebrewAdvancementAbilities");
     context.nameLabel = item.type === "race"
       ? "STARFRONTIERS.Item.Race"
       : item.type === "trainedAbility"
