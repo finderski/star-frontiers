@@ -2688,6 +2688,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.stat-roll-
   line-height: 1.15;
   margin: 0;
   text-transform: uppercase;
+  color: var(--sf-ink);
 }
 
 .stat-roll-card__header p {
@@ -2769,6 +2770,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   line-height: 1.15;
   margin: 0;
   text-transform: uppercase;
+  color: var(--sf-ink);
 }
 
 .check-roll-card__header p {
@@ -2820,7 +2822,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 }
 
 .check-roll-card__outcome--failure {
-  background: rgba(220, 38, 38, 0.12);
+  background: rgba(220, 38, 38, 0.6);
 }
 
 /* --- 14d. Chat-card actions (e.g. Roll Damage follow-up button) --- */
