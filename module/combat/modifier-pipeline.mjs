@@ -24,7 +24,7 @@ export const DEFAULT_TARGET_SIZE_MODIFIERS = Object.freeze({
   medium: 0,
   large: 5,
   giant: 10,
-  huge: 10
+  huge: 20
 });
 
 export const TARGET_SIZE_SETTING_KEYS = Object.freeze({

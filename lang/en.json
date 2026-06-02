@@ -937,7 +937,12 @@
       },
       "TargetSizeModifier": {
         "Hint": "Expanded-rules ranged attack modifier for this target size. Medium defaults to 0.",
-        "Name": "Expanded Target Size Modifier: {size}"
+        "Giant": "Expanded Target Size Modifier: Giant",
+        "Huge": "Expanded Target Size Modifier: Huge",
+        "Large": "Expanded Target Size Modifier: Large",
+        "Medium": "Expanded Target Size Modifier: Medium",
+        "Small": "Expanded Target Size Modifier: Small",
+        "Tiny": "Expanded Target Size Modifier: Tiny"
       },
       "ComputerPortabilityLevel": {
         "Hint": "Computers with a level above this value are treated as installed assets. They will not count toward encumbrance and will appear in the Assets section of the Equipment list.",

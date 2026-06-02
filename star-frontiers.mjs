@@ -378,10 +378,9 @@ Hooks.once("init", async () => {
   });
 
   for (const [size, settingKey] of Object.entries(TARGET_SIZE_SETTING_KEYS)) {
+    const capitalized = size.charAt(0).toUpperCase() + size.slice(1);
     game.settings.register(SYSTEM_ID, settingKey, {
-      name: game.i18n.format("STARFRONTIERS.Settings.TargetSizeModifier.Name", {
-        size: game.i18n.localize(`STARFRONTIERS.Choice.Size.${size}`)
-      }),
+      name: `STARFRONTIERS.Settings.TargetSizeModifier.${capitalized}`,
       hint: "STARFRONTIERS.Settings.TargetSizeModifier.Hint",
       scope: "world",
       config: true,

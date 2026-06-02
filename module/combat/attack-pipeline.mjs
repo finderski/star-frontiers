@@ -926,7 +926,7 @@ export function getWeaponDefenseLabel(weapon) {
 }
 
 export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
-  const profile = getWeaponAttackProfile(actor, weapon);
+  const profile = buildWeaponAttackProfile(actor, weapon);
   const activeMode = getActiveWeaponMode(weapon);
   const targetedToken = [...(game.user?.targets ?? [])][0] ?? null;
   const targetActor = targetedToken?.actor ?? null;
