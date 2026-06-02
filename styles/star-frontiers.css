@@ -146,6 +146,7 @@
 }
 
 body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
+body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog,
 .star-frontiers.sheet.theme-retro {
   --sf-ink: #d8f6ff;
   --sf-paper: #10151d;
@@ -182,7 +183,8 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 /* --- 3a. Container / typography --- */
 
 .star-frontiers-sheet,
-.star-frontiers-item-sheet {
+.star-frontiers-item-sheet,
+.star-frontiers.attack-dialog {
   background: var(--sf-paper);
   color: var(--sf-ink);
   font-family: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
@@ -205,7 +207,10 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 .star-frontiers-sheet select,
 .star-frontiers-item-sheet input,
 .star-frontiers-item-sheet textarea,
-.star-frontiers-item-sheet select {
+.star-frontiers-item-sheet select,
+.star-frontiers.attack-dialog input,
+.star-frontiers.attack-dialog textarea,
+.star-frontiers.attack-dialog select {
   background: transparent;
   border: 0;
   border-bottom: 2px solid var(--sf-line);
@@ -224,7 +229,10 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 .star-frontiers-sheet select:focus,
 .star-frontiers-item-sheet input:focus,
 .star-frontiers-item-sheet textarea:focus,
-.star-frontiers-item-sheet select:focus {
+.star-frontiers-item-sheet select:focus,
+.star-frontiers.attack-dialog input:focus,
+.star-frontiers.attack-dialog textarea:focus,
+.star-frontiers.attack-dialog select:focus {
   border-color: var(--sf-focus);
   box-shadow: 0 2px 0 rgba(124, 45, 18, 0.18);
   outline: none;
@@ -257,7 +265,8 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
  */
 
 .star-frontiers-sheet button,
-.star-frontiers-item-sheet button {
+.star-frontiers-item-sheet button,
+.star-frontiers.attack-dialog button {
   align-items: center;
   background: transparent;
   border: 1px solid var(--sf-line);
@@ -275,7 +284,9 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 .star-frontiers-sheet button:hover,
 .star-frontiers-sheet button:focus,
 .star-frontiers-item-sheet button:hover,
-.star-frontiers-item-sheet button:focus {
+.star-frontiers-item-sheet button:focus,
+.star-frontiers.attack-dialog button:hover,
+.star-frontiers.attack-dialog button:focus {
   background: var(--sf-button-hover);
 }
 
@@ -286,7 +297,8 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
  */
 
 .star-frontiers-sheet.theme-retro,
-.star-frontiers-item-sheet.theme-retro {
+.star-frontiers-item-sheet.theme-retro,
+body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog {
   --sf-ink: #d8f6ff;
   --sf-paper: #10151d;
   --sf-line: #4bdcff;
@@ -305,12 +317,16 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 .star-frontiers-sheet.theme-retro select,
 .star-frontiers-item-sheet.theme-retro input,
 .star-frontiers-item-sheet.theme-retro textarea,
-.star-frontiers-item-sheet.theme-retro select {
+.star-frontiers-item-sheet.theme-retro select,
+body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog input,
+body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog textarea,
+body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog select {
   background: rgba(9, 18, 28, 0.52);
 }
 
 .star-frontiers-sheet.theme-retro button,
-.star-frontiers-item-sheet.theme-retro button {
+.star-frontiers-item-sheet.theme-retro button,
+body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog button {
   box-shadow: 0 0 10px rgba(75, 220, 255, 0.15);
 }
 

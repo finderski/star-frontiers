@@ -1004,7 +1004,7 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   const allRollHtmls = [];
   const shotResults = [];
   for (let i = 0; i < shots; i++) {
-    const shotPenalty = i * -20;
+    const shotPenalty = 0;
     const shotTarget = clampAttackTarget(modifierContext.targetNumber + shotPenalty);
     const { total: rollTotal, rollHtml } = await evaluatePercentileRoll({
       forcedTotal: prompt.forcedRoll,
@@ -1337,6 +1337,15 @@ function clampRollTotal(value) {
   return Math.min(Math.max(Math.trunc(Number(value)), 1), 100);
 }
 
+function getOptionalNumericOverride(value, normalize) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return normalize(numeric);
+}
+
 function formatRollTotal(value) {
   return String(clampRollTotal(value)).padStart(2, "0");
 }
@@ -1361,9 +1370,7 @@ export function recomputeAttackCardModel(model = {}) {
   next.originalTargetNumber = clampAttackTarget(
     Number(next.originalTargetNumber ?? next.targetNumber ?? next.baseChance)
   );
-  next.targetNumberOverride = Number.isFinite(Number(next.targetNumberOverride))
-    ? clampAttackTarget(Number(next.targetNumberOverride))
-    : null;
+  next.targetNumberOverride = getOptionalNumericOverride(next.targetNumberOverride, clampAttackTarget);
   next.modifiers = Array.from(next.modifiers ?? []).map((modifier) => ({
     ...modifier,
     source: String(modifier?.source ?? MODIFIER_SOURCES.DERIVED),
@@ -1391,9 +1398,7 @@ export function recomputeAttackCardModel(model = {}) {
   next.shots = Array.from(next.shots ?? []).map((shot, index) => {
     const shotPenalty = Number(shot?.shotPenalty ?? 0);
     const originalRollTotal = clampRollTotal(shot?.originalRollTotal ?? shot?.rollTotal ?? 1);
-    let rollTotalOverride = Number.isFinite(Number(shot?.rollTotalOverride))
-      ? clampRollTotal(Number(shot.rollTotalOverride))
-      : null;
+    let rollTotalOverride = getOptionalNumericOverride(shot?.rollTotalOverride, clampRollTotal);
     if (rollTotalOverride !== null && rollTotalOverride === originalRollTotal) {
       rollTotalOverride = null;
     }
@@ -1442,7 +1447,7 @@ function getAttackSummaryTitle(model) {
   const weaponName = String(model?.weapon?.name ?? game.i18n.localize("STARFRONTIERS.Weapon.Name"));
   const targetName = String(model?.target?.name ?? "").trim();
   return targetName
-    ? `${attackerName} -> ${targetName} - ${weaponName}`
+    ? `${attackerName} → ${targetName} - ${weaponName}`
     : `${attackerName} - ${weaponName}`;
 }
 

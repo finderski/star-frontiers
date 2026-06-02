@@ -81,24 +81,16 @@
 
     <div class="sf-attack-card__details-body">
       <table class="sf-attack-card__modifiers">
-        <thead>
-          <tr>
-            <th>{{localize "STARFRONTIERS.Chat.Source"}}</th>
-            <th>{{localize "STARFRONTIERS.Chat.Modifier"}}</th>
-            <th>{{localize "STARFRONTIERS.Chat.Value"}}</th>
-            <th>{{localize "STARFRONTIERS.Chat.Enabled"}}</th>
-          </tr>
-        </thead>
         <tbody>
           <tr class="sf-attack-card__modifier-row sf-attack-card__modifier-row--base">
-            <td>{{localize "STARFRONTIERS.Modifier.Source.derived"}}</td>
+            {{!-- <td>{{localize "STARFRONTIERS.Modifier.Source.derived"}}</td> --}}
             <td>{{baseChanceLabel}}</td>
             <td>{{baseChance}}</td>
-            <td>Yes</td>
+            {{!-- <td>Yes</td> --}}
           </tr>
           {{#each modifierRows as |row|}}
             <tr class="sf-attack-card__modifier-row{{#unless row.enabled}} sf-attack-card__modifier-row--disabled{{/unless}}{{#if row.isAdjusted}} sf-attack-card__modifier-row--adjusted{{/if}}">
-              <td>{{row.sourceLabel}}</td>
+              {{!-- <td>{{row.sourceLabel}}</td> --}}
               <td>
                 <strong>{{row.label}}</strong>
                 {{#if row.notes}}
@@ -106,11 +98,11 @@
                 {{/if}}
               </td>
               <td>{{row.valueDisplay}}</td>
-              <td>{{#if row.enabled}}Yes{{else}}No{{/if}}</td>
+              {{!-- <td>{{#if row.enabled}}Yes{{else}}No{{/if}}</td> --}}
             </tr>
           {{/each}}
           <tr class="sf-attack-card__modifier-row sf-attack-card__modifier-row--total">
-            <td colspan="3"><strong>{{targetNumberLabel}}</strong></td>
+            <td><strong>{{targetNumberLabel}}</strong></td>
             <td><strong>{{targetNumber}}</strong></td>
           </tr>
         </tbody>
@@ -121,16 +113,16 @@
           <thead>
             <tr>
               <th>{{localize "STARFRONTIERS.Chat.Shot"}}</th>
-              <th>{{localize "STARFRONTIERS.Chat.Value"}}</th>
-              <th>{{localize "STARFRONTIERS.Chat.TargetNumber"}}</th>
-              <th>{{localize "STARFRONTIERS.Chat.Outcome"}}</th>
+              <th>{{localize "STARFRONTIERS.Chat.Roll"}}</th>
+              <th>{{localize "STARFRONTIERS.Chat.TargetNumber-abbr"}}</th>
+              <th>{{localize "STARFRONTIERS.Chat.Result"}}</th>
             </tr>
           </thead>
           <tbody>
             {{#each shotRows as |shot|}}
               <tr class="sf-attack-card__shot-row sf-attack-card__shot-row--{{shot.outcomeClass}}">
                 <td>
-                  {{localize "STARFRONTIERS.Weapon.ShotsLabel"}} {{shot.index}}
+                  {{!-- {{localize "STARFRONTIERS.Weapon.ShotsLabel"}} --}} {{shot.index}}
                   {{#if shot.shotPenalty}}
                     <small>{{shot.shotPenaltyDisplay}}</small>
                   {{/if}}
@@ -174,76 +166,77 @@
         </p>
       {{/if}}
 
-      {{{rollHtml}}}
-
       <section class="sf-attack-card__gm-adjustment">
-        <h4>{{localize "STARFRONTIERS.Chat.GMAdjustments"}}</h4>
+        <details>
+          <summary><h4>{{localize "STARFRONTIERS.Chat.GMAdjustments"}}</h4></summary>
 
-        <div class="sf-attack-card__gm-grid">
-          {{#each modifierRows as |row|}}
-            <label class="sf-attack-card__gm-field">
-              <span>{{row.label}}</span>
-              <input
-                type="number"
-                class="sf-attack-card__gm-input"
-                data-action="adjustAttackModifier"
-                data-modifier-id="{{row.id}}"
-                value="{{row.value}}"
-                step="1"
-              />
-              <span class="sf-attack-card__gm-checkbox">
+          <div class="sf-attack-card__gm-grid">
+            {{#each modifierRows as |row|}}
+              <label class="sf-attack-card__gm-field">
+                <span>{{row.label}}</span>
                 <input
-                  type="checkbox"
+                  type="number"
                   class="sf-attack-card__gm-input"
-                  data-action="toggleAttackModifier"
+                  data-action="adjustAttackModifier"
                   data-modifier-id="{{row.id}}"
-                  {{checked row.enabled}}
+                  value="{{row.value}}"
+                  step="1"
                 />
-                <small>{{localize "STARFRONTIERS.Chat.Enabled"}}</small>
-              </span>
-            </label>
-          {{/each}}
+                <span class="sf-attack-card__gm-checkbox">
+                  <input
+                    type="checkbox"
+                    class="sf-attack-card__gm-input"
+                    data-action="toggleAttackModifier"
+                    data-modifier-id="{{row.id}}"
+                    {{checked row.enabled}}
+                  />
+                  <small>{{localize "STARFRONTIERS.Chat.Enabled"}}</small>
+                </span>
+              </label>
+            {{/each}}
 
-          <label class="sf-attack-card__gm-field">
-            <span>{{localize "STARFRONTIERS.Chat.OverrideTargetNumber"}}</span>
-            <input
-              type="number"
-              class="sf-attack-card__gm-input"
-              data-action="setAttackTargetNumber"
-              value="{{targetNumberOverrideValue}}"
-              min="0"
-              max="100"
-              step="1"
-              placeholder="{{targetNumber}}"
-            />
-            <small>{{localize "STARFRONTIERS.Chat.CurrentTargetNumber"}}: {{targetNumber}}</small>
-          </label>
-
-          {{#each shotRows as |shot|}}
             <label class="sf-attack-card__gm-field">
-              <span>
-                {{#if ../isSingleShot}}
-                  {{localize "STARFRONTIERS.Chat.OverrideRollTotal"}}
-                {{else}}
-                  {{localize "STARFRONTIERS.Chat.OverrideRollTotal"}} {{localize "STARFRONTIERS.Weapon.ShotsLabel"}} {{shot.index}}
-                {{/if}}
-              </span>
+              <span>{{localize "STARFRONTIERS.Chat.OverrideTargetNumber"}}</span>
               <input
                 type="number"
                 class="sf-attack-card__gm-input"
-                data-action="setAttackRollTotal"
-                data-shot-index="{{shot.index}}"
-                value="{{shot.rollOverrideValue}}"
-                min="1"
+                data-action="setAttackTargetNumber"
+                value="{{targetNumberOverrideValue}}"
+                min="0"
                 max="100"
                 step="1"
-                placeholder="{{shot.rollTotalDisplay}}"
+                placeholder="{{targetNumber}}"
               />
-              <small>{{localize "STARFRONTIERS.Chat.CurrentRollTotal"}}: {{shot.rollTotalDisplay}}</small>
+              <small>{{localize "STARFRONTIERS.Chat.CurrentTargetNumber"}}: {{targetNumber}}</small>
             </label>
-          {{/each}}
-        </div>
+
+            {{#each shotRows as |shot|}}
+              <label class="sf-attack-card__gm-field">
+                <span>
+                  {{#if ../isSingleShot}}
+                    {{localize "STARFRONTIERS.Chat.OverrideRollTotal"}}
+                  {{else}}
+                    {{localize "STARFRONTIERS.Chat.OverrideRollTotal"}} {{localize "STARFRONTIERS.Weapon.ShotsLabel"}} {{shot.index}}
+                  {{/if}}
+                </span>
+                <input
+                  type="number"
+                  class="sf-attack-card__gm-input"
+                  data-action="setAttackRollTotal"
+                  data-shot-index="{{shot.index}}"
+                  value="{{shot.rollOverrideValue}}"
+                  min="1"
+                  max="100"
+                  step="1"
+                  placeholder="{{shot.rollTotalDisplay}}"
+                />
+                <small>{{localize "STARFRONTIERS.Chat.CurrentRollTotal"}}: {{shot.rollTotalDisplay}}</small>
+              </label>
+            {{/each}}
+          </div>
+        </details>
       </section>
     </div>
   </details>
+  {{{rollHtml}}}
 </section>
