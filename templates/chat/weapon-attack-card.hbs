@@ -1,23 +1,30 @@
-<section class="star-frontiers check-roll-card weapon-attack-card">
-  <header class="check-roll-card__header">
+<section class="star-frontiers check-roll-card weapon-attack-card sf-attack-card">
+  <header class="check-roll-card__header sf-attack-card__header">
     <h3>{{title}}</h3>
     {{#if subtitle}}
       <p>{{subtitle}}</p>
     {{/if}}
   </header>
 
-  <div class="check-roll-card__rows">
-    {{#each rows as |row|}}
-      <div class="check-roll-card__row">
-        <span class="check-roll-card__label">{{row.label}}</span>
-        <strong class="check-roll-card__value">{{row.value}}</strong>
-      </div>
-    {{/each}}
+  <div class="sf-attack-card__summary">
+    <div class="sf-attack-card__summary-line">
+      <span class="sf-attack-card__summary-roll">{{summaryRollText}}</span>
+      <span class="check-roll-card__outcome check-roll-card__outcome--{{outcomeClass}}">
+        {{summaryOutcome}}
+      </span>
+    </div>
+    {{#if adjustedByGm}}
+      <p class="sf-attack-card__adjusted">{{adjustedByGmLabel}}</p>
+    {{/if}}
+    {{#if blockerOverride}}
+      <p class="sf-attack-card__blocker-flag">{{localize "STARFRONTIERS.Combat.BlockerOverrideFlag"}}</p>
+    {{/if}}
   </div>
 
-  {{#if outcome}}
-    <div class="check-roll-card__outcome check-roll-card__outcome--{{outcomeClass}}">
-      {{outcome}}
+  {{#if ammo}}
+    <div class="sf-attack-card__ammo">
+      <span>{{localize "STARFRONTIERS.Weapon.AmmoRemaining"}}</span>
+      <strong>{{ammo.remaining}} / {{ammo.capacity}}</strong>
     </div>
   {{/if}}
 
@@ -33,27 +40,210 @@
       >
         {{damageButtonLabel}}
       </button>
-    </div>
-  {{/if}}
-
-  {{#if canRollAvoidance}}
-    <div class="chat-card-actions chat-card-actions--avoidance">
-      <button
-        type="button"
-        class="sf-chat-action"
-        data-action="rollAvoidance"
-        data-item-uuid="{{itemUuid}}"
-        data-target-token-uuid="{{targetTokenUuid}}"
-        data-target-actor-uuid="{{targetActorUuid}}"
-        data-roll-mode="{{rollMode}}"
-      >
-        {{avoidanceButtonLabel}}
-      </button>
-      {{#if avoidance.effectLabel}}
-        <span class="chat-card-actions__hint">{{avoidance.effectLabel}}</span>
+      {{#if canRollAvoidance}}
+        <button
+          type="button"
+          class="sf-chat-action"
+          data-action="rollAvoidance"
+          data-item-uuid="{{itemUuid}}"
+          data-target-token-uuid="{{targetTokenUuid}}"
+          data-target-actor-uuid="{{targetActorUuid}}"
+          data-roll-mode="{{rollMode}}"
+        >
+          {{avoidanceButtonLabel}}
+        </button>
       {{/if}}
     </div>
+  {{else}}
+    {{#if canRollAvoidance}}
+      <div class="chat-card-actions">
+        <button
+          type="button"
+          class="sf-chat-action"
+          data-action="rollAvoidance"
+          data-item-uuid="{{itemUuid}}"
+          data-target-token-uuid="{{targetTokenUuid}}"
+          data-target-actor-uuid="{{targetActorUuid}}"
+          data-roll-mode="{{rollMode}}"
+        >
+          {{avoidanceButtonLabel}}
+        </button>
+      </div>
+    {{/if}}
   {{/if}}
 
-  {{{rollHtml}}}
+  {{#if avoidance.effectLabel}}
+    <p class="chat-card-actions__hint">{{avoidance.effectLabel}}</p>
+  {{/if}}
+
+  <details class="sf-attack-card__details">
+    <summary>{{detailsLabel}}</summary>
+
+    <div class="sf-attack-card__details-body">
+      <table class="sf-attack-card__modifiers">
+        <thead>
+          <tr>
+            <th>{{localize "STARFRONTIERS.Chat.Source"}}</th>
+            <th>{{localize "STARFRONTIERS.Chat.Modifier"}}</th>
+            <th>{{localize "STARFRONTIERS.Chat.Value"}}</th>
+            <th>{{localize "STARFRONTIERS.Chat.Enabled"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sf-attack-card__modifier-row sf-attack-card__modifier-row--base">
+            <td>{{localize "STARFRONTIERS.Modifier.Source.derived"}}</td>
+            <td>{{baseChanceLabel}}</td>
+            <td>{{baseChance}}</td>
+            <td>Yes</td>
+          </tr>
+          {{#each modifierRows as |row|}}
+            <tr class="sf-attack-card__modifier-row{{#unless row.enabled}} sf-attack-card__modifier-row--disabled{{/unless}}{{#if row.isAdjusted}} sf-attack-card__modifier-row--adjusted{{/if}}">
+              <td>{{row.sourceLabel}}</td>
+              <td>
+                <strong>{{row.label}}</strong>
+                {{#if row.notes}}
+                  <small>{{row.notes}}</small>
+                {{/if}}
+              </td>
+              <td>{{row.valueDisplay}}</td>
+              <td>{{#if row.enabled}}Yes{{else}}No{{/if}}</td>
+            </tr>
+          {{/each}}
+          <tr class="sf-attack-card__modifier-row sf-attack-card__modifier-row--total">
+            <td colspan="3"><strong>{{targetNumberLabel}}</strong></td>
+            <td><strong>{{targetNumber}}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      {{#if shotRows.length}}
+        <table class="sf-attack-card__shots">
+          <thead>
+            <tr>
+              <th>{{localize "STARFRONTIERS.Chat.Shot"}}</th>
+              <th>{{localize "STARFRONTIERS.Chat.Value"}}</th>
+              <th>{{localize "STARFRONTIERS.Chat.TargetNumber"}}</th>
+              <th>{{localize "STARFRONTIERS.Chat.Outcome"}}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each shotRows as |shot|}}
+              <tr class="sf-attack-card__shot-row sf-attack-card__shot-row--{{shot.outcomeClass}}">
+                <td>
+                  {{localize "STARFRONTIERS.Weapon.ShotsLabel"}} {{shot.index}}
+                  {{#if shot.shotPenalty}}
+                    <small>{{shot.shotPenaltyDisplay}}</small>
+                  {{/if}}
+                </td>
+                <td>{{shot.rollTotalDisplay}}</td>
+                <td>{{shot.targetNumberDisplay}}</td>
+                <td>{{shot.outcomeLabel}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      {{/if}}
+
+      {{#if warnings.length}}
+        <div class="sf-attack-card__notes sf-attack-card__notes--warning">
+          <h4>{{localize "STARFRONTIERS.Chat.Warnings"}}</h4>
+          {{#each warnings as |warning|}}
+            <p>{{warning}}</p>
+          {{/each}}
+        </div>
+      {{/if}}
+
+      {{#if notes.length}}
+        <div class="sf-attack-card__notes">
+          <h4>{{localize "STARFRONTIERS.Chat.Notes"}}</h4>
+          {{#each notes as |note|}}
+            <p>{{note}}</p>
+          {{/each}}
+        </div>
+      {{/if}}
+
+      {{#if blockerOverride}}
+        <p class="sf-attack-card__blocker-override">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          {{#if blockerOverride.isGm}}
+            {{localize "STARFRONTIERS.Combat.BlockerOverrideGM"}}
+          {{else}}
+            {{localize "STARFRONTIERS.Combat.BlockerOverridePlayer"}}
+          {{/if}}
+          &mdash; {{blockerOverride.summary}}
+        </p>
+      {{/if}}
+
+      {{{rollHtml}}}
+
+      <section class="sf-attack-card__gm-adjustment">
+        <h4>{{localize "STARFRONTIERS.Chat.GMAdjustments"}}</h4>
+
+        <div class="sf-attack-card__gm-grid">
+          {{#each modifierRows as |row|}}
+            <label class="sf-attack-card__gm-field">
+              <span>{{row.label}}</span>
+              <input
+                type="number"
+                class="sf-attack-card__gm-input"
+                data-action="adjustAttackModifier"
+                data-modifier-id="{{row.id}}"
+                value="{{row.value}}"
+                step="1"
+              />
+              <span class="sf-attack-card__gm-checkbox">
+                <input
+                  type="checkbox"
+                  class="sf-attack-card__gm-input"
+                  data-action="toggleAttackModifier"
+                  data-modifier-id="{{row.id}}"
+                  {{checked row.enabled}}
+                />
+                <small>{{localize "STARFRONTIERS.Chat.Enabled"}}</small>
+              </span>
+            </label>
+          {{/each}}
+
+          <label class="sf-attack-card__gm-field">
+            <span>{{localize "STARFRONTIERS.Chat.OverrideTargetNumber"}}</span>
+            <input
+              type="number"
+              class="sf-attack-card__gm-input"
+              data-action="setAttackTargetNumber"
+              value="{{targetNumberOverrideValue}}"
+              min="0"
+              max="100"
+              step="1"
+              placeholder="{{targetNumber}}"
+            />
+            <small>{{localize "STARFRONTIERS.Chat.CurrentTargetNumber"}}: {{targetNumber}}</small>
+          </label>
+
+          {{#each shotRows as |shot|}}
+            <label class="sf-attack-card__gm-field">
+              <span>
+                {{#if ../isSingleShot}}
+                  {{localize "STARFRONTIERS.Chat.OverrideRollTotal"}}
+                {{else}}
+                  {{localize "STARFRONTIERS.Chat.OverrideRollTotal"}} {{localize "STARFRONTIERS.Weapon.ShotsLabel"}} {{shot.index}}
+                {{/if}}
+              </span>
+              <input
+                type="number"
+                class="sf-attack-card__gm-input"
+                data-action="setAttackRollTotal"
+                data-shot-index="{{shot.index}}"
+                value="{{shot.rollOverrideValue}}"
+                min="1"
+                max="100"
+                step="1"
+                placeholder="{{shot.rollTotalDisplay}}"
+              />
+              <small>{{localize "STARFRONTIERS.Chat.CurrentRollTotal"}}: {{shot.rollTotalDisplay}}</small>
+            </label>
+          {{/each}}
+        </div>
+      </section>
+    </div>
+  </details>
 </section>

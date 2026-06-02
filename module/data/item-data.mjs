@@ -56,6 +56,7 @@ export class StarFrontiersRaceData extends StarFrontiersItemData {
         running: numberField({ initial: 6, min: 0 }),
         hourly: numberField({ initial: 0, min: 0 })
       }),
+      size: textField({ initial: "medium", choices: ["tiny", "small", "medium", "large", "giant", "huge"] }),
       racialAbilityRefs: arrayField(textField()),
       racialAbilities: arrayField(schemaField({
         key: textField(),
@@ -175,6 +176,7 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
       twoHanded: boolField(),
       mechanics: schemaField({
         tags: setField(textField()),
+        attackModifier: numberField({ initial: 0 }),
         onHitEffectIds: arrayField(textField()),
         isHeavy: boolField(),
         rateOfFire: numberField({ initial: 1, min: 0 }),
@@ -183,6 +185,7 @@ export class StarFrontiersWeaponData extends StarFrontiersItemData {
           key: textField(),
           label: textField(),
           damageFormula: textField(),
+          attackModifier: numberField({ initial: 0 }),
           seuPerShot: numberField({ initial: 0, min: 0 }),
           avoidance: schemaField({
             enabled: boolField(),

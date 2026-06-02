@@ -348,6 +348,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       damageType: this.#choices(["", "albedo", "gaussAS", "sonic", "sonicAS", "inertia", "reactionSpeed", "stamina", "ir"], "STARFRONTIERS.Choice.DefenseType"),
       armorReduction: this.#choices(["", "half", "full", "flat"], "STARFRONTIERS.Choice.DefenseMode"),
       psa: this.#choices(["", "military", "technological", "biosocial"], "STARFRONTIERS.Choice.PSA"),
+      size: this.#choices(["tiny", "small", "medium", "large", "giant", "huge"], "STARFRONTIERS.Choice.Size"),
       screenPowerSource: this.#choices(["", "clip", "beltpack", "powerpack"], "STARFRONTIERS.Choice.ScreenPowerSource"),
       screenReduction: this.#choices(["", "half", "full", "absorbsN"], "STARFRONTIERS.Choice.ScreenReduction"),
       screenType: this.#choices(["", "albedo", "inertia", "gauss", "sonic", "chameleon", "holo"], "STARFRONTIERS.Choice.ScreenType"),
@@ -402,6 +403,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
         key: mode.key ?? "",
         label: mode.label ?? "",
         damageFormula: mode.damageFormula ?? "",
+        attackModifier: Number(mode.attackModifier ?? 0),
         seuPerShot: Number(mode.seuPerShot ?? 0),
         defenseTypes: Array.from(mode.defenseTypes ?? []),
         avoidance: {
@@ -454,6 +456,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       key: mode.key ?? "",
       label: mode.label ?? "",
       damageFormula: mode.damageFormula ?? "",
+      attackModifier: Number(mode.attackModifier ?? 0),
       seuPerShot: Number(mode.seuPerShot ?? 0),
       avoidance: {
         enabled: mode.avoidance?.enabled ?? false,
@@ -967,6 +970,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       key: "",
       label: "",
       damageFormula: "",
+      attackModifier: 0,
       seuPerShot: 0,
       avoidance: {
         enabled: false,

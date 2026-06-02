@@ -1,9 +1,26 @@
 import { SYSTEM_ID } from "../config.mjs";
+import {
+  ATTACK_TYPES,
+  BASIC_ATTACKER_MOVEMENT_MODS,
+  buildAttackModifierContext,
+  buildWeaponAttackProfile,
+  clampAttackTarget,
+  CREATURE_TARGET_MOVEMENT_MODS,
+  EXPANDED_ATTACKER_MOVEMENT_MODS,
+  EXPANDED_TARGET_MOVEMENT_MODS,
+  getActorTargetSize,
+  getAttackTypeForWeapon,
+  MODIFIER_SOURCES,
+  RANGE_BAND_MODS,
+  RANGE_BAND_ORDER,
+  resolveWeaponSkill,
+  shouldShowTargetSizeModifier
+} from "./modifier-pipeline.mjs";
 import { rememberDocumentSheetScroll } from "../sheets/scroll-preserving-sheet-mixin.mjs";
 
-export const RANGE_BAND_ORDER = ["pointBlank", "short", "medium", "long", "extreme"];
-export const RANGE_BAND_MODS = { pointBlank: 0, short: -10, medium: -20, long: -40, extreme: -80 };
 export const APPLY_ON_HIT_EFFECTS_SOCKET_ACTION = "applyOnHitEffects";
+export { ATTACK_TYPES, MODIFIER_SOURCES, RANGE_BAND_MODS, RANGE_BAND_ORDER, clampAttackTarget };
+export { buildWeaponAttackProfile as getWeaponAttackProfile, resolveWeaponSkill as getWeaponSkill };
 
 export function getPreferredWeaponForRangePreview(actor) {
   const weapons = actor?.items?.filter((item) => item.type === "weapon") ?? [];
@@ -105,84 +122,6 @@ export async function resolveWeaponAmmoItem(actor, weapon) {
   }
 }
 
-export function getWeaponAttackProfile(actor, weapon) {
-  const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
-
-  if (actor?.type === "creature") {
-    return {
-      attackAbilityKey: "",
-      baseTarget: clampAttackTarget(Number(actor.system.attackScore ?? weapon._source?.system?.attackScore ?? 0)),
-      rulesEdition,
-      skill: null,
-      skillLabel: game.i18n.localize("STARFRONTIERS.Creature.Attack")
-    };
-  }
-
-  const skill = getWeaponSkill(actor, weapon);
-  const dex = Number(actor.system.abilities?.dex?.value ?? 0);
-  const str = Number(actor.system.abilities?.str?.value ?? 0);
-  const skillKey = weapon.system.weaponSkillKey;
-  const isMelee = skillKey === "melee" || weapon.system.weaponType === "melee";
-  const isStr = skillKey === "str";
-
-  let baseTarget;
-  if (rulesEdition === "basic") {
-    if (isStr) baseTarget = str;
-    else if (isMelee) baseTarget = Math.max(str, dex);
-    else baseTarget = dex;
-  } else {
-    const levelBonus = Number(skill?.system.level ?? 0) * 10;
-    const skillBonus = Number(skill?.system.bonus ?? 0);
-    if (isStr) baseTarget = Math.ceil(str / 2) + levelBonus + skillBonus;
-    else if (isMelee) baseTarget = Math.ceil(Math.max(str, dex) / 2) + levelBonus + skillBonus;
-    else baseTarget = Math.ceil(dex / 2) + levelBonus + skillBonus;
-  }
-
-  return {
-    attackAbilityKey: isStr ? "str" : "dex",
-    baseTarget: clampAttackTarget(baseTarget),
-    rulesEdition,
-    skill,
-    skillLabel: skill?.name
-      ?? game.i18n.localize(`STARFRONTIERS.Choice.WeaponSkill.${skillKey || "None"}`)
-  };
-}
-
-export function getWeaponSkill(actor, weapon) {
-  const ref = weapon.system.requiredSkillRef;
-  if (ref) {
-    const owned = actor.items.get(ref);
-    if (owned?.type === "skill") return owned;
-
-    try {
-      const resolved = globalThis.fromUuidSync?.(ref) ?? null;
-      if (resolved?.type === "skill") {
-        if (resolved.parent === actor) return resolved;
-
-        const sourceId = resolved.uuid;
-        const ownedCopy = actor.items.find((item) =>
-          item.type === "skill"
-          && (item._stats?.compendiumSource === sourceId || item.name === resolved.name)
-        );
-        if (ownedCopy) return ownedCopy;
-      }
-    } catch {
-      /* ignore unresolved refs */
-    }
-  }
-
-  const key = weapon.system.weaponSkillKey;
-  if (!key) return null;
-
-  return actor.items
-    .filter((item) => item.type === "skill" && item.system.weaponSkillKey === key)
-    .sort((a, b) => Number(b.system.level ?? 0) - Number(a.system.level ?? 0))[0];
-}
-
-export function clampAttackTarget(value) {
-  return Math.min(Math.max(Math.round(value), 0), 100);
-}
-
 export function formatAttackTarget(value) {
   return value === null || value === undefined ? "" : String(value);
 }
@@ -254,52 +193,365 @@ export function getAvailableWeaponRangeBands(weapon) {
   return bands;
 }
 
-export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand = null) {
-  const rangeBands = autoRangeBand ? [] : getAvailableWeaponRangeBands(weapon);
-  const forcedField = getForcedRollOverrideField();
-  const options = rangeBands.map((band) => {
-    const mod = band.modifier >= 0 ? `+${band.modifier}` : `${band.modifier}`;
-    return `<option value="${band.key}">${band.label} (${mod})</option>`;
+function localizeAttackModifierSource(source) {
+  return game.i18n.localize(`STARFRONTIERS.Modifier.Source.${source}`);
+}
+
+function localizeModifierValue(key) {
+  return game.i18n.localize(`STARFRONTIERS.Modifier.Value.${key}`);
+}
+
+function localizeRangeBandValue(key) {
+  return game.i18n.localize(`STARFRONTIERS.Range.${key}`);
+}
+
+function signedModifierValue(value) {
+  const amount = Number(value ?? 0);
+  return amount >= 0 ? `+${amount}` : String(amount);
+}
+
+function buildSelectChoices(keys, formatter, valueMap = {}) {
+  return keys.map((key) => ({
+    value: key,
+    label: formatter(key),
+    modifierLabel: key in valueMap ? signedModifierValue(valueMap[key]) : ""
+  }));
+}
+
+function getDefaultRangeBandKey(rangeBands = []) {
+  return rangeBands.find((band) => band.key === "medium")?.key ?? rangeBands[0]?.key ?? "";
+}
+
+function buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBand = null, measuredDistance = null) {
+  const attackType = profile.attackType ?? getAttackTypeForWeapon(weapon);
+  const rulesEdition = profile.rulesEdition ?? game.settings.get(SYSTEM_ID, "rulesEdition");
+  const rangeBands = getAvailableWeaponRangeBands(weapon);
+  const targetSizeDerived = shouldShowTargetSizeModifier({ rulesEdition, attackType })
+    ? getActorTargetSize(targetActor)
+    : "";
+  const showRangeControl = attackType !== ATTACK_TYPES.MELEE && rangeBands.length > 0;
+  const canOverrideDerived = Boolean(game.user?.isGM || game.settings.get(SYSTEM_ID, "homebrewPlayerCanOverrideModifiers"));
+  const rof = rulesEdition === "expanded" ? Number(weapon.system.mechanics?.rateOfFire ?? 1) : 1;
+  return {
+    actor,
+    targetActor,
+    weapon,
+    profile,
+    autoRangeBand,
+    measuredDistance,
+    attackType,
+    rulesEdition,
+    targetSizeDerived,
+    showRangeControl,
+    rangeBands,
+    canOverrideDerived,
+    showTargetSizeControl: shouldShowTargetSizeModifier({ rulesEdition, attackType }),
+    targetIsCreature: targetActor?.type === "creature",
+    rof
+  };
+}
+
+function readAttackDialogState(root, setup) {
+  const readNumber = (name, fallback = 0) => {
+    const input = root.querySelector(`[name='${name}']`);
+    return Number.isFinite(input?.valueAsNumber) ? input.valueAsNumber : fallback;
+  };
+  const readChecked = (name) => Boolean(root.querySelector(`[name='${name}']`)?.checked);
+  const readValue = (name, fallback = "") => String(root.querySelector(`[name='${name}']`)?.value ?? fallback);
+  const derivedOverrides = {};
+
+  for (const row of root.querySelectorAll("[data-derived-modifier-id]")) {
+    const id = row.dataset.derivedModifierId;
+    if (!id) continue;
+    const valueInput = row.querySelector(`[name='derived-value-${id}']`);
+    const enabledInput = row.querySelector(`[name='derived-enabled-${id}']`);
+    derivedOverrides[id] = {
+      value: Number.isFinite(valueInput?.valueAsNumber) ? valueInput.valueAsNumber : 0,
+      enabled: enabledInput ? Boolean(enabledInput.checked) : true
+    };
+  }
+
+  return {
+    rangeBandKey: readValue("rangeBandKey", setup.autoRangeBand?.key ?? getDefaultRangeBandKey(setup.rangeBands)),
+    useRangeOverride: readValue("useRangeOverride", setup.autoRangeBand ? "false" : "true") === "true",
+    targetSizeKey: readValue("targetSizeKey", setup.targetSizeDerived || "medium"),
+    useTargetSizeOverride: readValue("useTargetSizeOverride", setup.targetSizeDerived ? "false" : "true") === "true",
+    attackerMovement: readValue("attackerMovement", setup.rulesEdition === "basic" ? "stationary" : "stationary"),
+    targetMovement: readValue("targetMovement", "walking"),
+    creatureTargetMovement: readValue("creatureTargetMovement", ""),
+    carefulAim: readChecked("carefulAim"),
+    firingTwoWeapons: readChecked("firingTwoWeapons"),
+    rifleInMelee: readChecked("rifleInMelee"),
+    gmCircumstanceLabel: readValue("gmCircumstanceLabel", ""),
+    gmCircumstanceValue: readNumber("gmCircumstanceValue", 0),
+    miscModifierLabel: readValue("miscModifierLabel", ""),
+    miscModifierValue: readNumber("miscModifierValue", 0),
+    derivedOverrides
+  };
+}
+
+function buildAttackDialogContext(setup, dialogState = {}) {
+  const modifierContext = buildAttackModifierContext({
+    attacker: setup.actor,
+    target: setup.targetActor,
+    weapon: setup.weapon,
+    attackType: setup.attackType,
+    mode: getActiveWeaponMode(setup.weapon),
+    profile: setup.profile,
+    resolvedRangeBand: setup.autoRangeBand,
+    measuredDistance: setup.measuredDistance,
+    dialogState
+  });
+
+  return {
+    ...modifierContext,
+    baseChance: modifierContext.baseChance,
+    targetNumber: modifierContext.targetNumber,
+    rangeControl: setup.showRangeControl
+      ? {
+          derived: Boolean(setup.autoRangeBand),
+          currentLabel: setup.autoRangeBand?.label ?? "",
+          useOverride: Boolean(dialogState.useRangeOverride ?? !setup.autoRangeBand),
+          selectedKey: dialogState.rangeBandKey || setup.autoRangeBand?.key || getDefaultRangeBandKey(setup.rangeBands),
+          options: setup.rangeBands.map((band) => ({
+            value: band.key,
+            label: `${band.label} (${signedModifierValue(band.modifier)})`
+          })),
+          canOverride: setup.canOverrideDerived
+        }
+      : null,
+    targetSizeControl: setup.showTargetSizeControl
+      ? {
+          derived: Boolean(setup.targetSizeDerived),
+          currentLabel: setup.targetSizeDerived ? game.i18n.localize(`STARFRONTIERS.Choice.Size.${setup.targetSizeDerived}`) : "",
+          useOverride: Boolean(dialogState.useTargetSizeOverride ?? !setup.targetSizeDerived),
+          selectedKey: dialogState.targetSizeKey || setup.targetSizeDerived || "medium",
+          options: buildSelectChoices(["tiny", "small", "medium", "large", "giant", "huge"], (key) => game.i18n.localize(`STARFRONTIERS.Choice.Size.${key}`)),
+          canOverride: setup.canOverrideDerived
+        }
+      : null,
+    modifierRows: modifierContext.modifiers.map((modifier) => ({
+      ...modifier,
+      sourceLabel: localizeAttackModifierSource(modifier.source),
+      valueDisplay: signedModifierValue(modifier.value),
+      canEditInDialog: (modifier.source === MODIFIER_SOURCES.DERIVED || modifier.source === MODIFIER_SOURCES.STATUS)
+        ? setup.canOverrideDerived
+        : false
+    })),
+    attackerMovementOptions: setup.rulesEdition === "basic"
+      ? buildSelectChoices(["stationary", "moving"], (key) => localizeModifierValue(key), BASIC_ATTACKER_MOVEMENT_MODS)
+      : buildSelectChoices(["stationary", "walking", "running", "dodging"], (key) => localizeModifierValue(key), EXPANDED_ATTACKER_MOVEMENT_MODS),
+    targetMovementOptions: buildSelectChoices(["stationary", "walking", "running", "dodging"], (key) => localizeModifierValue(key), EXPANDED_TARGET_MOVEMENT_MODS),
+    creatureTargetMovementOptions: buildSelectChoices(["", "medium", "fast", "veryFast"], (key) =>
+      key ? localizeModifierValue(key) : game.i18n.localize("STARFRONTIERS.Modifier.Value.unspecified"), CREATURE_TARGET_MOVEMENT_MODS),
+    attackerMovementSelected: dialogState.attackerMovement || (setup.rulesEdition === "basic" ? "stationary" : "stationary"),
+    targetMovementSelected: dialogState.targetMovement || "walking",
+    creatureTargetMovementSelected: dialogState.creatureTargetMovement || "",
+    carefulAim: Boolean(dialogState.carefulAim),
+    firingTwoWeapons: Boolean(dialogState.firingTwoWeapons),
+    rifleInMelee: Boolean(dialogState.rifleInMelee),
+    gmCircumstanceLabel: dialogState.gmCircumstanceLabel ?? "",
+    gmCircumstanceValue: Number(dialogState.gmCircumstanceValue ?? 0),
+    miscModifierLabel: dialogState.miscModifierLabel ?? "",
+    miscModifierValue: Number(dialogState.miscModifierValue ?? 0)
+  };
+}
+
+function renderAttackDialogModifierRows(rows = []) {
+  if (!rows.length) {
+    return `<p class="attack-dialog__empty">${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.NoActiveModifiers"))}</p>`;
+  }
+
+  return rows.map((row) => {
+    const safeId = foundry.utils.escapeHTML(row.id);
+    const safeLabel = foundry.utils.escapeHTML(row.label);
+    const safeSource = foundry.utils.escapeHTML(row.sourceLabel);
+    const safeNotes = row.notes ? `<small class="attack-dialog__modifier-notes">${foundry.utils.escapeHTML(row.notes)}</small>` : "";
+    const disabledAttr = row.canEditInDialog ? "" : " disabled";
+    const checkboxDisabledAttr = row.canEditInDialog ? "" : " disabled";
+    const checkedAttr = row.enabled ? " checked" : "";
+    const rowClass = row.enabled ? "" : " attack-dialog__modifier-row--disabled";
+    const valueMarkup = (row.source === MODIFIER_SOURCES.DERIVED || row.source === MODIFIER_SOURCES.STATUS)
+      ? `<input class="attack-dialog__modifier-value" type="number" step="1" name="derived-value-${safeId}" value="${Number(row.value ?? 0)}"${disabledAttr} />`
+      : `<strong class="attack-dialog__modifier-static">${foundry.utils.escapeHTML(row.valueDisplay)}</strong>`;
+    const enabledMarkup = (row.source === MODIFIER_SOURCES.DERIVED || row.source === MODIFIER_SOURCES.STATUS)
+      ? `<input type="checkbox" name="derived-enabled-${safeId}"${checkedAttr}${checkboxDisabledAttr} />`
+      : `<span class="attack-dialog__modifier-enabled">${row.enabled ? "✓" : "—"}</span>`;
+    return `
+      <div class="attack-dialog__modifier-row${rowClass}" data-derived-modifier-id="${safeId}">
+        <div class="attack-dialog__modifier-copy">
+          <span class="attack-dialog__modifier-source">${safeSource}</span>
+          <strong class="attack-dialog__modifier-label">${safeLabel}</strong>
+          ${safeNotes}
+        </div>
+        <div class="attack-dialog__modifier-controls">
+          ${valueMarkup}
+          ${enabledMarkup}
+        </div>
+      </div>
+    `;
   }).join("");
+}
 
-  const autoRangeInfo = autoRangeBand
-    ? `<p>${game.i18n.format("STARFRONTIERS.Weapon.AutoRangeDetected", {
-        range: autoRangeBand.label,
-        mod: autoRangeBand.mod >= 0 ? `+${autoRangeBand.mod}` : String(autoRangeBand.mod)
-      })}</p>`
-    : "";
+function renderAttackDialogWarnings(warnings = []) {
+  if (!warnings.length) return "";
+  return warnings.map((warning) => `<p>${foundry.utils.escapeHTML(warning)}</p>`).join("");
+}
 
-  const rof = profile.rulesEdition === "expanded" ? Number(weapon.system.mechanics?.rateOfFire ?? 1) : 1;
-  const shotsField = rof > 1
-    ? `<label class="dialog-field">
-        <span>${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")} (max ${rof}, −20 each)</span>
-        <input name="shots" type="number" step="1" min="1" max="${rof}" value="1">
-      </label>`
-    : "";
+function readAttackDialogBlockerState(root) {
+  const banner = root.querySelector("[data-attack-dialog-blocker-banner]");
+  if (!banner || banner.hidden) {
+    return { hasBlocker: false, gmOverride: false, playerOverride: false, overrideActive: true };
+  }
+  const gmOverride = Boolean(root.querySelector("[name='gmOverrideBlocker']")?.checked);
+  const playerOverride = Boolean(root.querySelector("[name='playerOverrideBlocker']")?.checked);
+  return {
+    hasBlocker: true,
+    gmOverride,
+    playerOverride,
+    overrideActive: gmOverride || playerOverride
+  };
+}
+
+function updateAttackDialogRollButton(root) {
+  const dialogRoot = root.closest?.(".application") ?? root.parentElement ?? root;
+  const button = dialogRoot?.querySelector?.("button[data-action='roll']")
+    ?? root.querySelector?.("button[data-action='roll']");
+  if (!button) return;
+  const state = readAttackDialogBlockerState(root);
+  button.disabled = state.hasBlocker && !state.overrideActive;
+}
+
+function syncAttackDialog(root, setup) {
+  const state = readAttackDialogState(root, setup);
+  const context = buildAttackDialogContext(setup, state);
+
+  const modifierRows = root.querySelector("[data-attack-dialog-modifiers]");
+  if (modifierRows) modifierRows.innerHTML = renderAttackDialogModifierRows(context.modifierRows);
+
+  const warnings = root.querySelector("[data-attack-dialog-warnings]");
+  if (warnings) warnings.innerHTML = renderAttackDialogWarnings(context.warnings);
+
+  const targetNumber = root.querySelector("[data-attack-dialog-target-number]");
+  if (targetNumber) targetNumber.textContent = String(context.targetNumber);
+
+  const banner = root.querySelector("[data-attack-dialog-blocker-banner]");
+  if (banner) {
+    const hasBlockers = Array.isArray(context.blockers) && context.blockers.length > 0;
+    banner.hidden = !hasBlockers;
+    const messages = banner.querySelector("[data-attack-dialog-blocker-messages]");
+    if (messages) {
+      messages.innerHTML = (context.blockers ?? []).map((blocker) => {
+        const label = foundry.utils.escapeHTML(String(blocker?.label ?? ""));
+        return `<p>${foundry.utils.escapeHTML(game.i18n.format("STARFRONTIERS.Combat.BlockerMessage", { label }))}</p>`;
+      }).join("");
+    }
+    updateAttackDialogRollButton(root);
+  }
+
+  const rangeLabel = root.querySelector("[data-attack-dialog-range-label]");
+  if (rangeLabel && context.rangeControl?.derived) {
+    const currentRange = context.rangeControl.options.find((option) => option.value === context.rangeControl.selectedKey);
+    rangeLabel.textContent = currentRange?.label ?? context.rangeControl.currentLabel;
+  }
+
+  const rangePanel = root.querySelector("[data-attack-dialog-panel='range']");
+  if (rangePanel && context.rangeControl?.derived) {
+    rangePanel.hidden = !context.rangeControl.useOverride;
+  }
+
+  const rangeOverride = root.querySelector("[name='useRangeOverride']");
+  if (rangeOverride) rangeOverride.value = context.rangeControl?.useOverride ? "true" : "false";
+
+  const sizeLabel = root.querySelector("[data-attack-dialog-size-label]");
+  if (sizeLabel && context.targetSizeControl?.derived) {
+    const currentSize = context.targetSizeControl.options.find((option) => option.value === context.targetSizeControl.selectedKey);
+    sizeLabel.textContent = currentSize?.label ?? context.targetSizeControl.currentLabel;
+  }
+
+  const sizePanel = root.querySelector("[data-attack-dialog-panel='size']");
+  if (sizePanel && context.targetSizeControl?.derived) {
+    sizePanel.hidden = !context.targetSizeControl.useOverride;
+  }
+
+  const sizeOverride = root.querySelector("[name='useTargetSizeOverride']");
+  if (sizeOverride) sizeOverride.value = context.targetSizeControl?.useOverride ? "true" : "false";
+}
+
+function resolveAttackDialogRangeBand(dialogState, autoRangeBand = null) {
+  const useOverride = Boolean(dialogState?.useRangeOverride);
+  const key = String(useOverride
+    ? (dialogState?.rangeBandKey ?? "")
+    : (autoRangeBand?.key ?? dialogState?.rangeBandKey ?? ""));
+  if (!key) return { key: "", label: "", mod: 0 };
+  return {
+    key,
+    label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
+    mod: Number(RANGE_BAND_MODS[key] ?? 0)
+  };
+}
+
+export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand = null, { measuredDistance = null, targetActor = null } = {}) {
+  const setup = buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBand, measuredDistance);
+  const initialContext = buildAttackDialogContext(setup, {
+    rangeBandKey: autoRangeBand?.key ?? getDefaultRangeBandKey(setup.rangeBands),
+    useRangeOverride: !autoRangeBand,
+    targetSizeKey: setup.targetSizeDerived || "medium",
+    useTargetSizeOverride: !setup.targetSizeDerived,
+    attackerMovement: setup.rulesEdition === "basic" ? "stationary" : "stationary",
+    targetMovement: "walking",
+    creatureTargetMovement: "",
+    carefulAim: false,
+    firingTwoWeapons: false,
+    rifleInMelee: false,
+    gmCircumstanceLabel: "",
+    gmCircumstanceValue: 0,
+    miscModifierLabel: "",
+    miscModifierValue: 0,
+    derivedOverrides: {}
+  });
+
+  const isGM = Boolean(game.user?.isGM);
+  const playerOverrideAllowed = Boolean(game.settings.get(SYSTEM_ID, "homebrewPlayerCanOverrideModifiers"));
+  const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/dialog/attack-prompt.hbs", {
+    attackerName: actor.name,
+    targetName: targetActor?.name ?? game.i18n.localize("STARFRONTIERS.Weapon.NoTarget"),
+    baseChance: initialContext.baseChance,
+    targetNumber: initialContext.targetNumber,
+    rangeControl: initialContext.rangeControl,
+    targetSizeControl: initialContext.targetSizeControl,
+    attackerMovementOptions: initialContext.attackerMovementOptions,
+    attackerMovementSelected: initialContext.attackerMovementSelected,
+    targetMovementOptions: initialContext.targetMovementOptions,
+    targetMovementSelected: initialContext.targetMovementSelected,
+    creatureTargetMovementOptions: initialContext.creatureTargetMovementOptions,
+    creatureTargetMovementSelected: initialContext.creatureTargetMovementSelected,
+    targetIsCreature: setup.targetIsCreature,
+    rulesEdition: setup.rulesEdition,
+    showTargetMovementControl: setup.rulesEdition === "expanded",
+    carefulAim: false,
+    firingTwoWeapons: false,
+    rifleInMelee: false,
+    gmCircumstanceLabel: "",
+    gmCircumstanceValue: 0,
+    miscModifierLabel: "",
+    miscModifierValue: 0,
+    rof: setup.rof,
+    shots: 1,
+    showShots: setup.rof > 1,
+    forcedField: getForcedRollOverrideField(),
+    modifierRowsHtml: renderAttackDialogModifierRows(initialContext.modifierRows),
+    warningsHtml: renderAttackDialogWarnings(initialContext.warnings),
+    blockers: initialContext.blockers ?? [],
+    isGM,
+    showPlayerOverride: !isGM && playerOverrideAllowed
+  });
 
   return foundry.applications.api.DialogV2.wait({
     window: {
       title: game.i18n.format("STARFRONTIERS.Weapon.AttackTitle", { weapon: weapon.name })
     },
-    content: `
-      <p>${game.i18n.format("STARFRONTIERS.Weapon.AttackPrompt", {
-        weapon: weapon.name,
-        target: profile.baseTarget
-      })}</p>
-      ${autoRangeInfo}
-      ${rangeBands.length ? `
-        <label class="dialog-field">
-          <span>${game.i18n.localize("STARFRONTIERS.Weapon.Range")}</span>
-          <select name="rangeBand">${options}</select>
-        </label>
-      ` : ""}
-      ${shotsField}
-      <label class="dialog-field">
-        <span>${game.i18n.localize("STARFRONTIERS.Character.Modifier")}</span>
-        <input name="modifier" type="number" step="1" value="0" autofocus>
-      </label>
-      ${forcedField}
-    `,
+    content,
     buttons: [
       {
         action: "roll",
@@ -307,20 +559,31 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
         default: true,
         callback: (event, button, dialog) => {
           const root = dialog.element;
-          const modifierInput = root.querySelector("[name='modifier']");
-          const rangeBandInput = root.querySelector("[name='rangeBand']");
-          const shotsInput = root.querySelector("[name='shots']");
-
-          const rangeBand = rangeBandInput?.value ?? "";
-          const rangeLabel = rangeBands.find((band) => band.key === rangeBand)?.label ?? "";
-          const shotsValue = shotsInput ? parseInt(shotsInput.value, 10) : 1;
-
+          const dialogState = readAttackDialogState(root, setup);
+          const shotsValue = root.querySelector("[name='shots']")?.valueAsNumber;
+          const blockerState = readAttackDialogBlockerState(root);
+          const blockerContext = buildAttackModifierContext({
+            attacker: actor,
+            target: targetActor,
+            weapon,
+            attackType: setup.attackType,
+            mode: getActiveWeaponMode(weapon),
+            profile,
+            resolvedRangeBand: setup.autoRangeBand,
+            measuredDistance: setup.measuredDistance,
+            dialogState
+          });
+          const blockerOverride = blockerState.hasBlocker && blockerState.overrideActive
+            ? {
+                blockers: (blockerContext.blockers ?? []).map((entry) => String(entry.label ?? "")),
+                by: blockerState.gmOverride ? "gm" : "player"
+              }
+            : null;
           return {
-            modifier: Number.isFinite(modifierInput?.valueAsNumber) ? modifierInput.valueAsNumber : 0,
+            dialogState,
             forcedRoll: readForcedRollOverride(root.querySelector("[name='forcedRoll']")),
-            rangeBand,
-            rangeLabel,
-            shots: rof > 1 ? Math.min(Math.max(shotsValue || 1, 1), rof) : 1
+            shots: setup.rof > 1 ? Math.min(Math.max(Number(shotsValue || 1), 1), setup.rof) : 1,
+            blockerOverride
           };
         }
       },
@@ -329,6 +592,52 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
         label: game.i18n.localize("Cancel")
       }
     ],
+    render: (event, dialog) => {
+      const root = dialog.element;
+      if (!root) return;
+
+      syncAttackDialog(root, setup);
+      updateAttackDialogRollButton(root);
+
+      root.addEventListener("input", (domEvent) => {
+        const target = domEvent.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.matches("input[type='number'], [name^='derived-value-']")) {
+          syncAttackDialog(root, setup);
+        }
+      });
+
+      root.addEventListener("change", (domEvent) => {
+        const target = domEvent.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.matches("[name='gmOverrideBlocker'], [name='playerOverrideBlocker']")) {
+          updateAttackDialogRollButton(root);
+          return;
+        }
+        if (target.matches("select, input[type='checkbox'], input[type='text']")) {
+          syncAttackDialog(root, setup);
+        }
+      });
+
+      root.addEventListener("click", (domEvent) => {
+        const target = domEvent.target instanceof HTMLElement
+          ? domEvent.target.closest("[data-attack-dialog-toggle]")
+          : null;
+        if (!target) return;
+        domEvent.preventDefault();
+        const toggle = target.dataset.attackDialogToggle;
+        if (toggle === "range" && setup.autoRangeBand) {
+          const input = root.querySelector("[name='useRangeOverride']");
+          if (input) input.value = input.value === "true" ? "false" : "true";
+          syncAttackDialog(root, setup);
+        }
+        if (toggle === "size" && setup.targetSizeDerived) {
+          const input = root.querySelector("[name='useTargetSizeOverride']");
+          if (input) input.value = input.value === "true" ? "false" : "true";
+          syncAttackDialog(root, setup);
+        }
+      });
+    },
     modal: true,
     rejectClose: false
   });
@@ -619,17 +928,10 @@ export function getWeaponDefenseLabel(weapon) {
 export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   const profile = getWeaponAttackProfile(actor, weapon);
   const activeMode = getActiveWeaponMode(weapon);
-  const isCreatureAttack = weapon.type === "creatureAttack";
-  const isMelee = !isCreatureAttack
-    && (weapon.system.weaponSkillKey === "melee" || weapon.system.weaponType === "melee");
-  const combatProfileBonus = Number(
-    isMelee
-      ? actor.system.combatProfile?.meleeBonus ?? 0
-      : actor.system.combatProfile?.rangedBonus ?? 0
-  );
   const targetedToken = [...(game.user?.targets ?? [])][0] ?? null;
+  const targetActor = targetedToken?.actor ?? null;
   const targetTokenUuid = targetedToken?.document?.uuid ?? "";
-  const targetActorUuid = targetedToken?.actor?.uuid ?? "";
+  const targetActorUuid = targetActor?.uuid ?? "";
 
   const ammoCheck = getAmmoConsumption(weapon);
   const loadedSource = await resolveLoadedSource(actor, weapon);
@@ -648,18 +950,27 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     ? getRangeBandFromDistance(weapon, targetDistance)
     : null;
 
-  const prompt = await promptWeaponAttack(actor, weapon, profile, autoRangeBand);
+  const prompt = await promptWeaponAttack(actor, weapon, profile, autoRangeBand, {
+    measuredDistance: targetDistance,
+    targetActor
+  });
   if (!prompt) return;
 
-  const activeBandKey = autoRangeBand?.key ?? prompt.rangeBand;
-  const activeRangeLabel = autoRangeBand?.label ?? prompt.rangeLabel;
-  const rangeMod = activeBandKey ? (RANGE_BAND_MODS[activeBandKey] ?? 0) : 0;
+  const modifierContext = buildAttackModifierContext({
+    attacker: actor,
+    target: targetActor,
+    weapon,
+    attackType: profile.attackType,
+    mode: activeMode,
+    profile,
+    resolvedRangeBand: autoRangeBand,
+    measuredDistance: targetDistance,
+    dialogState: prompt.dialogState
+  });
+  const selectedRangeBand = resolveAttackDialogRangeBand(prompt.dialogState, autoRangeBand);
+  const activeBandKey = selectedRangeBand.key;
   const shots = prompt.shots ?? 1;
   const totalAmmo = ammoCheck.amount * shots;
-  const encumbrance = getCombatEncumbranceMods(actor, profile.rulesEdition, {
-    isMelee,
-    attackAbilityKey: profile.attackAbilityKey
-  });
 
   if (ammoCheck.amount > 0) {
     const loaded = getLoadedAmmo(weapon, liveCapacity, loadedSource);
@@ -690,107 +1001,104 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     }
   }
 
-  const rows = [
-    { label: game.i18n.localize("STARFRONTIERS.Weapon.Skill"), value: profile.skillLabel },
-    { label: game.i18n.localize("STARFRONTIERS.Character.BaseTarget"), value: String(profile.baseTarget) }
-  ];
-
-  if (activeMode) {
-    rows.unshift({
-      label: game.i18n.localize("STARFRONTIERS.Weapon.Mode.Label"),
-      value: getWeaponModeLabel(activeMode)
-    });
-  }
-
-  if (autoRangeBand && targetDistance !== null) {
-    const units = canvas?.grid?.units || "m";
-    rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.Distance"), value: `${targetDistance} ${units}` });
-  }
-  if (activeRangeLabel) {
-    rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.Range"), value: activeRangeLabel });
-    rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.RangeModifier"), value: rangeMod >= 0 ? `+${rangeMod}` : String(rangeMod) });
-  }
-  if (encumbrance.attackerMod) {
-    rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.AttackerEncumbered"), value: encumbrance.attackerMod >= 0 ? `+${encumbrance.attackerMod}` : String(encumbrance.attackerMod) });
-  }
-  if (encumbrance.targetMod) {
-    rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.TargetEncumbered"), value: encumbrance.targetMod >= 0 ? `+${encumbrance.targetMod}` : String(encumbrance.targetMod) });
-  }
-  if (combatProfileBonus) {
-    rows.push({
-      label: game.i18n.localize(isMelee
-        ? "STARFRONTIERS.Weapon.MeleeBonus"
-        : "STARFRONTIERS.Weapon.RangedBonus"),
-      value: combatProfileBonus >= 0 ? `+${combatProfileBonus}` : String(combatProfileBonus)
-    });
-  }
-  rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Modifier"), value: prompt.modifier >= 0 ? `+${prompt.modifier}` : String(prompt.modifier) });
-  if (prompt.forcedRoll !== null && prompt.forcedRoll !== undefined) {
-    rows.push({
-      label: game.i18n.localize("STARFRONTIERS.Character.ForcedResult"),
-      value: String(prompt.forcedRoll).padStart(2, "0")
-    });
-  }
-
   const allRollHtmls = [];
-  let hitCount = 0;
+  const shotResults = [];
   for (let i = 0; i < shots; i++) {
     const shotPenalty = i * -20;
-    const shotTarget = clampAttackTarget(
-      profile.baseTarget + combatProfileBonus + rangeMod + prompt.modifier + shotPenalty + encumbrance.attackerMod + encumbrance.targetMod
-    );
+    const shotTarget = clampAttackTarget(modifierContext.targetNumber + shotPenalty);
     const { total: rollTotal, rollHtml } = await evaluatePercentileRoll({
       forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Weapon.AttackFlavor", { weapon: weapon.name })
     });
-    const hit = isHit(rollTotal, shotTarget, profile.rulesEdition);
-    if (hit) hitCount++;
     allRollHtmls.push(rollHtml);
-
-    if (shots > 1) {
-      const shotLabel = shotPenalty
-        ? `${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")} ${i + 1} (${shotPenalty})`
-        : `${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")} ${i + 1}`;
-      rows.push({ label: `${shotLabel} — ${game.i18n.localize("STARFRONTIERS.Character.Target")}`, value: String(shotTarget) });
-      rows.push({ label: `${shotLabel} — ${game.i18n.localize("STARFRONTIERS.Character.Rolled")}`, value: String(rollTotal).padStart(2, "0") });
-    } else {
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Target"), value: String(shotTarget) });
-      rows.push({ label: game.i18n.localize("STARFRONTIERS.Character.Rolled"), value: String(rollTotal).padStart(2, "0") });
-    }
+    shotResults.push({
+      index: i + 1,
+      shotPenalty,
+      originalRollTotal: rollTotal,
+      rollTotalOverride: null
+    });
   }
-
-  if (ammoCheck.amount > 0) {
-    const displayRemaining = loadedSource?.type === "powerSource"
-      ? Math.max(displayedPowerRemaining, 0)
-      : Math.max(liveCapacity - displayedConsumed, 0);
-    rows.push({ label: game.i18n.localize("STARFRONTIERS.Weapon.AmmoRemaining"), value: `${displayRemaining}/${liveCapacity}` });
-  }
-
-  const anyHit = hitCount > 0;
-  const outcome = shots > 1
-    ? `${hitCount}/${shots} ${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")}: ${anyHit ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure")}`
-    : anyHit ? game.i18n.localize("STARFRONTIERS.Character.Success") : game.i18n.localize("STARFRONTIERS.Character.Failure");
 
   const effectiveDamageFormula = buildEffectiveDamageFormula(weapon, activeBandKey ?? "");
+  const displayRemaining = ammoCheck.amount > 0
+    ? (loadedSource?.type === "powerSource"
+      ? Math.max(displayedPowerRemaining, 0)
+      : Math.max(liveCapacity - displayedConsumed, 0))
+    : null;
+  const attack = recomputeAttackCardModel({
+    attacker: {
+      id: actor.id,
+      name: actor.name,
+      uuid: actor.uuid
+    },
+    target: targetActor ? {
+      id: targetActor.id,
+      name: targetActor.name,
+      uuid: targetActor.uuid,
+      tokenUuid: targetTokenUuid,
+      size: getActorTargetSize(targetActor)
+    } : null,
+    weapon: {
+      id: weapon.id,
+      name: weapon.name,
+      uuid: weapon.uuid,
+      modeKey: activeMode?.key ?? "",
+      modeLabel: activeMode ? getWeaponModeLabel(activeMode) : "",
+      skillLabel: profile.skillLabel
+    },
+    attackType: profile.attackType,
+    rulesEdition: profile.rulesEdition,
+    rollMode,
+    rollHtml: allRollHtmls.join(""),
+    baseChance: modifierContext.baseChance,
+    originalTargetNumber: modifierContext.targetNumber,
+    targetNumberOverride: null,
+    modifiers: modifierContext.modifiers.map((modifier) => ({
+      ...foundry.utils.deepClone(modifier),
+      originalValue: Number(modifier.value ?? 0),
+      originalEnabled: Boolean(modifier.enabled)
+    })),
+    shots: shotResults,
+    damageFormula: effectiveDamageFormula,
+    damageAvailable: Boolean(effectiveDamageFormula),
+    avoidance: getWeaponAvoidance(weapon)?.enabled ? {
+      enabled: true,
+      ability: getWeaponAvoidance(weapon)?.ability ?? "",
+      abilityLabel: getWeaponAvoidance(weapon)?.ability
+        ? game.i18n.localize(`STARFRONTIERS.Ability.${getWeaponAvoidance(weapon).ability}`)
+        : "",
+      onSuccessEffect: getWeaponAvoidance(weapon)?.onSuccessEffect ?? "",
+      effectLabel: getAvoidanceEffectLabel(getWeaponAvoidance(weapon)?.onSuccessEffect)
+    } : null,
+    rangeBand: activeBandKey ? {
+      key: activeBandKey,
+      label: selectedRangeBand.label,
+      mod: selectedRangeBand.mod
+    } : null,
+    distance: targetDistance,
+    distanceUnits: canvas?.grid?.units || game.i18n.localize("STARFRONTIERS.Character.meter-abbr"),
+    ammo: ammoCheck.amount > 0 ? {
+      loadedSourceType: loadedSource?.type ?? "",
+      consumedPerShot: ammoCheck.amount,
+      totalConsumed: totalAmmo,
+      remaining: displayRemaining,
+      capacity: liveCapacity
+    } : null,
+    warnings: Array.from(modifierContext.warnings ?? []),
+    notes: prompt.forcedRoll !== null && prompt.forcedRoll !== undefined
+      ? [game.i18n.format("STARFRONTIERS.Chat.ForcedRollNote", { result: String(prompt.forcedRoll).padStart(2, "0") })]
+      : [],
+    blockerOverride: prompt.blockerOverride ?? null
+  });
 
   await createWeaponAttackChatMessage(actor, weapon, {
     rollMode,
-    rows,
-    outcome,
-    outcomeClass: anyHit ? "success" : "failure",
-    rollHtml: allRollHtmls.join(""),
-    canRollDamage: Boolean(effectiveDamageFormula),
-    activeBandKey: activeBandKey ?? "",
-    targetTokenUuid,
-    targetActorUuid,
-    hitCount,
-    shots
+    attack
   });
 
-  const targetActor = targetedToken?.actor ?? null;
   const avoidanceEnabled = Boolean(getWeaponAvoidance(weapon)?.enabled);
   const onHitEffectIds = getWeaponOnHitEffectIds(weapon);
-  if (anyHit && targetActor && onHitEffectIds.length && !avoidanceEnabled) {
+  if (attack.hitCount > 0 && targetActor && onHitEffectIds.length && !avoidanceEnabled) {
     await applyOnHitEffects(targetActor, onHitEffectIds, getWeaponOnHitEffectOrigin(weapon), weapon);
   }
 }
@@ -1024,62 +1332,295 @@ export async function evaluatePercentileRoll({ forcedTotal = null, flavor = "" }
   };
 }
 
-export async function createWeaponAttackChatMessage(actor, weapon, {
-  rows,
-  outcome,
-  outcomeClass,
-  rollHtml,
-  rollMode = "public",
-  canRollDamage = false,
-  activeBandKey = "",
-  targetTokenUuid = "",
-  targetActorUuid = "",
-  hitCount = 0,
-  shots = 1
-}) {
-  const avoidanceSource = getWeaponAvoidance(weapon);
-  const avoidance = avoidanceSource?.enabled ? {
-    ability: avoidanceSource.ability,
-    abilityLabel: avoidanceSource.ability
-      ? game.i18n.localize(`STARFRONTIERS.Ability.${avoidanceSource.ability}`)
-      : "",
-    onSuccessEffect: avoidanceSource.onSuccessEffect ?? "",
-    effectLabel: getAvoidanceEffectLabel(avoidanceSource.onSuccessEffect)
-  } : null;
+function clampRollTotal(value) {
+  if (!Number.isFinite(Number(value))) return 1;
+  return Math.min(Math.max(Math.trunc(Number(value)), 1), 100);
+}
 
-  const canRollAvoidance = Boolean(
-    avoidance
-    && hitCount > 0
-    && targetActorUuid
-    && shots > 0
+function formatRollTotal(value) {
+  return String(clampRollTotal(value)).padStart(2, "0");
+}
+
+function hasModifierAdjustment(modifier) {
+  return Number(modifier?.value ?? 0) !== Number(modifier?.originalValue ?? 0)
+    || Boolean(modifier?.enabled) !== Boolean(modifier?.originalEnabled ?? true);
+}
+
+function getAttackOutcomeLabel(model) {
+  if (Number(model?.shotCount ?? model?.shots?.length ?? 0) > 1) {
+    return `${model.hitCount}/${model.shots.length} ${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")}: ${game.i18n.localize(
+      model.hitCount > 0 ? "STARFRONTIERS.Character.Success" : "STARFRONTIERS.Character.Failure"
+    )}`;
+  }
+  return game.i18n.localize(model.hitCount > 0 ? "STARFRONTIERS.Character.Success" : "STARFRONTIERS.Character.Failure");
+}
+
+export function recomputeAttackCardModel(model = {}) {
+  const next = foundry.utils.deepClone(model ?? {});
+  next.baseChance = Number(next.baseChance ?? 0);
+  next.originalTargetNumber = clampAttackTarget(
+    Number(next.originalTargetNumber ?? next.targetNumber ?? next.baseChance)
   );
+  next.targetNumberOverride = Number.isFinite(Number(next.targetNumberOverride))
+    ? clampAttackTarget(Number(next.targetNumberOverride))
+    : null;
+  next.modifiers = Array.from(next.modifiers ?? []).map((modifier) => ({
+    ...modifier,
+    source: String(modifier?.source ?? MODIFIER_SOURCES.DERIVED),
+    label: String(modifier?.label ?? ""),
+    notes: String(modifier?.notes ?? ""),
+    attackTypes: Array.from(modifier?.attackTypes ?? []),
+    value: Number(modifier?.value ?? 0),
+    enabled: modifier?.enabled !== false,
+    overridable: Boolean(modifier?.overridable),
+    originalValue: Number(modifier?.originalValue ?? modifier?.value ?? 0),
+    originalEnabled: modifier?.originalEnabled === undefined
+      ? (modifier?.enabled !== false)
+      : Boolean(modifier.originalEnabled)
+  }));
 
-  const avoidanceButtonLabel = avoidance
-    ? game.i18n.format("STARFRONTIERS.Weapon.RollAvoidanceButton", { ability: avoidance.abilityLabel })
-    : "";
+  const computedTargetNumber = clampAttackTarget(
+    next.baseChance + next.modifiers.reduce((total, modifier) => total + (modifier.enabled ? Number(modifier.value ?? 0) : 0), 0)
+  );
+  next.computedTargetNumber = computedTargetNumber;
+  if (next.targetNumberOverride !== null && next.targetNumberOverride === computedTargetNumber) {
+    next.targetNumberOverride = null;
+  }
+  next.targetNumber = clampAttackTarget(next.targetNumberOverride ?? computedTargetNumber);
 
-  const content = await foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/weapon-attack-card.hbs", {
-    title: game.i18n.format("STARFRONTIERS.Weapon.AttackTitle", { weapon: weapon.name }),
-    subtitle: getRollTitleName(actor),
-    rows,
-    outcome,
-    outcomeClass,
-    rollHtml,
-    canRollDamage,
-    damageButtonLabel: game.i18n.localize("STARFRONTIERS.Weapon.RollDamage"),
-    itemUuid: weapon.uuid,
-    bandKey: activeBandKey,
-    rollMode,
-    canRollAvoidance,
-    avoidance,
-    avoidanceButtonLabel,
-    targetTokenUuid,
-    targetActorUuid
+  next.shots = Array.from(next.shots ?? []).map((shot, index) => {
+    const shotPenalty = Number(shot?.shotPenalty ?? 0);
+    const originalRollTotal = clampRollTotal(shot?.originalRollTotal ?? shot?.rollTotal ?? 1);
+    let rollTotalOverride = Number.isFinite(Number(shot?.rollTotalOverride))
+      ? clampRollTotal(Number(shot.rollTotalOverride))
+      : null;
+    if (rollTotalOverride !== null && rollTotalOverride === originalRollTotal) {
+      rollTotalOverride = null;
+    }
+    const rollTotal = rollTotalOverride ?? originalRollTotal;
+    const targetNumber = clampAttackTarget(next.targetNumber + shotPenalty);
+    return {
+      index: Number(shot?.index ?? index + 1),
+      shotPenalty,
+      originalRollTotal,
+      rollTotalOverride,
+      rollTotal,
+      targetNumber,
+      hit: isHit(rollTotal, targetNumber, next.rulesEdition ?? game.settings.get(SYSTEM_ID, "rulesEdition"))
+    };
   });
 
+  next.shotCount = next.shots.length;
+  next.hitCount = next.shots.filter((shot) => shot.hit).length;
+  next.outcome = next.hitCount > 0 ? "success" : "failure";
+  next.outcomeLabel = getAttackOutcomeLabel(next);
+  if (next.blockerOverride && typeof next.blockerOverride === "object") {
+    next.blockerOverride = {
+      by: String(next.blockerOverride.by ?? "gm"),
+      blockers: Array.from(next.blockerOverride.blockers ?? []).map((label) => String(label ?? "")).filter(Boolean)
+    };
+    if (!next.blockerOverride.blockers.length) next.blockerOverride = null;
+  } else {
+    next.blockerOverride = null;
+  }
+  next.damageAvailable = Boolean(next.damageFormula) && next.hitCount > 0;
+  next.canRollAvoidance = Boolean(next.avoidance?.enabled && next.target?.uuid && next.hitCount > 0 && next.shots.length > 0);
+  next.adjustedByGm = next.targetNumberOverride !== null
+    || next.modifiers.some((modifier) => hasModifierAdjustment(modifier))
+    || next.shots.some((shot) => shot.rollTotalOverride !== null);
+  next.roll = {
+    formula: String(next.roll?.formula ?? "1d100"),
+    total: next.shots[0]?.rollTotal ?? null,
+    originalTotal: next.shots[0]?.originalRollTotal ?? null
+  };
+
+  return next;
+}
+
+function getAttackSummaryTitle(model) {
+  const attackerName = String(model?.attacker?.name ?? game.i18n.localize("STARFRONTIERS.Character.CharacterName"));
+  const weaponName = String(model?.weapon?.name ?? game.i18n.localize("STARFRONTIERS.Weapon.Name"));
+  const targetName = String(model?.target?.name ?? "").trim();
+  return targetName
+    ? `${attackerName} -> ${targetName} - ${weaponName}`
+    : `${attackerName} - ${weaponName}`;
+}
+
+function getAttackSummaryRollText(model) {
+  if ((model?.shots?.length ?? 0) > 1) {
+    return game.i18n.format("STARFRONTIERS.Chat.HitSummary", {
+      hits: Number(model?.hitCount ?? 0),
+      shots: Number(model?.shots?.length ?? 0),
+      target: Number(model?.targetNumber ?? 0)
+    });
+  }
+  const shot = model?.shots?.[0];
+  if (!shot) return "";
+  return game.i18n.format("STARFRONTIERS.Chat.RollSummary", {
+    roll: formatRollTotal(shot.rollTotal),
+    target: Number(shot.targetNumber ?? model?.targetNumber ?? 0)
+  });
+}
+
+function buildAttackCardContext(model, { isGM = false } = {}) {
+  const modifierRows = Array.from(model.modifiers ?? []).map((modifier) => ({
+    ...modifier,
+    sourceLabel: localizeAttackModifierSource(modifier.source),
+    valueDisplay: signedModifierValue(modifier.value),
+    originalValueDisplay: signedModifierValue(modifier.originalValue),
+    isAdjusted: hasModifierAdjustment(modifier)
+  }));
+  const shotRows = Array.from(model.shots ?? []).map((shot) => ({
+    ...shot,
+    rollTotalDisplay: formatRollTotal(shot.rollTotal),
+    originalRollTotalDisplay: formatRollTotal(shot.originalRollTotal),
+    shotPenaltyDisplay: signedModifierValue(shot.shotPenalty),
+    targetNumberDisplay: String(shot.targetNumber),
+    outcomeLabel: game.i18n.localize(shot.hit ? "STARFRONTIERS.Character.Success" : "STARFRONTIERS.Character.Failure"),
+    outcomeClass: shot.hit ? "success" : "failure",
+    rollOverrideValue: shot.rollTotalOverride ?? ""
+  }));
+  const subtitleParts = [];
+  if (model.weapon?.modeLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.ModeSummary", { mode: model.weapon.modeLabel }));
+  if (model.weapon?.skillLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.SkillSummary", { skill: model.weapon.skillLabel }));
+  if (model.rangeBand?.label) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.RangeSummary", { range: model.rangeBand.label }));
+  if (Number.isFinite(model.distance)) {
+    subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.DistanceSummary", {
+      distance: model.distance,
+      units: model.distanceUnits || game.i18n.localize("STARFRONTIERS.Character.meter-abbr")
+    }));
+  }
+
+  return {
+    title: getAttackSummaryTitle(model),
+    subtitle: subtitleParts.join(" | "),
+    summaryRollText: getAttackSummaryRollText(model),
+    summaryOutcome: model.outcomeLabel,
+    outcomeClass: model.outcome,
+    adjustedByGm: model.adjustedByGm,
+    adjustedByGmLabel: game.i18n.localize("STARFRONTIERS.Chat.AdjustedByGM"),
+    detailsLabel: game.i18n.localize("STARFRONTIERS.Chat.ShowDetails"),
+    baseChance: model.baseChance,
+    baseChanceLabel: game.i18n.localize("STARFRONTIERS.Chat.BaseChance"),
+    targetNumber: model.targetNumber,
+    computedTargetNumber: model.computedTargetNumber,
+    targetNumberLabel: game.i18n.localize("STARFRONTIERS.Chat.TargetNumber"),
+    modifierRows,
+    shotRows,
+    isSingleShot: shotRows.length === 1,
+    canRollDamage: Boolean(model.damageAvailable),
+    damageButtonLabel: game.i18n.localize("STARFRONTIERS.Weapon.RollDamage"),
+    itemUuid: model.weapon?.uuid ?? "",
+    bandKey: model.rangeBand?.key ?? "",
+    rollMode: model.rollMode ?? "public",
+    canRollAvoidance: Boolean(model.canRollAvoidance),
+    avoidance: model.avoidance ?? null,
+    avoidanceButtonLabel: model.avoidance
+      ? game.i18n.format("STARFRONTIERS.Weapon.RollAvoidanceButton", { ability: model.avoidance.abilityLabel })
+      : "",
+    targetTokenUuid: model.target?.tokenUuid ?? "",
+    targetActorUuid: model.target?.uuid ?? "",
+    warnings: Array.from(model.warnings ?? []),
+    notes: Array.from(model.notes ?? []),
+    rollHtml: model.rollHtml ?? "",
+    ammo: model.ammo ?? null,
+    isGM,
+    targetNumberOverrideValue: model.targetNumberOverride ?? "",
+    blockerOverride: model.blockerOverride
+      ? {
+          by: model.blockerOverride.by,
+          isGm: model.blockerOverride.by === "gm",
+          blockers: Array.from(model.blockerOverride.blockers ?? []),
+          summary: Array.from(model.blockerOverride.blockers ?? []).join(", ")
+        }
+      : null
+  };
+}
+
+async function renderAttackCardContent(model, { isGM = Boolean(game.user?.isGM) } = {}) {
+  return foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/weapon-attack-card.hbs", buildAttackCardContext(model, { isGM }));
+}
+
+function getAttackModelFromMessage(message) {
+  const model = message?.flags?.[SYSTEM_ID]?.attack;
+  if (!model) return null;
+  return foundry.utils.deepClone(model);
+}
+
+async function updateAttackCardMessage(message, model) {
+  const nextModel = recomputeAttackCardModel(model);
+  const content = await renderAttackCardContent(nextModel);
+  await message.update({
+    content,
+    [`flags.${SYSTEM_ID}.attack`]: nextModel
+  });
+  return nextModel;
+}
+
+export async function handleAttackCardAdjustmentInput(message, element) {
+  if (!game.user?.isGM || !message || !(element instanceof HTMLInputElement)) return false;
+  const model = getAttackModelFromMessage(message);
+  if (!model) return false;
+
+  const nextModel = foundry.utils.deepClone(model);
+  const action = String(element.dataset.action ?? "");
+
+  if (action === "adjustAttackModifier") {
+    const modifierId = String(element.dataset.modifierId ?? "");
+    const modifier = Array.from(nextModel.modifiers ?? []).find((entry) => entry.id === modifierId);
+    if (!modifier) return false;
+    modifier.value = element.value === ""
+      ? Number(modifier.originalValue ?? modifier.value ?? 0)
+      : (Number.isFinite(element.valueAsNumber) ? element.valueAsNumber : Number(modifier.originalValue ?? modifier.value ?? 0));
+    await updateAttackCardMessage(message, nextModel);
+    return true;
+  }
+
+  if (action === "toggleAttackModifier") {
+    const modifierId = String(element.dataset.modifierId ?? "");
+    const modifier = Array.from(nextModel.modifiers ?? []).find((entry) => entry.id === modifierId);
+    if (!modifier) return false;
+    modifier.enabled = Boolean(element.checked);
+    await updateAttackCardMessage(message, nextModel);
+    return true;
+  }
+
+  if (action === "setAttackTargetNumber") {
+    nextModel.targetNumberOverride = element.value === ""
+      ? null
+      : clampAttackTarget(Number.isFinite(element.valueAsNumber) ? element.valueAsNumber : nextModel.targetNumber);
+    await updateAttackCardMessage(message, nextModel);
+    return true;
+  }
+
+  if (action === "setAttackRollTotal") {
+    const shotIndex = Math.max(Number(element.dataset.shotIndex ?? 1) - 1, 0);
+    const shot = Array.from(nextModel.shots ?? [])[shotIndex];
+    if (!shot) return false;
+    shot.rollTotalOverride = element.value === ""
+      ? null
+      : clampRollTotal(Number.isFinite(element.valueAsNumber) ? element.valueAsNumber : shot.originalRollTotal);
+    await updateAttackCardMessage(message, nextModel);
+    return true;
+  }
+
+  return false;
+}
+
+export async function createWeaponAttackChatMessage(actor, weapon, {
+  attack,
+  rollMode = "public"
+}) {
+  const model = recomputeAttackCardModel(attack);
+  const content = await renderAttackCardContent(model);
   const chatData = {
     content,
-    speaker: ChatMessage.getSpeaker({ actor })
+    speaker: ChatMessage.getSpeaker({ actor }),
+    flags: {
+      [SYSTEM_ID]: {
+        attack: model
+      }
+    }
   };
 
   applyChatMessageMode(chatData, rollMode);

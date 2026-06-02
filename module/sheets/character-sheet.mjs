@@ -2712,6 +2712,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     updates["system.personalFile.racialAbilities"] = game.settings.get(SYSTEM_ID, "rulesEdition") === "expanded"
       ? (racialAbilitySummary ?? StarFrontiersCharacterSheet.#buildLegacyRaceAbilitySummary(race, raceBonusSelections))
       : "";
+    updates["system.size"] = String(race?.system?.size ?? "medium") || "medium";
     updates["system.handedness.kind"] = StarFrontiersCharacterSheet.#coerceHandednessKind(actor);
 
     if (!applyStats) return updates;

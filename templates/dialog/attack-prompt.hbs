@@ -1,0 +1,190 @@
+<form class="star-frontiers attack-dialog" autocomplete="off">
+  <input type="hidden" name="useRangeOverride" value="{{#if rangeControl}}{{#if rangeControl.useOverride}}true{{else}}false{{/if}}{{else}}false{{/if}}" />
+  <input type="hidden" name="useTargetSizeOverride" value="{{#if targetSizeControl}}{{#if targetSizeControl.useOverride}}true{{else}}false{{/if}}{{else}}false{{/if}}" />
+
+  <section
+    class="attack-dialog__blocker-banner sf-attack-blocker-banner"
+    data-attack-dialog-blocker-banner
+    {{#unless blockers.length}}hidden{{/unless}}
+  >
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <div class="sf-attack-blocker-banner__body">
+      <div class="sf-attack-blocker-banner__messages" data-attack-dialog-blocker-messages>
+        {{#each blockers as |blocker|}}
+          <p>{{localize "STARFRONTIERS.Combat.BlockerMessage" label=blocker.label}}</p>
+        {{/each}}
+      </div>
+      <div class="sf-attack-blocker-banner__overrides">
+        {{#if isGM}}
+          <label>
+            <input type="checkbox" name="gmOverrideBlocker" />
+            <span>{{localize "STARFRONTIERS.Combat.GMOverrideBlocker"}}</span>
+          </label>
+        {{/if}}
+        {{#if showPlayerOverride}}
+          <label>
+            <input type="checkbox" name="playerOverrideBlocker" />
+            <span>{{localize "STARFRONTIERS.Combat.PlayerOverrideBlocker"}}</span>
+          </label>
+        {{/if}}
+      </div>
+    </div>
+  </section>
+
+  <section class="attack-dialog__summary">
+    <div class="attack-dialog__identity">
+      <div class="attack-dialog__identity-row">
+        <span class="attack-dialog__identity-label">{{localize "STARFRONTIERS.Chat.AttackerLabel"}}</span>
+        <strong>{{attackerName}}</strong>
+      </div>
+      <div class="attack-dialog__identity-row">
+        <span class="attack-dialog__identity-label">{{localize "STARFRONTIERS.Chat.TargetLabel"}}</span>
+        <strong>{{targetName}}</strong>
+      </div>
+    </div>
+
+    <div class="attack-dialog__totals">
+      <div class="attack-dialog__total">
+        <span>{{localize "STARFRONTIERS.Chat.BaseChance"}}</span>
+        <strong>{{baseChance}}</strong>
+      </div>
+      <div class="attack-dialog__total">
+        <span>{{localize "STARFRONTIERS.Chat.TargetNumber"}}</span>
+        <strong data-attack-dialog-target-number>{{targetNumber}}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="attack-dialog__modifiers">
+    <h3>{{localize "STARFRONTIERS.Chat.Modifiers"}}</h3>
+    <div data-attack-dialog-modifiers>
+      {{{modifierRowsHtml}}}
+    </div>
+    <div class="attack-dialog__warnings" data-attack-dialog-warnings>
+      {{{warningsHtml}}}
+    </div>
+  </section>
+
+  <section class="attack-dialog__controls">
+    <h3>{{localize "STARFRONTIERS.Chat.DialogInputs"}}</h3>
+
+    {{#if rangeControl}}
+      <div class="attack-dialog__field attack-dialog__field--full">
+        <div class="attack-dialog__field-header">
+          <span>{{localize "STARFRONTIERS.Modifier.RangeBand"}}</span>
+          {{#if rangeControl.derived}}
+            <div class="attack-dialog__derived">
+              <strong data-attack-dialog-range-label>{{rangeControl.currentLabel}}</strong>
+              {{#if rangeControl.canOverride}}
+                <button type="button" class="attack-dialog__toggle" data-attack-dialog-toggle="range">
+                  {{localize "STARFRONTIERS.Chat.Change"}}
+                </button>
+              {{/if}}
+            </div>
+          {{/if}}
+        </div>
+        <div
+          class="attack-dialog__override-panel"
+          data-attack-dialog-panel="range"
+          {{#if rangeControl.derived}}{{#unless rangeControl.useOverride}}hidden{{/unless}}{{/if}}
+        >
+          <select name="rangeBandKey">
+            {{selectOptions rangeControl.options selected=rangeControl.selectedKey nameAttr="value" labelAttr="label"}}
+          </select>
+        </div>
+      </div>
+    {{/if}}
+
+    {{#if targetSizeControl}}
+      <div class="attack-dialog__field attack-dialog__field--full">
+        <div class="attack-dialog__field-header">
+          <span>{{localize "STARFRONTIERS.Modifier.TargetSize"}}</span>
+          {{#if targetSizeControl.derived}}
+            <div class="attack-dialog__derived">
+              <strong data-attack-dialog-size-label>{{targetSizeControl.currentLabel}}</strong>
+              {{#if targetSizeControl.canOverride}}
+                <button type="button" class="attack-dialog__toggle" data-attack-dialog-toggle="size">
+                  {{localize "STARFRONTIERS.Chat.Change"}}
+                </button>
+              {{/if}}
+            </div>
+          {{/if}}
+        </div>
+        <div
+          class="attack-dialog__override-panel"
+          data-attack-dialog-panel="size"
+          {{#if targetSizeControl.derived}}{{#unless targetSizeControl.useOverride}}hidden{{/unless}}{{/if}}
+        >
+          <select name="targetSizeKey">
+            {{selectOptions targetSizeControl.options selected=targetSizeControl.selectedKey nameAttr="value" labelAttr="label"}}
+          </select>
+        </div>
+      </div>
+    {{/if}}
+
+    <label class="attack-dialog__field">
+      <span>{{localize "STARFRONTIERS.Modifier.AttackerMovement"}}</span>
+      <select name="attackerMovement">
+        {{selectOptions attackerMovementOptions selected=attackerMovementSelected nameAttr="value" labelAttr="label"}}
+      </select>
+    </label>
+
+    {{#if showTargetMovementControl}}
+      {{#if targetIsCreature}}
+        <label class="attack-dialog__field">
+          <span>{{localize "STARFRONTIERS.Modifier.CreatureTargetMovement"}}</span>
+          <select name="creatureTargetMovement">
+            {{selectOptions creatureTargetMovementOptions selected=creatureTargetMovementSelected nameAttr="value" labelAttr="label"}}
+          </select>
+        </label>
+      {{else}}
+        <label class="attack-dialog__field">
+          <span>{{localize "STARFRONTIERS.Modifier.TargetMovement"}}</span>
+          <select name="targetMovement">
+            {{selectOptions targetMovementOptions selected=targetMovementSelected nameAttr="value" labelAttr="label"}}
+          </select>
+        </label>
+      {{/if}}
+    {{/if}}
+
+    <label class="attack-dialog__field attack-dialog__field--checkbox">
+      <input type="checkbox" name="carefulAim" {{checked carefulAim}} />
+      <span>{{localize "STARFRONTIERS.Modifier.CarefulAim"}}</span>
+    </label>
+
+    <label class="attack-dialog__field attack-dialog__field--checkbox">
+      <input type="checkbox" name="firingTwoWeapons" {{checked firingTwoWeapons}} />
+      <span>{{localize "STARFRONTIERS.Modifier.FiringTwoWeapons"}}</span>
+    </label>
+
+    <label class="attack-dialog__field attack-dialog__field--checkbox">
+      <input type="checkbox" name="rifleInMelee" {{checked rifleInMelee}} />
+      <span>{{localize "STARFRONTIERS.Modifier.RifleInMelee"}}</span>
+    </label>
+
+    {{#if showShots}}
+      <label class="attack-dialog__field">
+        <span>{{localize "STARFRONTIERS.Weapon.ShotsLabel"}}</span>
+        <input type="number" name="shots" value="{{shots}}" min="1" max="{{rof}}" step="1" />
+      </label>
+    {{/if}}
+  </section>
+
+  <section class="attack-dialog__controls attack-dialog__controls--manual">
+    <h3>{{localize "STARFRONTIERS.Chat.ManualModifiers"}}</h3>
+
+    <label class="attack-dialog__field attack-dialog__field--manual">
+      <span>{{localize "STARFRONTIERS.Modifier.GMCircumstance"}}</span>
+      <input type="text" name="gmCircumstanceLabel" value="{{gmCircumstanceLabel}}" />
+      <input type="number" name="gmCircumstanceValue" value="{{gmCircumstanceValue}}" step="1" />
+    </label>
+
+    <label class="attack-dialog__field attack-dialog__field--manual">
+      <span>{{localize "STARFRONTIERS.Modifier.MiscModifier"}}</span>
+      <input type="text" name="miscModifierLabel" value="{{miscModifierLabel}}" />
+      <input type="number" name="miscModifierValue" value="{{miscModifierValue}}" step="1" />
+    </label>
+
+    {{{forcedField}}}
+  </section>
+</form>

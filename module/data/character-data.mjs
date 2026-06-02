@@ -136,6 +136,7 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
     return {
       playerName: textField(),
       race: textField(),
+      size: textField({ initial: "medium", choices: ["tiny", "small", "medium", "large", "giant", "huge"] }),
       handedness: schemaField({
         kind: textField({ initial: "right", choices: ["left", "right", "ambi"] })
       }),

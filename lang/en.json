@@ -145,13 +145,67 @@
       "InitiativeModifier-abbr": "IM",
       "Weapons": "Weapons"
     },
+    "Chat": {
+      "AdjustedByGM": "(adjusted by GM)",
+      "AttackerLabel": "Attacker",
+      "BaseChance": "Base Chance",
+      "Change": "Change...",
+      "CurrentRollTotal": "Current Roll",
+      "CurrentTargetNumber": "Current Target",
+      "DialogInputs": "Dialog Inputs",
+      "DistanceSummary": "Distance: {distance} {units}",
+      "Enabled": "Enabled",
+      "ForcedRollNote": "Forced d100 result: {result}",
+      "GMAdjustments": "GM Adjustments",
+      "HitSummary": "Hits: {hits}/{shots} (base target {target})",
+      "ManualModifiers": "Manual Modifiers",
+      "ModeSummary": "Mode: {mode}",
+      "Modifier": "Modifier",
+      "Modifiers": "Modifiers",
+      "Notes": "Notes",
+      "Outcome": "Outcome",
+      "OverrideRollTotal": "Override Roll Total",
+      "OverrideTargetNumber": "Override Target Number",
+      "RangeSummary": "Range: {range}",
+      "RollSummary": "Roll: {roll} vs {target}",
+      "Shot": "Shot",
+      "ShowDetails": "Show Details",
+      "SkillSummary": "Skill: {skill}",
+      "Source": "Source",
+      "TargetLabel": "Target",
+      "TargetNumber": "Target Number",
+      "Value": "Value",
+      "Warnings": "Warnings"
+    },
     "Effects": {
       "AppliedToTarget": "{effects} applied to {target}.",
       "NoGmConnectedToApply": "No GM is connected to apply effects to that target.",
       "NoPermissionToApply": "You don't have permission to apply effects to that target."
     },
+    "Combat": {
+      "BlockerMessage": "Cannot attack: {label}",
+      "BlockerOverrideFlag": "(blocker overridden)",
+      "BlockerOverrideGM": "Attack allowed despite blocker (GM override)",
+      "BlockerOverridePlayer": "Attack allowed despite blocker (player override)",
+      "GMOverrideBlocker": "GM Override (allow the attack anyway)",
+      "PlayerOverrideBlocker": "Override (allow the attack — at GM's discretion)"
+    },
     "Common": {
       "DragToReorder": "Drag to reorder"
+    },
+    "Status": {
+      "Defending": "Defending",
+      "Flying": "Flying",
+      "HardCover": "Hard Cover",
+      "Hovering": "Hovering",
+      "Prone": "Prone",
+      "SoftCover": "Soft Cover",
+      "Stunned": "Stunned (cannot attack)",
+      "StunnedTarget": "Stunned Target (+20 to hit)",
+      "Unconscious": "Unconscious (cannot attack)",
+      "UnstableFast": "Unstable / Fast Platform",
+      "UnstableSlow": "Unstable / Slow Platform",
+      "WrongHand": "Wrong Hand"
     },
     "Actor": {
       "Type": {
@@ -417,6 +471,14 @@
       "RulesEdition": {
         "basic": "Basic",
         "expanded": "Expanded"
+      },
+      "Size": {
+        "giant": "Giant",
+        "huge": "Huge",
+        "large": "Large",
+        "medium": "Medium",
+        "small": "Small",
+        "tiny": "Tiny"
       },
       "ScreenPowerSource": {
         "None": "None",
@@ -719,6 +781,7 @@
       "SEURemaining": "SEU Remaining",
       "ScreenData": "Screen",
       "ScreenType": "Screen Type",
+      "Size": "Size",
       "Shots": "Shots",
       "SkillData": "Skill",
       "Slots": "Slots",
@@ -790,6 +853,48 @@
       "Action": "Placeholder action",
       "Message": "{label} is a placeholder for a future Star Frontiers action."
     },
+    "Modifier": {
+      "AttackerMovement": "Attacker Movement",
+      "AttackerMovementLabel": "Attacker Movement: {movement}",
+      "AttackerWounded": "Wounded (STA <= 1/2)",
+      "CarefulAim": "Careful Aim",
+      "CreatureTargetMovement": "Creature Target Movement",
+      "CreatureTargetMovementLabel": "Creature Movement: {movement}",
+      "FiringTwoWeapons": "Firing Two Weapons",
+      "GMCircumstance": "GM Circumstance",
+      "HeavyWeaponPenalty": "Heavy Weapon (untrained)",
+      "MiscModifier": "Misc Modifier",
+      "ModeAttackModifier": "Mode Attack Modifier",
+      "ModeAttackModifierLabel": "Mode: {mode}",
+      "NoActiveModifiers": "No active modifiers.",
+      "RangeBand": "Range Band",
+      "RangeBandLabel": "Range: {band}",
+      "RifleInMelee": "Rifle in Melee",
+      "SkillBonusNote": "Includes skill bonus {bonus}.",
+      "Source": {
+        "derived": "Derived",
+        "dialog": "Dialog",
+        "manual": "Manual",
+        "status": "Status"
+      },
+      "TargetMovement": "Target Movement",
+      "TargetMovementLabel": "Target Movement: {movement}",
+      "TargetSize": "Target Size",
+      "TargetSizeLabel": "Target Size: {size}",
+      "Value": {
+        "dodging": "Dodging",
+        "fast": "Fast",
+        "medium": "Medium",
+        "moving": "Moving",
+        "running": "Running",
+        "stationary": "Stationary",
+        "unspecified": "Unspecified",
+        "veryFast": "Very Fast",
+        "walking": "Walking"
+      },
+      "WeaponAttackModifierLabel": "{weapon} Attack Modifier",
+      "WeaponSkillLabel": "Skill: {skill} (lvl {level})"
+    },
     "Range": {
       "extreme": "Extreme",
       "long": "Long",
@@ -826,6 +931,14 @@
         "Hint": "Show a GM-only testing field on modifier prompts so a specific d100 result can be forced instead of rolled normally.",
         "Name": "Enable GM Roll Overrides"
       },
+      "PlayerOverrideModifiers": {
+        "Hint": "When enabled, players can toggle and edit derived attack modifier rows in the attack dialog. When disabled, only the GM can override derived rows. Dialog inputs and manual modifier fields remain editable.",
+        "Name": "Homebrew: Players can override attack modifiers"
+      },
+      "TargetSizeModifier": {
+        "Hint": "Expanded-rules ranged attack modifier for this target size. Medium defaults to 0.",
+        "Name": "Expanded Target Size Modifier: {size}"
+      },
       "ComputerPortabilityLevel": {
         "Hint": "Computers with a level above this value are treated as installed assets. They will not count toward encumbrance and will appear in the Assets section of the Equipment list.",
         "Name": "Maximum Portable Computer Level"
@@ -860,6 +973,7 @@
       "AmmoRemaining": "Ammo Remaining",
       "Attack": "Attack",
       "AttackFlavor": "{weapon} Attack",
+      "AttackModifier": "Attack Modifier",
       "AttackPrompt": "Choose the range band and enter any situational modifier. The base target is {target}.",
       "AttackTitle": "{weapon} Attack",
       "Avoidance": "Avoidance",
@@ -883,6 +997,7 @@
       "Defense": "Defense",
       "InvalidDamageFormula": "That weapon's damage formula is invalid.",
       "Name": "Weapon",
+      "NoTarget": "(no target)",
       "NoDamageFormula": "That weapon does not have a damage formula yet.",
       "OutOfAmmo": "That weapon does not have enough loaded ammunition.",
       "CannotReload": "No linked ammunition found for that weapon.",

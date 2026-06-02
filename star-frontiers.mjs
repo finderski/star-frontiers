@@ -38,6 +38,11 @@ import {
 } from "./module/sheets/creature-sheet.mjs";
 import { StarFrontiersRosterSheet } from "./module/sheets/roster-sheet.mjs";
 import * as AttackPipeline from "./module/combat/attack-pipeline.mjs";
+import { SF_STATUS_DEFINITIONS } from "./module/combat/status-config.mjs";
+import {
+  DEFAULT_TARGET_SIZE_MODIFIERS,
+  TARGET_SIZE_SETTING_KEYS
+} from "./module/combat/modifier-pipeline.mjs";
 import { StarFrontiersItemSheet } from "./module/sheets/item-sheet.mjs";
 import {
   registerMigrationSettings,
@@ -187,6 +192,7 @@ function applySheetTheme(theme = game.settings.get(SYSTEM_ID, "sheetTheme")) {
 
 Hooks.once("init", async () => {
   await foundry.applications.handlebars.loadTemplates([
+    "systems/star-frontiers/templates/dialog/attack-prompt.hbs",
     "systems/star-frontiers/templates/item/parts/reductions-editor.hbs",
     "systems/star-frontiers/templates/actor/parts/racial-ability-actions.hbs"
   ]);
@@ -362,6 +368,29 @@ Hooks.once("init", async () => {
     default: true
   });
 
+  game.settings.register(SYSTEM_ID, "homebrewPlayerCanOverrideModifiers", {
+    name: "STARFRONTIERS.Settings.PlayerOverrideModifiers.Name",
+    hint: "STARFRONTIERS.Settings.PlayerOverrideModifiers.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
+  for (const [size, settingKey] of Object.entries(TARGET_SIZE_SETTING_KEYS)) {
+    game.settings.register(SYSTEM_ID, settingKey, {
+      name: game.i18n.format("STARFRONTIERS.Settings.TargetSizeModifier.Name", {
+        size: game.i18n.localize(`STARFRONTIERS.Choice.Size.${size}`)
+      }),
+      hint: "STARFRONTIERS.Settings.TargetSizeModifier.Hint",
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: -100, max: 100, step: 1 },
+      default: Number(DEFAULT_TARGET_SIZE_MODIFIERS[size] ?? 0)
+    });
+  }
+
   game.settings.register(SYSTEM_ID, "homebrewAdvancementAbilities", {
     name: "STARFRONTIERS.Settings.HomebrewAdvancementAbilities.Name",
     hint: "STARFRONTIERS.Settings.HomebrewAdvancementAbilities.Hint",
@@ -407,6 +436,15 @@ Hooks.once("init", async () => {
   game.socket.on(`system.${SYSTEM_ID}`, async (payload) => {
     await AttackPipeline.handleSystemSocketMessage(payload);
   });
+
+  CONFIG.statusEffects = [
+    ...(CONFIG.statusEffects ?? []),
+    ...SF_STATUS_DEFINITIONS.map((def) => ({
+      id: def.id,
+      name: def.name,
+      img: def.img
+    }))
+  ];
 
   installTokenDoubleRightClickTargeting();
 });
@@ -487,6 +525,20 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
       StarFrontiersCharacterSheet.handleChatCardAction(button);
+    });
+  }
+
+  if (!game.user?.isGM) {
+    for (const section of html.querySelectorAll(".sf-attack-card__gm-adjustment")) {
+      section.remove();
+    }
+    return;
+  }
+
+  for (const input of html.querySelectorAll(".sf-attack-card__gm-input")) {
+    input.addEventListener("change", (event) => {
+      const target = event.currentTarget;
+      AttackPipeline.handleAttackCardAdjustmentInput(message, target);
     });
   }
 });
