@@ -45,14 +45,17 @@ export const EXPANDED_ATTACKER_MOVEMENT_MODS = Object.freeze({
   stationary: 0,
   walking: 0,
   running: -10,
-  dodging: -20
+  dodging: -20,
+  inSlowVehicle: -10,
+  inFastVehicle: -20
 });
 
 export const EXPANDED_TARGET_MOVEMENT_MODS = Object.freeze({
   stationary: 10,
   walking: 0,
   running: -10,
-  dodging: -20
+  dodging: -20,
+  inMovingVehicle: -10
 });
 
 export const CREATURE_TARGET_MOVEMENT_MODS = Object.freeze({
@@ -134,7 +137,11 @@ function normalizeDialogState(dialogState = {}) {
     wrongHand: Boolean(dialogState.wrongHand),
     firingBurst: Boolean(dialogState.firingBurst),
     attackingFromBehind: Boolean(dialogState.attackingFromBehind),
-    targetInVehicle: Boolean(dialogState.targetInVehicle),
+    softCover: Boolean(dialogState.softCover),
+    hardCover: Boolean(dialogState.hardCover),
+    targetProne: Boolean(dialogState.targetProne),
+    targetDefending: Boolean(dialogState.targetDefending),
+    targetStunned: Boolean(dialogState.targetStunned),
     usingScope: Boolean(dialogState.usingScope),
     opportunityShot: Boolean(dialogState.opportunityShot),
     carefulAim: Boolean(dialogState.carefulAim),
@@ -336,7 +343,7 @@ function appendDerivedRows(modifiers, {
       source: MODIFIER_SOURCES.DERIVED,
       attackTypes: [ATTACK_TYPES.RANGED],
       value: -10,
-      overridable: true
+      overridable: false
     }));
   }
 
@@ -347,7 +354,7 @@ function appendDerivedRows(modifiers, {
       source: MODIFIER_SOURCES.DERIVED,
       attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
       value: -10,
-      overridable: true
+      overridable: false
     }));
   }
 
@@ -363,7 +370,7 @@ function appendDerivedRows(modifiers, {
       source: MODIFIER_SOURCES.DERIVED,
       attackTypes: [attackType],
       value: modeAttackModifier,
-      overridable: true
+      overridable: false
     }));
   }
 
@@ -381,7 +388,7 @@ function appendDerivedRows(modifiers, {
       source: MODIFIER_SOURCES.DERIVED,
       attackTypes: [attackType],
       value: combatProfileBonus,
-      overridable: true
+      overridable: false
     }));
   }
 
@@ -400,7 +407,7 @@ function appendDerivedRows(modifiers, {
         source: MODIFIER_SOURCES.DERIVED,
         attackTypes: [attackType],
         value: -10,
-        overridable: true
+        overridable: false
       }));
     }
   }
@@ -412,7 +419,7 @@ function appendDerivedRows(modifiers, {
       source: MODIFIER_SOURCES.DERIVED,
       attackTypes: [attackType],
       value: 10,
-      overridable: true
+      overridable: false
     }));
   }
 }
@@ -423,9 +430,16 @@ function statusSideAppliesTo(sideDef, attackType) {
 }
 
 function appendStatusRows(modifiers, blockers, { attacker, target, attackType }) {
-  for (const def of SF_STATUS_DEFINITIONS) {
-    if (def.id === SF_STATUS_IDS.WRONG_HAND) continue;
+  const attackerDialogStatusIds = new Set([SF_STATUS_IDS.WRONG_HAND]);
+  const targetDialogStatusIds = new Set([
+    SF_STATUS_IDS.SOFT_COVER,
+    SF_STATUS_IDS.HARD_COVER,
+    SF_STATUS_IDS.PRONE,
+    SF_STATUS_IDS.DEFENDING,
+    SF_STATUS_IDS.STUNNED
+  ]);
 
+  for (const def of SF_STATUS_DEFINITIONS) {
     if (def.attacker && actorHasSfStatus(attacker, def.id)) {
       if (def.attacker.blocker) {
         blockers.push({
@@ -434,7 +448,7 @@ function appendStatusRows(modifiers, blockers, { attacker, target, attackType })
           source: MODIFIER_SOURCES.STATUS,
           side: "attacker"
         });
-      } else if (statusSideAppliesTo(def.attacker, attackType)) {
+      } else if (!attackerDialogStatusIds.has(def.id) && statusSideAppliesTo(def.attacker, attackType)) {
         modifiers.push(makeModifierRow({
           id: `status-${def.id}-attacker`,
           label: game.i18n.localize(def.attacker.label),
@@ -454,7 +468,7 @@ function appendStatusRows(modifiers, blockers, { attacker, target, attackType })
           source: MODIFIER_SOURCES.STATUS,
           side: "target"
         });
-      } else if (statusSideAppliesTo(def.target, attackType)) {
+      } else if (!targetDialogStatusIds.has(def.id) && statusSideAppliesTo(def.target, attackType)) {
         modifiers.push(makeModifierRow({
           id: `status-${def.id}-target`,
           label: game.i18n.localize(def.target.label),
@@ -530,6 +544,56 @@ function appendDialogRows(modifiers, {
     }));
   }
 
+  if (dialog.softCover) {
+    modifiers.push(makeModifierRow({
+      id: "soft-cover",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.SoftCover"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
+      value: -10
+    }));
+  }
+
+  if (dialog.hardCover) {
+    modifiers.push(makeModifierRow({
+      id: "hard-cover",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.HardCover"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
+      value: -20
+    }));
+  }
+
+  if (dialog.targetProne) {
+    modifiers.push(makeModifierRow({
+      id: "target-prone",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.TargetProne"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
+      value: -5
+    }));
+  }
+
+  if (dialog.targetDefending) {
+    modifiers.push(makeModifierRow({
+      id: "target-defending",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.TargetDefending"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.MELEE],
+      value: -15
+    }));
+  }
+
+  if (dialog.targetStunned) {
+    modifiers.push(makeModifierRow({
+      id: "target-stunned",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.TargetStunned"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.MELEE, ATTACK_TYPES.THROWN],
+      value: 20
+    }));
+  }
+
   if (dialog.firingBurst) {
     modifiers.push(makeModifierRow({
       id: "firing-burst",
@@ -547,16 +611,6 @@ function appendDialogRows(modifiers, {
       source: MODIFIER_SOURCES.DIALOG,
       attackTypes: [ATTACK_TYPES.MELEE],
       value: 20
-    }));
-  }
-
-  if (dialog.targetInVehicle) {
-    modifiers.push(makeModifierRow({
-      id: "target-in-vehicle",
-      label: game.i18n.localize("STARFRONTIERS.Modifier.TargetInVehicle"),
-      source: MODIFIER_SOURCES.DIALOG,
-      attackTypes: [ATTACK_TYPES.RANGED],
-      value: -10
     }));
   }
 

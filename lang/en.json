@@ -157,6 +157,7 @@
       "Enabled": "Enabled",
       "ForcedRollNote": "Forced d100 result: {result}",
       "GMAdjustments": "GM Adjustments",
+      "GMTesting": "Forced d100 / GM Testing",
       "HitSummary": "Hits: {hits}/{shots} (base target {target})",
       "ManualModifiers": "Manual Modifiers",
       "ModeSummary": "Mode: {mode}",
@@ -188,12 +189,18 @@
       "NoPermissionToApply": "You don't have permission to apply effects to that target."
     },
     "Combat": {
+      "AppliesToAllShots": "Applies to All Shots",
       "BlockerMessage": "Cannot attack: {label}",
       "BlockerOverrideFlag": "(blocker overridden)",
       "BlockerOverrideGM": "Attack allowed despite blocker (GM override)",
       "BlockerOverridePlayer": "Attack allowed despite blocker (player override)",
       "GMOverrideBlocker": "GM Override (allow the attack anyway)",
-      "PlayerOverrideBlocker": "Override (allow the attack — at GM's discretion)"
+      "PerShot": "Per-Shot",
+      "PlayerOverrideBlocker": "Override (allow the attack — at GM's discretion)",
+      "ROFExceeded": "{weapon} has a Rate of Fire of {rof}. Shots clamped.",
+      "ROFHint": "Maximum {rof} shot(s) per turn",
+      "ShotN": "Shot {n}",
+      "Shots": "Shots"
     },
     "Common": {
       "DragToReorder": "Drag to reorder"
@@ -884,23 +891,30 @@
       "RifleInMelee": "Rifle in Melee",
       "SkillBonusNote": "Includes skill bonus {bonus}.",
       "ShotN": "Shot {n}",
+      "SoftCover": "Soft Cover",
       "Source": {
         "derived": "Derived",
         "dialog": "Dialog",
         "manual": "Manual",
         "status": "Status"
       },
-      "TargetInVehicle": "Target in Moving Vehicle",
+      "HardCover": "Hard Cover",
+      "TargetDefending": "Target Defending",
       "TargetMovement": "Target Movement",
       "TargetMovementLabel": "Target Movement: {movement}",
+      "TargetProne": "Target Prone",
       "TargetSize": "Target Size",
       "TargetSizeLabel": "Target Size: {size}",
+      "TargetStunned": "Target Stunned",
       "TelescopicSight": "Using Telescopic Sight",
       "TelescopicSightHint": "Range uses next-closer band. Not usable at Point Blank or Short range. ROF limited to 1.",
       "TelescopicSightNote": "via Telescopic Sight",
       "Value": {
         "dodging": "Dodging",
         "fast": "Fast",
+        "inFastVehicle": "In Fast Vehicle (>150 m/turn)",
+        "inMovingVehicle": "In Moving Vehicle",
+        "inSlowVehicle": "In Slow Vehicle (≤150 m/turn)",
         "medium": "Medium",
         "moving": "Moving",
         "running": "Running",
@@ -950,7 +964,7 @@
         "Name": "Enable GM Roll Overrides"
       },
       "PlayerOverrideModifiers": {
-        "Hint": "When enabled, players can toggle and edit derived attack modifier rows in the attack dialog. When disabled, only the GM can override derived rows. Dialog inputs and manual modifier fields remain editable.",
+        "Hint": "When enabled, players can toggle situational attack-dialog checkboxes such as Careful Aim, cover, and target posture. When disabled, only the GM can change those checkbox states. Derived modifiers such as Wounded or weapon mode bonuses are never toggleable from the dialog; use GM Circumstance or chat-card overrides instead.",
         "Name": "Homebrew: Players can override attack modifiers"
       },
       "TargetSizeModifier": {
