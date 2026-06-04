@@ -385,7 +385,15 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       if (item.type === "consumable") statusBadge = `${sys.uses?.value ?? 0}/${sys.uses?.max ?? 0}`;
       else if (item.type === "powerSource") statusBadge = `${sys.remaining ?? 0}/${sys.capacity ?? 0} SEU`;
       else if (item.type === "computer") statusBadge = `${sys.functionPoints?.used ?? 0}/${sys.functionPoints?.max ?? 0} FP`;
-      else if (item.type === "ammo") statusBadge = `${sys.shots ?? 0} ${game.i18n.localize("STARFRONTIERS.Item.Shots").toLowerCase()}`;
+      else if (item.type === "ammo") {
+        const total = Number(sys.shots ?? 0);
+        const consumed = Math.min(Math.max(Number(sys.consumed ?? 0), 0), total);
+        const remaining = Math.max(total - consumed, 0);
+        const unit = sys.ammoType === "seu"
+          ? game.i18n.localize("STARFRONTIERS.Choice.AmmoType.seu")
+          : game.i18n.localize("STARFRONTIERS.Item.Shots").toLowerCase();
+        statusBadge = `${remaining}/${total} ${unit}`;
+      }
 
       let carryStateCycleable = true;
       let carryStateLocked = false;
@@ -545,19 +553,61 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     return details;
   }
 
+  static #getAmmoSourceCounts(item) {
+    if (!item) return { remaining: 0, capacity: 0 };
+    if (item.type === "powerSource") {
+      const capacity = Number(item.system?.capacity ?? 0);
+      const remaining = Math.min(Math.max(Number(item.system?.remaining ?? 0), 0), capacity);
+      return { remaining, capacity };
+    }
+    if (item.type === "ammo") {
+      const capacity = Number(item.system?.shots ?? 0);
+      const consumed = Math.min(Math.max(Number(item.system?.consumed ?? 0), 0), capacity);
+      const remaining = Math.max(capacity - consumed, 0);
+      return { remaining, capacity };
+    }
+    return { remaining: 0, capacity: 0 };
+  }
+
+  static #formatAmmoSourceLabel(item) {
+    if (!item) return "";
+    if (item.type === "powerSource") {
+      const { remaining, capacity } = StarFrontiersCharacterSheet.#getAmmoSourceCounts(item);
+      return `${item.name} (${remaining}/${capacity} SEU)`;
+    }
+    if (item.type === "ammo") {
+      const { remaining, capacity } = StarFrontiersCharacterSheet.#getAmmoSourceCounts(item);
+      const unit = item.system?.ammoType === "seu"
+        ? game.i18n.localize("STARFRONTIERS.Choice.AmmoType.seu")
+        : game.i18n.localize("STARFRONTIERS.Item.Shots").toLowerCase();
+      return `${item.name} (${remaining}/${capacity} ${unit})`;
+    }
+    return item.name;
+  }
+
+  static #formatAmmoSourceDisplay(item) {
+    if (!item) return "";
+    if (item.type === "powerSource") {
+      const { remaining, capacity } = StarFrontiersCharacterSheet.#getAmmoSourceCounts(item);
+      return `${item.name} — ${remaining}/${capacity} SEU`;
+    }
+    if (item.type === "ammo") {
+      const { remaining, capacity } = StarFrontiersCharacterSheet.#getAmmoSourceCounts(item);
+      const unit = item.system?.ammoType === "seu"
+        ? game.i18n.localize("STARFRONTIERS.Choice.AmmoType.seu")
+        : game.i18n.localize("STARFRONTIERS.Item.Shots").toLowerCase();
+      return `${item.name} — ${remaining}/${capacity} ${unit}`;
+    }
+    return item.name;
+  }
+
   static async #prepareWeaponLinkedSourceDisplay(actor, item) {
     const clipRef = item.system.ammo?.clipItem;
     if (!clipRef) return "";
     const linked = await StarFrontiersCharacterSheet.#resolveItemRef(actor, clipRef);
     if (!linked) return "";
-    if (linked.type === "powerSource") {
-      const remaining = Number(linked.system.remaining ?? 0);
-      const capacity = Number(linked.system.capacity ?? 0);
-      return `${linked.name} — ${remaining} / ${capacity} SEU`;
-    }
-    if (linked.type === "ammo") {
-      const shots = Number(linked.system.shots ?? 0);
-      return `${linked.name} — ${shots} ${game.i18n.localize("STARFRONTIERS.Item.Shots").toLowerCase()}`;
+    if (linked.type === "powerSource" || linked.type === "ammo") {
+      return StarFrontiersCharacterSheet.#formatAmmoSourceDisplay(linked);
     }
     return linked.name;
   }
@@ -578,7 +628,9 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
 
     const formatChoice = (item, linkedElsewhere) => ({
       id: item.id,
-      name: linkedElsewhere ? `🔗 ${item.name}` : item.name,
+      name: linkedElsewhere
+        ? `🔗 ${StarFrontiersCharacterSheet.#formatAmmoSourceLabel(item)}`
+        : StarFrontiersCharacterSheet.#formatAmmoSourceLabel(item),
       selected: item.id === linkedRef,
       linkedElsewhere
     });
@@ -2264,12 +2316,16 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       const loadedSource = await AttackPipeline.resolveLoadedSource(this.document, item);
       const capacity = AttackPipeline.getLiveCapacity(item, loadedSource);
       const loaded = Math.min(Math.max(Number(target.value || 0), 0), capacity);
+      const nextConsumed = Math.max(capacity - loaded, 0);
       if (loadedSource?.type === "powerSource") {
         await loadedSource.update({ "system.remaining": loaded });
-        await item.update({ "system.ammo.consumed": Math.max(capacity - loaded, 0) });
+        await item.update({ "system.ammo.consumed": nextConsumed });
         return;
       }
-      await item.update({ "system.ammo.consumed": Math.max(capacity - loaded, 0) });
+      if (loadedSource?.type === "ammo") {
+        await loadedSource.update({ "system.consumed": nextConsumed });
+      }
+      await item.update({ "system.ammo.consumed": nextConsumed });
       return;
     }
 

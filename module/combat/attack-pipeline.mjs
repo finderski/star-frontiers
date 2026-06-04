@@ -221,7 +221,7 @@ function buildSelectChoices(keys, formatter, valueMap = {}) {
 }
 
 function getDefaultRangeBandKey(rangeBands = []) {
-  return rangeBands.find((band) => band.key === "medium")?.key ?? rangeBands[0]?.key ?? "";
+  return rangeBands.find((band) => band.key === "pointBlank")?.key ?? rangeBands[0]?.key ?? "";
 }
 
 const PER_SHOT_MODIFIER_IDS = new Set([
@@ -339,10 +339,17 @@ function getDefaultShotState(setup, seed = {}) {
   return {
     rangeBandKey: String(base.rangeBandKey ?? setup.autoRangeBand?.key ?? getDefaultRangeBandKey(setup.rangeBands)),
     useRangeOverride: base.useRangeOverride === undefined ? !setup.autoRangeBand : Boolean(base.useRangeOverride),
-    targetSizeKey: String(base.targetSizeKey ?? setup.targetSizeDerived ?? "medium"),
+    showRangeSelect: base.showRangeSelect === undefined
+      ? (setup.autoRangeBand ? Boolean(base.useRangeOverride) : false)
+      : Boolean(base.showRangeSelect),
+    targetSizeKey: String(base.targetSizeKey || setup.targetSizeDerived || "medium"),
     useTargetSizeOverride: base.useTargetSizeOverride === undefined ? !setup.targetSizeDerived : Boolean(base.useTargetSizeOverride),
-    targetMovement: String(base.targetMovement ?? "walking"),
+    showTargetSizeSelect: base.showTargetSizeSelect === undefined
+      ? (setup.targetSizeDerived ? Boolean(base.useTargetSizeOverride) : false)
+      : Boolean(base.showTargetSizeSelect),
+    targetMovement: String(base.targetMovement ?? "stationary"),
     creatureTargetMovement: String(base.creatureTargetMovement ?? ""),
+    showTargetMovementSelect: Boolean(base.showTargetMovementSelect),
     softCover: base.softCover === undefined ? Boolean(setup.targetHasSoftCover) : Boolean(base.softCover),
     hardCover: base.hardCover === undefined ? Boolean(setup.targetHasHardCover) : Boolean(base.hardCover),
     targetProne: base.targetProne === undefined ? Boolean(setup.targetHasProne) : Boolean(base.targetProne),
@@ -363,10 +370,13 @@ function normalizeShotState(setup, shotState = {}, index = 1, seed = null) {
   return {
     rangeBandKey: String(next.rangeBandKey ?? fallback.rangeBandKey),
     useRangeOverride: Boolean(next.useRangeOverride),
-    targetSizeKey: String(next.targetSizeKey ?? fallback.targetSizeKey),
+    showRangeSelect: Boolean(next.showRangeSelect),
+    targetSizeKey: String(next.targetSizeKey || fallback.targetSizeKey),
     useTargetSizeOverride: Boolean(next.useTargetSizeOverride),
+    showTargetSizeSelect: Boolean(next.showTargetSizeSelect),
     targetMovement: String(next.targetMovement ?? fallback.targetMovement),
     creatureTargetMovement: String(next.creatureTargetMovement ?? fallback.creatureTargetMovement),
+    showTargetMovementSelect: Boolean(next.showTargetMovementSelect),
     softCover: Boolean(next.softCover),
     hardCover: Boolean(next.hardCover),
     targetProne: Boolean(next.targetProne),
@@ -445,6 +455,7 @@ function buildShotRangeControl(setup, shotState) {
     derived: Boolean(setup.autoRangeBand),
     currentLabel: `${effectiveLabel} (${signedModifierValue(effectiveMod)})`,
     useOverride: Boolean(shotState.useRangeOverride ?? !setup.autoRangeBand),
+    showSelect: Boolean(shotState.showRangeSelect),
     selectedKey,
     options: setup.rangeBands.map((band) => ({
       value: band.key,
@@ -455,11 +466,12 @@ function buildShotRangeControl(setup, shotState) {
 
 function buildShotTargetSizeControl(setup, shotState) {
   if (!setup.showTargetSizeControl) return null;
-  const selectedKey = String(shotState.targetSizeKey ?? setup.targetSizeDerived ?? "medium");
+  const selectedKey = String(shotState.targetSizeKey || setup.targetSizeDerived || "medium");
   return {
     derived: Boolean(setup.targetSizeDerived),
     currentLabel: game.i18n.localize(`STARFRONTIERS.Choice.Size.${setup.targetSizeDerived || selectedKey}`),
     useOverride: Boolean(shotState.useTargetSizeOverride ?? !setup.targetSizeDerived),
+    showSelect: Boolean(shotState.showTargetSizeSelect),
     selectedKey,
     options: buildSelectChoices(["tiny", "small", "medium", "large", "giant", "huge"], (key) =>
       game.i18n.localize(`STARFRONTIERS.Choice.Size.${key}`))
@@ -528,10 +540,13 @@ function readAttackDialogState(root, setup) {
     shotStates[index - 1] = {
       rangeBandKey: readValue(`shot.${index}.rangeBandKey`, setup.autoRangeBand?.key ?? getDefaultRangeBandKey(setup.rangeBands)),
       useRangeOverride: readValue(`shot.${index}.useRangeOverride`, setup.autoRangeBand ? "false" : "true") === "true",
-      targetSizeKey: readValue(`shot.${index}.targetSizeKey`, setup.targetSizeDerived || "medium"),
+      showRangeSelect: readValue(`shot.${index}.showRangeSelect`, "false") === "true",
+      targetSizeKey: readValue(`shot.${index}.targetSizeKey`, setup.targetSizeDerived || "medium") || (setup.targetSizeDerived || "medium"),
       useTargetSizeOverride: readValue(`shot.${index}.useTargetSizeOverride`, setup.targetSizeDerived ? "false" : "true") === "true",
-      targetMovement: readValue(`shot.${index}.targetMovement`, "walking"),
+      showTargetSizeSelect: readValue(`shot.${index}.showTargetSizeSelect`, "false") === "true",
+      targetMovement: readValue(`shot.${index}.targetMovement`, "stationary"),
       creatureTargetMovement: readValue(`shot.${index}.creatureTargetMovement`, ""),
+      showTargetMovementSelect: readValue(`shot.${index}.showTargetMovementSelect`, "false") === "true",
       softCover: readChecked(`shot.${index}.softCover`),
       hardCover: readChecked(`shot.${index}.hardCover`),
       targetProne: readChecked(`shot.${index}.targetProne`),
@@ -603,6 +618,7 @@ function buildAttackDialogContext(setup, dialogState = {}) {
       creatureTargetMovementOptions,
       targetMovementSelected: shotState.targetMovement,
       creatureTargetMovementSelected: shotState.creatureTargetMovement,
+      showTargetMovementSelect: shotState.showTargetMovementSelect,
       softCover: shotState.softCover,
       hardCover: shotState.hardCover,
       targetProne: shotState.targetProne,
@@ -745,29 +761,26 @@ function renderAttackDialogShotPanels(shotPanels = []) {
     if (!shot.rangeControl) return "";
     const shotIndex = shot.index;
     const useOverrideValue = shot.rangeControl.useOverride ? "true" : "false";
+    const showSelectValue = shot.rangeControl.showSelect ? "true" : "false";
     const label = foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.RangeBand"));
     const currentLabel = foundry.utils.escapeHTML(String(shot.rangeControl.currentLabel ?? ""));
     const optionsHtml = renderSelectOptions(shot.rangeControl.options, shot.rangeControl.selectedKey);
-    const selectHidden = shot.rangeControl.derived && !shot.rangeControl.useOverride ? " hidden" : "";
-    const toggleButton = shot.rangeControl.derived
-      ? `
-        <div class="attack-dialog__derived">
-          <strong data-attack-dialog-range-label>${currentLabel}</strong>
-          <button type="button" class="attack-dialog__toggle" data-attack-dialog-toggle="range" data-shot-index="${shotIndex}">
-            ${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.Change"))}
-          </button>
-        </div>
-      `
-      : "";
+    const selectHidden = shot.rangeControl.showSelect ? "" : " hidden";
     return `
       <div class="attack-dialog__field attack-dialog__field--full">
         <input type="hidden" name="shot.${shotIndex}.useRangeOverride" value="${useOverrideValue}" />
+        <input type="hidden" name="shot.${shotIndex}.showRangeSelect" value="${showSelectValue}" />
         <div class="attack-dialog__field-header">
-          <span>${label}</span>
-          ${toggleButton}
+          <span class="attack-dialog__field-label">${label}</span>
+          <div class="attack-dialog__derived">
+            <strong data-attack-dialog-range-label>${currentLabel}</strong>
+            <button type="button" class="attack-dialog__toggle" data-attack-dialog-toggle="range" data-shot-index="${shotIndex}">
+              ${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.Change"))}
+            </button>
+          </div>
         </div>
         <div class="attack-dialog__override-panel"${selectHidden}>
-          <select name="shot.${shotIndex}.rangeBandKey">
+          <select class="attack-dialog__inline-select" name="shot.${shotIndex}.rangeBandKey">
             ${optionsHtml}
           </select>
         </div>
@@ -779,29 +792,26 @@ function renderAttackDialogShotPanels(shotPanels = []) {
     if (!shot.targetSizeControl) return "";
     const shotIndex = shot.index;
     const useOverrideValue = shot.targetSizeControl.useOverride ? "true" : "false";
+    const showSelectValue = shot.targetSizeControl.showSelect ? "true" : "false";
     const label = foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.TargetSize"));
     const currentLabel = foundry.utils.escapeHTML(String(shot.targetSizeControl.currentLabel ?? ""));
     const optionsHtml = renderSelectOptions(shot.targetSizeControl.options, shot.targetSizeControl.selectedKey);
-    const selectHidden = shot.targetSizeControl.derived && !shot.targetSizeControl.useOverride ? " hidden" : "";
-    const toggleButton = shot.targetSizeControl.derived
-      ? `
-        <div class="attack-dialog__derived">
-          <strong data-attack-dialog-size-label>${currentLabel}</strong>
-          <button type="button" class="attack-dialog__toggle" data-attack-dialog-toggle="size" data-shot-index="${shotIndex}">
-            ${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.Change"))}
-          </button>
-        </div>
-      `
-      : "";
+    const selectHidden = shot.targetSizeControl.showSelect ? "" : " hidden";
     return `
       <div class="attack-dialog__field attack-dialog__field--full">
         <input type="hidden" name="shot.${shotIndex}.useTargetSizeOverride" value="${useOverrideValue}" />
+        <input type="hidden" name="shot.${shotIndex}.showTargetSizeSelect" value="${showSelectValue}" />
         <div class="attack-dialog__field-header">
-          <span>${label}</span>
-          ${toggleButton}
+          <span class="attack-dialog__field-label">${label}</span>
+          <div class="attack-dialog__derived">
+            <strong data-attack-dialog-size-label>${currentLabel}</strong>
+            <button type="button" class="attack-dialog__toggle" data-attack-dialog-toggle="size" data-shot-index="${shotIndex}">
+              ${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.Change"))}
+            </button>
+          </div>
         </div>
         <div class="attack-dialog__override-panel"${selectHidden}>
-          <select name="shot.${shotIndex}.targetSizeKey">
+          <select class="attack-dialog__inline-select" name="shot.${shotIndex}.targetSizeKey">
             ${optionsHtml}
           </select>
         </div>
@@ -814,13 +824,30 @@ function renderAttackDialogShotPanels(shotPanels = []) {
     const targetLabel = foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.TargetLabel"));
     const targetName = foundry.utils.escapeHTML(String(shot.targetName ?? game.i18n.localize("STARFRONTIERS.Weapon.NoTarget")));
     const targetNumberLabel = foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.TargetNumber"));
+    const movementLabel = shot.targetIsCreature
+      ? foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.CreatureTargetMovement"))
+      : foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.TargetMovement"));
+    const movementCurrentLabel = shot.targetIsCreature
+      ? foundry.utils.escapeHTML(shot.creatureTargetMovementSelected
+        ? localizeModifierValue(shot.creatureTargetMovementSelected)
+        : game.i18n.localize("STARFRONTIERS.Modifier.Value.unspecified"))
+      : foundry.utils.escapeHTML(localizeModifierValue(shot.targetMovementSelected || "stationary"));
     const movementControl = !shot.showTargetMovementControl
       ? ""
       : shot.targetIsCreature
         ? `
-          <label class="attack-dialog__field attack-dialog__field--full attack-dialog__field--inline">
-            <div class="attack-dialog__field-header attack-dialog__field-header--control">
-              <span>${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.CreatureTargetMovement"))}</span>
+          <label class="attack-dialog__field attack-dialog__field--full">
+            <input type="hidden" name="shot.${shot.index}.showTargetMovementSelect" value="${shot.showTargetMovementSelect ? "true" : "false"}" />
+            <div class="attack-dialog__field-header">
+              <span class="attack-dialog__field-label">${movementLabel}</span>
+              <div class="attack-dialog__derived">
+                <strong>${movementCurrentLabel}</strong>
+                <button type="button" class="attack-dialog__toggle" data-attack-dialog-toggle="movement" data-shot-index="${shot.index}">
+                  ${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.Change"))}
+                </button>
+              </div>
+            </div>
+            <div class="attack-dialog__override-panel"${shot.showTargetMovementSelect ? "" : " hidden"}>
               <select class="attack-dialog__inline-select" name="shot.${shot.index}.creatureTargetMovement">
                 ${renderSelectOptions(shot.creatureTargetMovementOptions, shot.creatureTargetMovementSelected)}
               </select>
@@ -828,9 +855,18 @@ function renderAttackDialogShotPanels(shotPanels = []) {
           </label>
         `
         : `
-          <label class="attack-dialog__field attack-dialog__field--full attack-dialog__field--inline">
-            <div class="attack-dialog__field-header attack-dialog__field-header--control">
-              <span>${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.TargetMovement"))}</span>
+          <label class="attack-dialog__field attack-dialog__field--full">
+            <input type="hidden" name="shot.${shot.index}.showTargetMovementSelect" value="${shot.showTargetMovementSelect ? "true" : "false"}" />
+            <div class="attack-dialog__field-header">
+              <span class="attack-dialog__field-label">${movementLabel}</span>
+              <div class="attack-dialog__derived">
+                <strong>${movementCurrentLabel}</strong>
+                <button type="button" class="attack-dialog__toggle" data-attack-dialog-toggle="movement" data-shot-index="${shot.index}">
+                  ${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.Change"))}
+                </button>
+              </div>
+            </div>
+            <div class="attack-dialog__override-panel"${shot.showTargetMovementSelect ? "" : " hidden"}>
               <select class="attack-dialog__inline-select" name="shot.${shot.index}.targetMovement">
                 ${renderSelectOptions(shot.targetMovementOptions, shot.targetMovementSelected)}
               </select>
@@ -1153,13 +1189,57 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
         const shotIndex = String(target.dataset.shotIndex ?? root.querySelector("[name='activeShotIndex']")?.value ?? "1");
         if (toggle === "range" && setup.autoRangeBand) {
           const input = root.querySelector(`[name='shot.${shotIndex}.useRangeOverride']`);
-          if (input) input.value = input.value === "true" ? "false" : "true";
+          const panel = root.querySelector(`[name='shot.${shotIndex}.showRangeSelect']`);
+          const isOverride = input?.value === "true";
+          const isOpen = panel?.value === "true";
+          if (input && panel) {
+            if (!isOverride) {
+              input.value = "true";
+              panel.value = "true";
+            } else if (isOpen) {
+              input.value = "false";
+              panel.value = "false";
+            } else {
+              panel.value = "true";
+            }
+          }
           syncAttackDialog(root, setup);
           return;
         }
         if (toggle === "size" && setup.targetSizeDerived) {
           const input = root.querySelector(`[name='shot.${shotIndex}.useTargetSizeOverride']`);
-          if (input) input.value = input.value === "true" ? "false" : "true";
+          const panel = root.querySelector(`[name='shot.${shotIndex}.showTargetSizeSelect']`);
+          const isOverride = input?.value === "true";
+          const isOpen = panel?.value === "true";
+          if (input && panel) {
+            if (!isOverride) {
+              input.value = "true";
+              panel.value = "true";
+            } else if (isOpen) {
+              input.value = "false";
+              panel.value = "false";
+            } else {
+              panel.value = "true";
+            }
+          }
+          syncAttackDialog(root, setup);
+          return;
+        }
+        if (toggle === "range") {
+          const panel = root.querySelector(`[name='shot.${shotIndex}.showRangeSelect']`);
+          if (panel) panel.value = panel.value === "true" ? "false" : "true";
+          syncAttackDialog(root, setup);
+          return;
+        }
+        if (toggle === "size") {
+          const panel = root.querySelector(`[name='shot.${shotIndex}.showTargetSizeSelect']`);
+          if (panel) panel.value = panel.value === "true" ? "false" : "true";
+          syncAttackDialog(root, setup);
+          return;
+        }
+        if (toggle === "movement") {
+          const panel = root.querySelector(`[name='shot.${shotIndex}.showTargetMovementSelect']`);
+          if (panel) panel.value = panel.value === "true" ? "false" : "true";
           syncAttackDialog(root, setup);
         }
       });
@@ -1523,11 +1603,15 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
       const nextRemaining = Math.max(displayedPowerRemaining - totalAmmo, 0);
       await loadedSource.update({ "system.remaining": nextRemaining });
       displayedPowerRemaining = nextRemaining;
-    } else if (loadedSource?.type === "ammo" && nextConsumed >= liveCapacity) {
-      const currentQty = Number(loadedSource.system?.quantity ?? 0);
-      if (currentQty > 0) {
-        await loadedSource.update({ "system.quantity": currentQty - 1 });
+    } else if (loadedSource?.type === "ammo") {
+      const ammoUpdates = {
+        "system.consumed": Math.min(Math.max(nextConsumed, 0), liveCapacity)
+      };
+      if (nextConsumed >= liveCapacity) {
+        const currentQty = Number(loadedSource.system?.quantity ?? 0);
+        if (currentQty > 0) ammoUpdates["system.quantity"] = currentQty - 1;
       }
+      await loadedSource.update(ammoUpdates);
     }
   }
 
@@ -1820,7 +1904,7 @@ export async function promptModifier(label, targetValue, {
     },
     content: `
       <p>${game.i18n.format(promptKey, { ability: label, name: label, target: targetValue, ...promptData })}</p>
-      <input name="modifier" type="number" step="1" value="0" autofocus>
+      <input class="attack-dialog__inline-input" name="modifier" type="number" step="1" value="0" autofocus>
       ${forcedField}
     `,
     ok: {
@@ -1845,7 +1929,7 @@ export function getForcedRollOverrideField() {
   return `
     <label class="dialog-field">
       <span>${game.i18n.localize("STARFRONTIERS.Character.TestingForcedRoll")}</span>
-      <input name="forcedRoll" type="number" step="1" min="1" max="100" value="">
+      <input class="attack-dialog__inline-input" name="forcedRoll" type="number" step="1" min="1" max="100" value="">
       <small>${game.i18n.localize("STARFRONTIERS.Character.TestingForcedRollHint")}</small>
     </label>
   `;

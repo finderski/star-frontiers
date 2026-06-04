@@ -3027,6 +3027,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 }
 
 .attack-dialog__subsection .attack-dialog__inline-input,
+.attack-dialog__controls .attack-dialog__inline-input,
 .attack-dialog__subsection .attack-dialog__inline-select {
   background:rgba(9, 18, 28, 0.52);
   border: 0;
@@ -3036,7 +3037,8 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 }
 
 /* checkbox stuff */
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox {
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox,
+label.attack-dialog__field--checkbox > input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
 
@@ -3052,16 +3054,19 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   position: relative;
 }
 
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox::before {
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox::before,
+label.attack-dialog__field--checkbox > input[type="checkbox"]::before {
   content: "";
 }
 
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked {
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked,
+label.attack-dialog__field--checkbox > input[type="checkbox"]:checked {
   background: var(--sf-cyan, #53dcff);
   border-color: var(--sf-cyan, #53dcff);
 }
 
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked::after {
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked::after,
+label.attack-dialog__field--checkbox > input[type="checkbox"]:checked::after {
   content: "x";
   color: var(--sf-bg, #071521);
   font-size: 1.5em;
@@ -3073,7 +3078,8 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   font-family: var(--input);
 }
 
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:focus-visible {
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:focus-visible,
+label.attack-dialog__field--checkbox > input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--sf-cyan, #53dcff);
   outline-offset: 2px;
 }
@@ -3229,6 +3235,11 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   gap: 0.75rem;
 }
 
+.attack-dialog__field-header span.attack-dialog__field-header-label {
+  color: var(--sf-ink);
+  font-family: var(--fieldset);
+}
+
 .attack-dialog__field-header--control {
   flex-wrap: wrap;
 }
@@ -3315,6 +3326,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   display: grid;
   gap: 0.85rem;
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  font-family: var(--fieldset);
 }
 
 .attack-dialog__shot-checkboxes {

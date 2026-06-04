@@ -663,9 +663,9 @@ function appendDialogRows(modifiers, {
       if (targetMovementValue) {
         modifiers.push(makeModifierRow({
           id: "target-movement",
-          label: game.i18n.format("STARFRONTIERS.Modifier.TargetMovementLabel", {
-            movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.targetMovement || "walking"}`)
-          }),
+        label: game.i18n.format("STARFRONTIERS.Modifier.TargetMovementLabel", {
+            movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.targetMovement || "stationary"}`)
+        }),
           source: MODIFIER_SOURCES.DIALOG,
           attackTypes: [attackType],
           value: targetMovementValue
