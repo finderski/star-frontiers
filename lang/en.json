@@ -152,7 +152,7 @@
       "Change": "Change...",
       "CurrentRollTotal": "Current Roll",
       "CurrentTargetNumber": "Current Target",
-      "DialogInputs": "Dialog Inputs",
+      "DialogInputs": "Modifiers",
       "DistanceSummary": "Distance: {distance} {units}",
       "Enabled": "Enabled",
       "ForcedRollNote": "Forced d100 result: {result}",
@@ -166,6 +166,7 @@
       "Outcome": "Outcome",
       "OverrideRollTotal": "Override Roll Total",
       "OverrideTargetNumber": "Override Target Number",
+      "PerShotOverrides": "Per-Shot Overrides",
       "RangeSummary": "Range: {range}",
       "Result": "Result",
       "RollSummary": "Roll: {roll} vs {target}",
@@ -182,6 +183,7 @@
     },
     "Effects": {
       "AppliedToTarget": "{effects} applied to {target}.",
+      "EffectDisabled": "Disabled",
       "NoGmConnectedToApply": "No GM is connected to apply effects to that target.",
       "NoPermissionToApply": "You don't have permission to apply effects to that target."
     },
@@ -857,12 +859,16 @@
       "Message": "{label} is a placeholder for a future Star Frontiers action."
     },
     "Modifier": {
+      "AdjustPerShot": "Adjust per-shot...",
+      "AdjustPerShotHint": "Default: all shots use the modifiers above. Use this to override specific modifiers for individual shots.",
+      "AttackingFromBehind": "Attacking From Behind",
       "AttackerMovement": "Attacker Movement",
       "AttackerMovementLabel": "Attacker Movement: {movement}",
       "AttackerWounded": "Wounded (STA <= 1/2)",
       "CarefulAim": "Careful Aim",
       "CreatureTargetMovement": "Creature Target Movement",
       "CreatureTargetMovementLabel": "Creature Movement: {movement}",
+      "FiringBurst": "Firing a Burst",
       "FiringTwoWeapons": "Firing Two Weapons",
       "GMCircumstance": "GM Circumstance",
       "HeavyWeaponPenalty": "Heavy Weapon (untrained)",
@@ -870,20 +876,28 @@
       "ModeAttackModifier": "Mode Attack Modifier",
       "ModeAttackModifierLabel": "Mode: {mode}",
       "NoActiveModifiers": "No active modifiers.",
+      "OpportunityShot": "Opportunity Shot",
+      "OpportunityShotHint": "Cancels the target's movement modifier.",
+      "OpportunityShotNote": "Cancels target movement modifier",
       "RangeBand": "Range Band",
       "RangeBandLabel": "Range: {band}",
       "RifleInMelee": "Rifle in Melee",
       "SkillBonusNote": "Includes skill bonus {bonus}.",
+      "ShotN": "Shot {n}",
       "Source": {
         "derived": "Derived",
         "dialog": "Dialog",
         "manual": "Manual",
         "status": "Status"
       },
+      "TargetInVehicle": "Target in Moving Vehicle",
       "TargetMovement": "Target Movement",
       "TargetMovementLabel": "Target Movement: {movement}",
       "TargetSize": "Target Size",
       "TargetSizeLabel": "Target Size: {size}",
+      "TelescopicSight": "Using Telescopic Sight",
+      "TelescopicSightHint": "Range uses next-closer band. Not usable at Point Blank or Short range. ROF limited to 1.",
+      "TelescopicSightNote": "via Telescopic Sight",
       "Value": {
         "dodging": "Dodging",
         "fast": "Fast",
@@ -895,6 +909,7 @@
         "veryFast": "Very Fast",
         "walking": "Walking"
       },
+      "WrongHand": "Using Wrong Hand",
       "WeaponAttackModifierLabel": "{weapon} Attack Modifier",
       "WeaponSkillLabel": "Skill: {skill} (lvl {level})"
     },

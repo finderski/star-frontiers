@@ -56,17 +56,14 @@
   </section>
 
   <section class="attack-dialog__modifiers">
-    <h3>{{localize "STARFRONTIERS.Chat.Modifiers"}}</h3>
+    <h3>{{localize "STARFRONTIERS.Chat.DialogInputs"}}</h3>
     <div data-attack-dialog-modifiers>
       {{{modifierRowsHtml}}}
     </div>
     <div class="attack-dialog__warnings" data-attack-dialog-warnings>
       {{{warningsHtml}}}
     </div>
-  </section>
-
-  <section class="attack-dialog__controls">
-    <h3>{{localize "STARFRONTIERS.Chat.DialogInputs"}}</h3>
+    <div class="attack-dialog__modifiers-controls">
 
     {{#if rangeControl}}
       <div class="attack-dialog__field attack-dialog__field--full">
@@ -152,15 +149,59 @@
       <span>{{localize "STARFRONTIERS.Modifier.CarefulAim"}}</span>
     </label>
 
+    {{#if showWrongHand}}
+      <label class="attack-dialog__field attack-dialog__field--checkbox">
+        <input type="checkbox" name="wrongHand" {{checked wrongHand}} />
+        <span>{{localize "STARFRONTIERS.Modifier.WrongHand"}} (-10)</span>
+      </label>
+    {{/if}}
+
     <label class="attack-dialog__field attack-dialog__field--checkbox">
       <input type="checkbox" name="firingTwoWeapons" {{checked firingTwoWeapons}} />
       <span>{{localize "STARFRONTIERS.Modifier.FiringTwoWeapons"}}</span>
     </label>
 
+    {{#if supportsBurst}}
+      <label class="attack-dialog__field attack-dialog__field--checkbox">
+        <input type="checkbox" name="firingBurst" {{checked firingBurst}} />
+        <span>{{localize "STARFRONTIERS.Modifier.FiringBurst"}} (+20)</span>
+      </label>
+    {{/if}}
+
     <label class="attack-dialog__field attack-dialog__field--checkbox">
       <input type="checkbox" name="rifleInMelee" {{checked rifleInMelee}} />
       <span>{{localize "STARFRONTIERS.Modifier.RifleInMelee"}}</span>
     </label>
+
+    {{#if showAttackingFromBehind}}
+      <label class="attack-dialog__field attack-dialog__field--checkbox">
+        <input type="checkbox" name="attackingFromBehind" {{checked attackingFromBehind}} />
+        <span>{{localize "STARFRONTIERS.Modifier.AttackingFromBehind"}} (+20)</span>
+      </label>
+    {{/if}}
+
+    {{#if showTargetInVehicle}}
+      <label class="attack-dialog__field attack-dialog__field--checkbox">
+        <input type="checkbox" name="targetInVehicle" {{checked targetInVehicle}} />
+        <span>{{localize "STARFRONTIERS.Modifier.TargetInVehicle"}} (-10)</span>
+      </label>
+    {{/if}}
+
+    {{#if showTelescopicSight}}
+      <label class="attack-dialog__field attack-dialog__field--checkbox attack-dialog__field--hint">
+        <input type="checkbox" name="usingScope" {{checked usingScope}} />
+        <span>{{localize "STARFRONTIERS.Modifier.TelescopicSight"}}</span>
+        <small class="form-hint">{{localize "STARFRONTIERS.Modifier.TelescopicSightHint"}}</small>
+      </label>
+    {{/if}}
+
+    {{#if showOpportunityShot}}
+      <label class="attack-dialog__field attack-dialog__field--checkbox attack-dialog__field--hint">
+        <input type="checkbox" name="opportunityShot" {{checked opportunityShot}} />
+        <span>{{localize "STARFRONTIERS.Modifier.OpportunityShot"}}</span>
+        <small class="form-hint">{{localize "STARFRONTIERS.Modifier.OpportunityShotHint"}}</small>
+      </label>
+    {{/if}}
 
     {{#if showShots}}
       <label class="attack-dialog__field">
@@ -168,7 +209,18 @@
         <input type="number" name="shots" value="{{shots}}" min="1" max="{{rof}}" step="1" />
       </label>
     {{/if}}
+    </div>
   </section>
+
+  {{#if showShots}}
+    <details class="attack-dialog__per-shot" data-attack-dialog-per-shot {{#unless showPerShotAdjustments}}hidden{{/unless}}>
+      <summary>{{localize "STARFRONTIERS.Modifier.AdjustPerShot"}}</summary>
+      <p class="form-hint">{{localize "STARFRONTIERS.Modifier.AdjustPerShotHint"}}</p>
+      <div data-attack-dialog-per-shot-host>
+        {{{shotPanelsHtml}}}
+      </div>
+    </details>
+  {{/if}}
 
   <section class="attack-dialog__controls attack-dialog__controls--manual">
     <h3>{{localize "STARFRONTIERS.Chat.ManualModifiers"}}</h3>

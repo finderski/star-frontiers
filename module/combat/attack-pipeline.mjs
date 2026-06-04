@@ -5,6 +5,7 @@ import {
   buildAttackModifierContext,
   buildWeaponAttackProfile,
   clampAttackTarget,
+  computeShotContext,
   CREATURE_TARGET_MOVEMENT_MODS,
   EXPANDED_ATTACKER_MOVEMENT_MODS,
   EXPANDED_TARGET_MOVEMENT_MODS,
@@ -17,6 +18,7 @@ import {
   shouldShowTargetSizeModifier
 } from "./modifier-pipeline.mjs";
 import { rememberDocumentSheetScroll } from "../sheets/scroll-preserving-sheet-mixin.mjs";
+import { actorHasSfStatus, SF_STATUS_IDS } from "./status-config.mjs";
 
 export const APPLY_ON_HIT_EFFECTS_SOCKET_ACTION = "applyOnHitEffects";
 export { ATTACK_TYPES, MODIFIER_SOURCES, RANGE_BAND_MODS, RANGE_BAND_ORDER, clampAttackTarget };
@@ -232,11 +234,13 @@ function buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBa
   const showRangeControl = attackType !== ATTACK_TYPES.MELEE && rangeBands.length > 0;
   const canOverrideDerived = Boolean(game.user?.isGM || game.settings.get(SYSTEM_ID, "homebrewPlayerCanOverrideModifiers"));
   const rof = rulesEdition === "expanded" ? Number(weapon.system.mechanics?.rateOfFire ?? 1) : 1;
+  const activeMode = getActiveWeaponMode(weapon);
   return {
     actor,
     targetActor,
     weapon,
     profile,
+    activeMode,
     autoRangeBand,
     measuredDistance,
     attackType,
@@ -247,7 +251,15 @@ function buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBa
     canOverrideDerived,
     showTargetSizeControl: shouldShowTargetSizeModifier({ rulesEdition, attackType }),
     targetIsCreature: targetActor?.type === "creature",
-    rof
+    rof,
+    attackerHasWrongHand: actorHasSfStatus(actor, SF_STATUS_IDS.WRONG_HAND),
+    showWrongHand: attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.MELEE,
+    supportsBurst: attackType === ATTACK_TYPES.RANGED
+      && Boolean(activeMode?.burst?.available || activeMode?.burst || weapon.system?.mechanics?.burst?.available),
+    showAttackingFromBehind: rulesEdition === "expanded" && attackType === ATTACK_TYPES.MELEE,
+    showTargetInVehicle: rulesEdition === "expanded" && attackType === ATTACK_TYPES.RANGED,
+    showTelescopicSight: attackType === ATTACK_TYPES.RANGED,
+    showOpportunityShot: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN)
   };
 }
 
@@ -271,7 +283,11 @@ function readAttackDialogState(root, setup) {
     };
   }
 
-  return {
+  const shots = setup.rof > 1
+    ? Math.min(Math.max(readNumber("shots", 1), 1), setup.rof)
+    : 1;
+
+  const attackLevelState = {
     rangeBandKey: readValue("rangeBandKey", setup.autoRangeBand?.key ?? getDefaultRangeBandKey(setup.rangeBands)),
     useRangeOverride: readValue("useRangeOverride", setup.autoRangeBand ? "false" : "true") === "true",
     targetSizeKey: readValue("targetSizeKey", setup.targetSizeDerived || "medium"),
@@ -279,6 +295,12 @@ function readAttackDialogState(root, setup) {
     attackerMovement: readValue("attackerMovement", setup.rulesEdition === "basic" ? "stationary" : "stationary"),
     targetMovement: readValue("targetMovement", "walking"),
     creatureTargetMovement: readValue("creatureTargetMovement", ""),
+    wrongHand: readChecked("wrongHand"),
+    firingBurst: readChecked("firingBurst"),
+    attackingFromBehind: readChecked("attackingFromBehind"),
+    targetInVehicle: readChecked("targetInVehicle"),
+    usingScope: readChecked("usingScope"),
+    opportunityShot: readChecked("opportunityShot"),
     carefulAim: readChecked("carefulAim"),
     firingTwoWeapons: readChecked("firingTwoWeapons"),
     rifleInMelee: readChecked("rifleInMelee"),
@@ -286,7 +308,57 @@ function readAttackDialogState(root, setup) {
     gmCircumstanceValue: readNumber("gmCircumstanceValue", 0),
     miscModifierLabel: readValue("miscModifierLabel", ""),
     miscModifierValue: readNumber("miscModifierValue", 0),
-    derivedOverrides
+    derivedOverrides,
+    shots
+  };
+
+  const attackContext = buildAttackModifierContext({
+    attacker: setup.actor,
+    target: setup.targetActor,
+    weapon: setup.weapon,
+    attackType: setup.attackType,
+    mode: setup.activeMode,
+    profile: setup.profile,
+    resolvedRangeBand: setup.autoRangeBand,
+    measuredDistance: setup.measuredDistance,
+    dialogState: attackLevelState
+  });
+
+  const shotPerShotOverrides = [];
+  for (const panel of root.querySelectorAll(".attack-dialog__shot-panel")) {
+    const index = Number(panel.dataset.shotIndex ?? 0);
+    if (index < 1) continue;
+    const overrides = {};
+
+    for (const modRow of panel.querySelectorAll(".attack-dialog__shot-mod")) {
+      const modId = String(modRow.dataset.modifierId ?? "");
+      if (!modId) continue;
+      const enabledInput = modRow.querySelector("input[type='checkbox']");
+      const valueInput = modRow.querySelector("input[type='number']");
+      const attackLevelMod = attackContext.modifiers.find((modifier) => modifier.id === modId);
+      if (!attackLevelMod || !enabledInput || !valueInput) continue;
+
+      const enabled = Boolean(enabledInput.checked);
+      const value = Number.isFinite(valueInput.valueAsNumber)
+        ? valueInput.valueAsNumber
+        : Number(attackLevelMod.value ?? 0);
+
+      if (enabled !== Boolean(attackLevelMod.enabled) || value !== Number(attackLevelMod.value ?? 0)) {
+        overrides[modId] = {
+          enabled: enabled !== Boolean(attackLevelMod.enabled) ? enabled : undefined,
+          value: value !== Number(attackLevelMod.value ?? 0) ? value : undefined
+        };
+      }
+    }
+
+    if (Object.keys(overrides).length) {
+      shotPerShotOverrides[index - 1] = overrides;
+    }
+  }
+
+  return {
+    ...attackLevelState,
+    shotPerShotOverrides
   };
 }
 
@@ -296,11 +368,24 @@ function buildAttackDialogContext(setup, dialogState = {}) {
     target: setup.targetActor,
     weapon: setup.weapon,
     attackType: setup.attackType,
-    mode: getActiveWeaponMode(setup.weapon),
+    mode: setup.activeMode,
     profile: setup.profile,
     resolvedRangeBand: setup.autoRangeBand,
     measuredDistance: setup.measuredDistance,
     dialogState
+  });
+  const shots = setup.rof > 1
+    ? Math.min(Math.max(Number(dialogState.shots ?? 1), 1), setup.rof)
+    : 1;
+  const shotPanels = Array.from({ length: shots }, (_, index) => {
+    const shotOverrides = dialogState.shotPerShotOverrides?.[index] ?? {};
+    const shotContext = computeShotContext(modifierContext, shotOverrides);
+    return {
+      index: index + 1,
+      modifiers: shotContext.modifiers,
+      targetNumber: shotContext.targetNumber,
+      modifierOverridden: Object.keys(shotOverrides).length > 0
+    };
   });
 
   return {
@@ -347,9 +432,24 @@ function buildAttackDialogContext(setup, dialogState = {}) {
     attackerMovementSelected: dialogState.attackerMovement || (setup.rulesEdition === "basic" ? "stationary" : "stationary"),
     targetMovementSelected: dialogState.targetMovement || "walking",
     creatureTargetMovementSelected: dialogState.creatureTargetMovement || "",
+    wrongHand: dialogState.wrongHand ?? setup.attackerHasWrongHand,
+    firingBurst: Boolean(dialogState.firingBurst),
+    attackingFromBehind: Boolean(dialogState.attackingFromBehind),
+    targetInVehicle: Boolean(dialogState.targetInVehicle),
+    usingScope: Boolean(dialogState.usingScope),
+    opportunityShot: Boolean(dialogState.opportunityShot),
     carefulAim: Boolean(dialogState.carefulAim),
     firingTwoWeapons: Boolean(dialogState.firingTwoWeapons),
     rifleInMelee: Boolean(dialogState.rifleInMelee),
+    shots,
+    shotPanels,
+    showPerShotAdjustments: shots > 1,
+    showWrongHand: setup.showWrongHand,
+    supportsBurst: setup.supportsBurst,
+    showAttackingFromBehind: setup.showAttackingFromBehind,
+    showTargetInVehicle: setup.showTargetInVehicle,
+    showTelescopicSight: setup.showTelescopicSight,
+    showOpportunityShot: setup.showOpportunityShot,
     gmCircumstanceLabel: dialogState.gmCircumstanceLabel ?? "",
     gmCircumstanceValue: Number(dialogState.gmCircumstanceValue ?? 0),
     miscModifierLabel: dialogState.miscModifierLabel ?? "",
@@ -358,11 +458,12 @@ function buildAttackDialogContext(setup, dialogState = {}) {
 }
 
 function renderAttackDialogModifierRows(rows = []) {
-  if (!rows.length) {
+  const visibleRows = rows.filter((row) => !row.hiddenInDialog);
+  if (!visibleRows.length) {
     return `<p class="attack-dialog__empty">${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.NoActiveModifiers"))}</p>`;
   }
 
-  return rows.map((row) => {
+  return visibleRows.map((row) => {
     const safeId = foundry.utils.escapeHTML(row.id);
     const safeLabel = foundry.utils.escapeHTML(row.label);
     const safeSource = foundry.utils.escapeHTML(row.sourceLabel);
@@ -396,6 +497,36 @@ function renderAttackDialogModifierRows(rows = []) {
 function renderAttackDialogWarnings(warnings = []) {
   if (!warnings.length) return "";
   return warnings.map((warning) => `<p>${foundry.utils.escapeHTML(warning)}</p>`).join("");
+}
+
+function renderAttackDialogShotPanels(shotPanels = []) {
+  if (!shotPanels.length) return "";
+
+  return shotPanels.map((shot) => {
+    const safeLegend = foundry.utils.escapeHTML(game.i18n.format("STARFRONTIERS.Modifier.ShotN", { n: shot.index }));
+    const rows = Array.from(shot.modifiers ?? []).map((modifier) => {
+      const safeId = foundry.utils.escapeHTML(String(modifier.id ?? ""));
+      const safeLabel = foundry.utils.escapeHTML(String(modifier.label ?? ""));
+      const checkedAttr = modifier.enabled ? " checked" : "";
+      const value = Number(modifier.value ?? 0);
+      return `
+        <label class="attack-dialog__shot-mod" data-modifier-id="${safeId}">
+          <input type="checkbox" name="shot.${shot.index}.enabled.${safeId}"${checkedAttr} />
+          <span>${safeLabel}</span>
+          <input type="number" name="shot.${shot.index}.value.${safeId}" value="${value}" step="1" />
+        </label>
+      `;
+    }).join("");
+
+    const content = rows || `<p class="attack-dialog__empty">${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Modifier.NoActiveModifiers"))}</p>`;
+    return `
+      <fieldset class="attack-dialog__shot-panel" data-shot-index="${shot.index}">
+        <legend>${safeLegend}</legend>
+        <p class="attack-dialog__shot-target">${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Chat.TargetNumber"))}: ${shot.targetNumber}</p>
+        ${content}
+      </fieldset>
+    `;
+  }).join("");
 }
 
 function readAttackDialogBlockerState(root) {
@@ -476,6 +607,13 @@ function syncAttackDialog(root, setup) {
 
   const sizeOverride = root.querySelector("[name='useTargetSizeOverride']");
   if (sizeOverride) sizeOverride.value = context.targetSizeControl?.useOverride ? "true" : "false";
+
+  const perShotSection = root.querySelector("[data-attack-dialog-per-shot]");
+  if (perShotSection) {
+    perShotSection.hidden = !context.showPerShotAdjustments;
+    const perShotHost = perShotSection.querySelector("[data-attack-dialog-per-shot-host]");
+    if (perShotHost) perShotHost.innerHTML = renderAttackDialogShotPanels(context.shotPanels);
+  }
 }
 
 function resolveAttackDialogRangeBand(dialogState, autoRangeBand = null) {
@@ -501,6 +639,12 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     attackerMovement: setup.rulesEdition === "basic" ? "stationary" : "stationary",
     targetMovement: "walking",
     creatureTargetMovement: "",
+    wrongHand: setup.attackerHasWrongHand,
+    firingBurst: false,
+    attackingFromBehind: false,
+    targetInVehicle: false,
+    usingScope: false,
+    opportunityShot: false,
     carefulAim: false,
     firingTwoWeapons: false,
     rifleInMelee: false,
@@ -508,7 +652,9 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     gmCircumstanceValue: 0,
     miscModifierLabel: "",
     miscModifierValue: 0,
-    derivedOverrides: {}
+    derivedOverrides: {},
+    shots: 1,
+    shotPerShotOverrides: []
   });
 
   const isGM = Boolean(game.user?.isGM);
@@ -529,6 +675,18 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     targetIsCreature: setup.targetIsCreature,
     rulesEdition: setup.rulesEdition,
     showTargetMovementControl: setup.rulesEdition === "expanded",
+    showWrongHand: initialContext.showWrongHand,
+    wrongHand: initialContext.wrongHand,
+    supportsBurst: initialContext.supportsBurst,
+    firingBurst: initialContext.firingBurst,
+    showAttackingFromBehind: initialContext.showAttackingFromBehind,
+    attackingFromBehind: initialContext.attackingFromBehind,
+    showTargetInVehicle: initialContext.showTargetInVehicle,
+    targetInVehicle: initialContext.targetInVehicle,
+    showTelescopicSight: initialContext.showTelescopicSight,
+    usingScope: initialContext.usingScope,
+    showOpportunityShot: initialContext.showOpportunityShot,
+    opportunityShot: initialContext.opportunityShot,
     carefulAim: false,
     firingTwoWeapons: false,
     rifleInMelee: false,
@@ -537,8 +695,10 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     miscModifierLabel: "",
     miscModifierValue: 0,
     rof: setup.rof,
-    shots: 1,
+    shots: initialContext.shots,
     showShots: setup.rof > 1,
+    showPerShotAdjustments: initialContext.showPerShotAdjustments,
+    shotPanelsHtml: renderAttackDialogShotPanels(initialContext.shotPanels),
     forcedField: getForcedRollOverrideField(),
     modifierRowsHtml: renderAttackDialogModifierRows(initialContext.modifierRows),
     warningsHtml: renderAttackDialogWarnings(initialContext.warnings),
@@ -560,7 +720,6 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
         callback: (event, button, dialog) => {
           const root = dialog.element;
           const dialogState = readAttackDialogState(root, setup);
-          const shotsValue = root.querySelector("[name='shots']")?.valueAsNumber;
           const blockerState = readAttackDialogBlockerState(root);
           const blockerContext = buildAttackModifierContext({
             attacker: actor,
@@ -582,7 +741,7 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
           return {
             dialogState,
             forcedRoll: readForcedRollOverride(root.querySelector("[name='forcedRoll']")),
-            shots: setup.rof > 1 ? Math.min(Math.max(Number(shotsValue || 1), 1), setup.rof) : 1,
+            shots: Number(dialogState.shots ?? 1),
             blockerOverride
           };
         }
@@ -595,6 +754,8 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     render: (event, dialog) => {
       const root = dialog.element;
       if (!root) return;
+      const application = root.closest(".application");
+      application?.classList.add("star-frontiers", "attack-dialog-window");
 
       syncAttackDialog(root, setup);
       updateAttackDialogRollButton(root);
@@ -1003,9 +1164,12 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
 
   const allRollHtmls = [];
   const shotResults = [];
+  const shotPerShotOverrides = Array.from(prompt.dialogState?.shotPerShotOverrides ?? []);
   for (let i = 0; i < shots; i++) {
+    const shotOverrides = shotPerShotOverrides[i] ?? {};
+    const shotContext = computeShotContext(modifierContext, shotOverrides);
     const shotPenalty = 0;
-    const shotTarget = clampAttackTarget(modifierContext.targetNumber + shotPenalty);
+    const shotTarget = clampAttackTarget(shotContext.targetNumber + shotPenalty);
     const { total: rollTotal, rollHtml } = await evaluatePercentileRoll({
       forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Weapon.AttackFlavor", { weapon: weapon.name })
@@ -1014,6 +1178,9 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     shotResults.push({
       index: i + 1,
       shotPenalty,
+      modifierOverrides: shotOverrides,
+      modifiers: shotContext.modifiers,
+      targetNumber: shotTarget,
       originalRollTotal: rollTotal,
       rollTotalOverride: null
     });
@@ -1397,16 +1564,22 @@ export function recomputeAttackCardModel(model = {}) {
 
   next.shots = Array.from(next.shots ?? []).map((shot, index) => {
     const shotPenalty = Number(shot?.shotPenalty ?? 0);
+    const modifierOverrides = foundry.utils.deepClone(shot?.modifierOverrides ?? {});
+    const shotContext = computeShotContext(next, modifierOverrides);
     const originalRollTotal = clampRollTotal(shot?.originalRollTotal ?? shot?.rollTotal ?? 1);
     let rollTotalOverride = getOptionalNumericOverride(shot?.rollTotalOverride, clampRollTotal);
     if (rollTotalOverride !== null && rollTotalOverride === originalRollTotal) {
       rollTotalOverride = null;
     }
     const rollTotal = rollTotalOverride ?? originalRollTotal;
-    const targetNumber = clampAttackTarget(next.targetNumber + shotPenalty);
+    const targetBase = next.targetNumberOverride !== null ? next.targetNumber : shotContext.targetNumber;
+    const targetNumber = clampAttackTarget(targetBase + shotPenalty);
     return {
       index: Number(shot?.index ?? index + 1),
       shotPenalty,
+      modifierOverrides,
+      modifierOverridden: Object.keys(modifierOverrides).length > 0,
+      modifiers: shotContext.modifiers,
       originalRollTotal,
       rollTotalOverride,
       rollTotal,
@@ -1481,10 +1654,25 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
     originalRollTotalDisplay: formatRollTotal(shot.originalRollTotal),
     shotPenaltyDisplay: signedModifierValue(shot.shotPenalty),
     targetNumberDisplay: String(shot.targetNumber),
+    targetNumberDisplayWithOverrideFlag: shot.modifierOverridden ? `${shot.targetNumber}*` : String(shot.targetNumber),
     outcomeLabel: game.i18n.localize(shot.hit ? "STARFRONTIERS.Character.Success" : "STARFRONTIERS.Character.Failure"),
     outcomeClass: shot.hit ? "success" : "failure",
     rollOverrideValue: shot.rollTotalOverride ?? ""
   }));
+  const shotOverrideSections = shotRows
+    .filter((shot) => shot.modifierOverridden)
+    .map((shot) => ({
+      index: shot.index,
+      rows: Array.from(shot.modifiers ?? [])
+        .filter((modifier) => modifier.shotOverridden)
+        .map((modifier) => ({
+          label: modifier.label,
+          valueDisplay: signedModifierValue(modifier.value),
+          enabledLabel: modifier.enabled
+            ? game.i18n.localize("STARFRONTIERS.Chat.Enabled")
+            : game.i18n.localize("STARFRONTIERS.Effects.EffectDisabled")
+        }))
+    }));
   const subtitleParts = [];
   if (model.weapon?.modeLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.ModeSummary", { mode: model.weapon.modeLabel }));
   if (model.weapon?.skillLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.SkillSummary", { skill: model.weapon.skillLabel }));
@@ -1512,6 +1700,7 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
     targetNumberLabel: game.i18n.localize("STARFRONTIERS.Chat.TargetNumber"),
     modifierRows,
     shotRows,
+    shotOverrideSections,
     isSingleShot: shotRows.length === 1,
     canRollDamage: Boolean(model.damageAvailable),
     damageButtonLabel: game.i18n.localize("STARFRONTIERS.Weapon.RollDamage"),

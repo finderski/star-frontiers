@@ -1,5 +1,5 @@
 import { STAR_FRONTIERS_CONFIG, SYSTEM_ID } from "../config.mjs";
-import { actorHasSfStatus, SF_STATUS_DEFINITIONS } from "./status-config.mjs";
+import { actorHasSfStatus, SF_STATUS_DEFINITIONS, SF_STATUS_IDS } from "./status-config.mjs";
 
 export const RANGE_BAND_ORDER = ["pointBlank", "short", "medium", "long", "extreme"];
 export const RANGE_BAND_MODS = Object.freeze({ pointBlank: 0, short: -10, medium: -20, long: -40, extreme: -80 });
@@ -83,11 +83,6 @@ function localizeRangeBand(key) {
   return game.i18n.localize(`STARFRONTIERS.Range.${key}`);
 }
 
-function signedValue(value) {
-  const amount = Number(value ?? 0);
-  return amount >= 0 ? `+${amount}` : String(amount);
-}
-
 function makeModifierRow({
   id,
   label,
@@ -97,6 +92,7 @@ function makeModifierRow({
   enabled = true,
   overridable = false,
   notes = "",
+  hiddenInDialog = false,
   originalValue = value,
   originalEnabled = enabled
 }) {
@@ -109,6 +105,7 @@ function makeModifierRow({
     enabled: Boolean(enabled),
     overridable: Boolean(overridable),
     notes,
+    hiddenInDialog: Boolean(hiddenInDialog),
     originalValue: Number(originalValue ?? value ?? 0),
     originalEnabled: Boolean(originalEnabled)
   };
@@ -134,6 +131,12 @@ function normalizeDialogState(dialogState = {}) {
     attackerMovement: String(dialogState.attackerMovement ?? ""),
     targetMovement: String(dialogState.targetMovement ?? ""),
     creatureTargetMovement: String(dialogState.creatureTargetMovement ?? ""),
+    wrongHand: Boolean(dialogState.wrongHand),
+    firingBurst: Boolean(dialogState.firingBurst),
+    attackingFromBehind: Boolean(dialogState.attackingFromBehind),
+    targetInVehicle: Boolean(dialogState.targetInVehicle),
+    usingScope: Boolean(dialogState.usingScope),
+    opportunityShot: Boolean(dialogState.opportunityShot),
     carefulAim: Boolean(dialogState.carefulAim),
     firingTwoWeapons: Boolean(dialogState.firingTwoWeapons),
     rifleInMelee: Boolean(dialogState.rifleInMelee),
@@ -289,6 +292,32 @@ export function sumEnabledModifiers(modifiers = []) {
   return modifiers.reduce((total, modifier) => total + (modifier.enabled ? Number(modifier.value ?? 0) : 0), 0);
 }
 
+function applyTelescopicSightShift(rangeBandKey, usingScope) {
+  if (!usingScope) return rangeBandKey;
+  const downgradeMap = { medium: "short", long: "medium", extreme: "long" };
+  return downgradeMap[rangeBandKey] ?? rangeBandKey;
+}
+
+export function computeShotContext(attackContext, shotOverrides = {}) {
+  const normalizedOverrides = normalizeDerivedOverrides(shotOverrides);
+  const modifiers = Array.from(attackContext?.modifiers ?? []).map((modifier) => {
+    const override = normalizedOverrides[modifier.id];
+    if (!override) return foundry.utils.deepClone(modifier);
+    return {
+      ...foundry.utils.deepClone(modifier),
+      enabled: override.enabled !== undefined ? Boolean(override.enabled) : Boolean(modifier.enabled),
+      value: override.value !== undefined ? Number(override.value) : Number(modifier.value ?? 0),
+      shotOverridden: true
+    };
+  });
+
+  const targetNumber = clampAttackTarget(
+    Number(attackContext?.baseChance ?? 0) + sumEnabledModifiers(modifiers)
+  );
+
+  return { modifiers, targetNumber };
+}
+
 function appendDerivedRows(modifiers, {
   attacker,
   target,
@@ -300,59 +329,6 @@ function appendDerivedRows(modifiers, {
   rulesEdition,
   dialog
 }) {
-  if (profile.skillModifier) {
-    const notes = profile.skillBonus
-      ? game.i18n.format("STARFRONTIERS.Modifier.SkillBonusNote", { bonus: signedValue(profile.skillBonus) })
-      : "";
-    modifiers.push(makeModifierRow({
-      id: "weapon-skill",
-      label: game.i18n.format("STARFRONTIERS.Modifier.WeaponSkillLabel", {
-        skill: profile.skillLabel,
-        level: profile.skillLevel
-      }),
-      source: MODIFIER_SOURCES.DERIVED,
-      attackTypes: [attackType],
-      value: profile.skillModifier,
-      overridable: true,
-      notes
-    }));
-  }
-
-  if (resolvedRangeBand && !dialog.useRangeOverride && attackType !== ATTACK_TYPES.MELEE) {
-    modifiers.push(makeModifierRow({
-      id: "range-band",
-      label: game.i18n.format("STARFRONTIERS.Modifier.RangeBandLabel", {
-        band: localizeRangeBand(resolvedRangeBand.key)
-      }),
-      source: MODIFIER_SOURCES.DERIVED,
-      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
-      value: Number(resolvedRangeBand.mod ?? 0),
-      overridable: true
-    }));
-  }
-
-  if (shouldShowTargetSizeModifier({ rulesEdition, attackType })) {
-    const derivedTargetSize = getActorTargetSize(target);
-    const selectedSize = dialog.useTargetSizeOverride
-      ? dialog.targetSizeKey
-      : derivedTargetSize;
-    const shouldUseDerived = Boolean(derivedTargetSize) && !dialog.useTargetSizeOverride;
-    const modifierValue = getTargetSizeModifier(selectedSize);
-
-    if (selectedSize && (modifierValue !== 0 || shouldUseDerived)) {
-      modifiers.push(makeModifierRow({
-        id: "target-size",
-        label: game.i18n.format("STARFRONTIERS.Modifier.TargetSizeLabel", {
-          size: localizeSize(selectedSize)
-        }),
-        source: shouldUseDerived ? MODIFIER_SOURCES.DERIVED : MODIFIER_SOURCES.DIALOG,
-        attackTypes: [ATTACK_TYPES.RANGED],
-        value: modifierValue,
-        overridable: shouldUseDerived
-      }));
-    }
-  }
-
   if (attackType === ATTACK_TYPES.RANGED && attacker.system?.derived?.isWounded) {
     modifiers.push(makeModifierRow({
       id: "attacker-wounded",
@@ -360,17 +336,6 @@ function appendDerivedRows(modifiers, {
       source: MODIFIER_SOURCES.DERIVED,
       attackTypes: [ATTACK_TYPES.RANGED],
       value: -10,
-      overridable: true
-    }));
-  }
-
-  if (profile.staticAttackModifier) {
-    modifiers.push(makeModifierRow({
-      id: "weapon-attack-mod",
-      label: game.i18n.format("STARFRONTIERS.Modifier.WeaponAttackModifierLabel", { weapon: weapon.name }),
-      source: MODIFIER_SOURCES.DERIVED,
-      attackTypes: [attackType],
-      value: profile.staticAttackModifier,
       overridable: true
     }));
   }
@@ -459,6 +424,8 @@ function statusSideAppliesTo(sideDef, attackType) {
 
 function appendStatusRows(modifiers, blockers, { attacker, target, attackType }) {
   for (const def of SF_STATUS_DEFINITIONS) {
+    if (def.id === SF_STATUS_IDS.WRONG_HAND) continue;
+
     if (def.attacker && actorHasSfStatus(attacker, def.id)) {
       if (def.attacker.blocker) {
         blockers.push({
@@ -508,31 +475,89 @@ function appendDialogRows(modifiers, {
   dialog,
   resolvedRangeBand
 }) {
-  if (!resolvedRangeBand && attackType !== ATTACK_TYPES.MELEE && dialog.rangeBandKey) {
-    modifiers.push(makeModifierRow({
-      id: "range-band",
-      label: game.i18n.format("STARFRONTIERS.Modifier.RangeBandLabel", {
-        band: localizeRangeBand(dialog.rangeBandKey)
-      }),
-      source: MODIFIER_SOURCES.DIALOG,
-      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
-      value: Number(RANGE_BAND_MODS[dialog.rangeBandKey] ?? 0)
-    }));
+  if (attackType !== ATTACK_TYPES.MELEE) {
+    const usingDerivedRange = Boolean(resolvedRangeBand) && !dialog.useRangeOverride;
+    const selectedRangeKey = usingDerivedRange
+      ? String(resolvedRangeBand?.key ?? "")
+      : String(dialog.rangeBandKey ?? "");
+    const effectiveRangeKey = applyTelescopicSightShift(selectedRangeKey, dialog.usingScope);
+    const scopeShifted = dialog.usingScope && effectiveRangeKey !== selectedRangeKey;
+    if (effectiveRangeKey) {
+      modifiers.push(makeModifierRow({
+        id: "range-band",
+        label: game.i18n.format("STARFRONTIERS.Modifier.RangeBandLabel", {
+          band: localizeRangeBand(effectiveRangeKey)
+        }),
+        source: usingDerivedRange ? MODIFIER_SOURCES.DERIVED : MODIFIER_SOURCES.DIALOG,
+        attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
+        value: Number(RANGE_BAND_MODS[effectiveRangeKey] ?? 0),
+        notes: scopeShifted ? game.i18n.localize("STARFRONTIERS.Modifier.TelescopicSightNote") : "",
+        hiddenInDialog: usingDerivedRange,
+        overridable: usingDerivedRange
+      }));
+    }
   }
 
   if (shouldShowTargetSizeModifier({ rulesEdition, attackType })) {
     const derivedTargetSize = getActorTargetSize(target);
-    if (!derivedTargetSize && dialog.targetSizeKey) {
+    const usingDerivedSize = Boolean(derivedTargetSize) && !dialog.useTargetSizeOverride;
+    const selectedSize = usingDerivedSize
+      ? derivedTargetSize
+      : String(dialog.targetSizeKey ?? "");
+    const modifierValue = getTargetSizeModifier(selectedSize);
+    if (selectedSize && modifierValue !== 0) {
       modifiers.push(makeModifierRow({
         id: "target-size",
         label: game.i18n.format("STARFRONTIERS.Modifier.TargetSizeLabel", {
-          size: localizeSize(dialog.targetSizeKey)
+          size: localizeSize(selectedSize)
         }),
-        source: MODIFIER_SOURCES.DIALOG,
+        source: usingDerivedSize ? MODIFIER_SOURCES.DERIVED : MODIFIER_SOURCES.DIALOG,
         attackTypes: [ATTACK_TYPES.RANGED],
-        value: getTargetSizeModifier(dialog.targetSizeKey)
+        value: modifierValue,
+        hiddenInDialog: usingDerivedSize,
+        overridable: usingDerivedSize
       }));
     }
+  }
+
+  if (dialog.wrongHand) {
+    modifiers.push(makeModifierRow({
+      id: "wrong-hand",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.WrongHand"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.MELEE],
+      value: -10
+    }));
+  }
+
+  if (dialog.firingBurst) {
+    modifiers.push(makeModifierRow({
+      id: "firing-burst",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.FiringBurst"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED],
+      value: 20
+    }));
+  }
+
+  if (dialog.attackingFromBehind) {
+    modifiers.push(makeModifierRow({
+      id: "attacking-from-behind",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.AttackingFromBehind"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.MELEE],
+      value: 20
+    }));
+  }
+
+  if (dialog.targetInVehicle) {
+    modifiers.push(makeModifierRow({
+      id: "target-in-vehicle",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.TargetInVehicle"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED],
+      value: -10
+    }));
   }
 
   if (rulesEdition === "basic") {
@@ -563,7 +588,9 @@ function appendDialogRows(modifiers, {
     }
 
     if (target?.type === "creature") {
-      const creatureMovementValue = Number(CREATURE_TARGET_MOVEMENT_MODS[dialog.creatureTargetMovement] ?? 0);
+      const creatureMovementValue = dialog.opportunityShot
+        ? 0
+        : Number(CREATURE_TARGET_MOVEMENT_MODS[dialog.creatureTargetMovement] ?? 0);
       if (creatureMovementValue) {
         modifiers.push(makeModifierRow({
           id: "creature-target-movement",
@@ -576,7 +603,9 @@ function appendDialogRows(modifiers, {
         }));
       }
     } else {
-      const targetMovementValue = Number(EXPANDED_TARGET_MOVEMENT_MODS[dialog.targetMovement] ?? 0);
+      const targetMovementValue = dialog.opportunityShot
+        ? 0
+        : Number(EXPANDED_TARGET_MOVEMENT_MODS[dialog.targetMovement] ?? 0);
       if (targetMovementValue) {
         modifiers.push(makeModifierRow({
           id: "target-movement",
@@ -589,6 +618,17 @@ function appendDialogRows(modifiers, {
         }));
       }
     }
+  }
+
+  if (dialog.opportunityShot) {
+    modifiers.push(makeModifierRow({
+      id: "opportunity-shot",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.OpportunityShot"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
+      value: 0,
+      notes: game.i18n.localize("STARFRONTIERS.Modifier.OpportunityShotNote")
+    }));
   }
 
   if (dialog.carefulAim) {
@@ -701,10 +741,10 @@ export function buildAttackModifierContext({
 
   const applicable = modifiers.filter((modifier) =>
     modifier.attackTypes.includes(attackType) || modifier.attackTypes.includes(ATTACK_TYPES.ALL));
-  const targetNumber = clampAttackTarget(Number(profile.baseChance ?? 0) + sumEnabledModifiers(applicable));
+  const targetNumber = clampAttackTarget(Number(profile.baseTarget ?? 0) + sumEnabledModifiers(applicable));
 
   return {
-    baseChance: Number(profile.baseChance ?? 0),
+    baseChance: Number(profile.baseTarget ?? 0),
     modifiers: applicable,
     targetNumber,
     blockers,

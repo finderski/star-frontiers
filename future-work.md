@@ -258,6 +258,9 @@ Per rules, certain screens drain SEU continuously while active (some per-minute 
 ### Work
 
 - Hook into the Foundry combat tracker's turn/round events.
+
+---
+
 - For each active screen on a character at the start of a round, compute the SEU drain based on turn length (round = 6 seconds; 1 minute = 10 rounds).
 - Decrement `powerSource.remaining` accordingly. If insufficient, mark the screen as inactive and post a chat message: "X's screen has run out of power."
 - For per-hit drains: integrate with the damage application pipeline (item 2). When a screen absorbs a hit, deduct `seuPerHit` from its linked PowerSource.
@@ -273,7 +276,28 @@ Per rules, certain screens drain SEU continuously while active (some per-minute 
 
 ---
 
-## 9. Compendium Content Packs
+## 9. World-Level Overrides for Range and Creature-Size Modifiers
+
+**Source:** Deferred during the ranged attack tighten-up pass.
+**Status:** Concept. Target size already has per-size settings (`expandedTargetSizeModTiny` through `expandedTargetSizeModHuge`). Range bands are still hardcoded in `RANGE_BAND_MODS`.
+
+### Context
+
+The attack dialog no longer shows per-attack derived rows for auto-range and auto target size because those values are already visible in the dialog controls and chat-card details. GM-level customization of those penalties belongs in world settings rather than per-attack overrides.
+
+### Work
+
+1. Add world settings for each range band: `rangeBandModPointBlank`, `rangeBandModShort`, `rangeBandModMedium`, `rangeBandModLong`, `rangeBandModExtreme`.
+2. Replace direct `RANGE_BAND_MODS` lookups in `modifier-pipeline.mjs` with a helper that reads the world settings.
+3. Add a settings UI grouping that mirrors the existing target-size settings so the GM can adjust the whole game's range penalties in one place.
+
+### Dependencies
+
+- None.
+
+---
+
+## 10. Compendium Content Packs
 
 **Status:** No compendium ships with the system.
 
@@ -306,7 +330,7 @@ The system is currently bring-your-own-data. World-builders create every weapon,
 
 ---
 
-## 10. Paired-Ability Point Shift Control
+## 11. Paired-Ability Point Shift Control
 
 **Status:** Concept only. Currently players manually overwrite ability values to shift points within a pair.
 
@@ -353,7 +377,7 @@ The compute-on-the-fly approach is cleaner (no new schema). The cap check then b
 
 ---
 
-## 11. Ammo Management — Partial-Clip Preservation & Reload Workflow
+## 12. Ammo Management — Partial-Clip Preservation & Reload Workflow
 
 **Status:** Partial-clip preservation **DONE** (0.2.9). Auto-link on drop **DONE** for compendium drops (0.2.9). Clip-type discrimination and recharge hierarchy still pending.
 
@@ -468,7 +492,7 @@ Spent clips and depleted power sources are never discarded — they can be recha
 
 ---
 
-## 12. Weapon Modes Editor — "Duplicate Mode" Button
+## 13. Weapon Modes Editor — "Duplicate Mode" Button
 
 **Status:** Polish. The Weapon Modes editor (item sheet) is implemented. This is a small quality-of-life addition.
 
@@ -516,7 +540,7 @@ i18n key: `"DuplicateMode": "Duplicate this mode"`.
 
 ---
 
-## 13. Spacesuit Armor (Knight Hawks) — Percent-Chance Protection Mode
+## 14. Spacesuit Armor (Knight Hawks) — Percent-Chance Protection Mode
 
 **Source:** Knight Hawks Expansion, Personal Space Equipment / Weapons vs. Armor chart.
 **Status:** Concept only. Out of scope for the 0.3.1 armor sheet pass per Rich's "no Knight Hawks until later" directive.
@@ -546,7 +570,7 @@ There's also a stacking rule: a defensive suit worn UNDER spacesuit armor compou
 
 ---
 
-## 14. Zebulon's Defensive Suits — Threshold-Per-Turn and Amplify Modes
+## 15. Zebulon's Defensive Suits — Threshold-Per-Turn and Amplify Modes
 
 **Source:** Zebulon's Guide to Frontier Space, defensive suits section.
 **Status:** Concept only. Out of scope for the 0.3.1 armor sheet pass.

@@ -128,12 +128,33 @@
                   {{/if}}
                 </td>
                 <td>{{shot.rollTotalDisplay}}</td>
-                <td>{{shot.targetNumberDisplay}}</td>
+                <td>{{shot.targetNumberDisplayWithOverrideFlag}}</td>
                 <td>{{shot.outcomeLabel}}</td>
               </tr>
             {{/each}}
           </tbody>
         </table>
+      {{/if}}
+
+      {{#if shotOverrideSections.length}}
+        <div class="sf-attack-card__notes">
+          {{#each shotOverrideSections as |shot|}}
+            <h4>{{localize "STARFRONTIERS.Modifier.ShotN" n=shot.index}} {{localize "STARFRONTIERS.Chat.PerShotOverrides"}}</h4>
+            <table class="sf-attack-card__modifiers sf-attack-card__modifiers--shot-overrides">
+              <tbody>
+                {{#each shot.rows as |row|}}
+                  <tr class="sf-attack-card__modifier-row">
+                    <td>
+                      <strong>{{row.label}}</strong>
+                      <small>{{row.enabledLabel}}</small>
+                    </td>
+                    <td>{{row.valueDisplay}}</td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          {{/each}}
+        </div>
       {{/if}}
 
       {{#if warnings.length}}

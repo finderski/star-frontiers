@@ -126,14 +126,18 @@
  * ===================================================================== */
 
 .star-frontiers-sheet,
-.star-frontiers-item-sheet {
+.star-frontiers-item-sheet,
+.star-frontiers.attack-dialog,
+.star-frontiers.attack-dialog-window {
   --logo: "av05";
   --fieldset: "michroma";
   --input: "prosto", monospace, "Courier New", Courier, monospace;
   --symbol: "noto";
 }
 
-.star-frontiers.sheet {
+.star-frontiers.sheet,
+.star-frontiers.attack-dialog,
+.star-frontiers.attack-dialog-window {
   --sf-ink: #1f1f1f;
   --sf-paper: #f8f7f1;
   --sf-line: #222;
@@ -147,6 +151,7 @@
 
 body[data-star-frontiers-theme="retro"] .star-frontiers.sheet,
 body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog,
+body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog-window,
 .star-frontiers.sheet.theme-retro {
   --sf-ink: #d8f6ff;
   --sf-paper: #10151d;
@@ -161,6 +166,22 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog,
 .star-frontiers.sheet .window-content {
   background: var(--sf-paper);
   box-shadow: var(--sf-window-shadow);
+}
+
+.star-frontiers.attack-dialog-window .window-content {
+  background: var(--sf-paper);
+  box-shadow: var(--sf-window-shadow);
+  color: var(--sf-ink);
+}
+
+.star-frontiers.attack-dialog-window .window-header {
+  border-bottom: 1px solid var(--sf-row-line);
+  color: var(--sf-ink);
+}
+
+.star-frontiers.attack-dialog-window .window-title {
+  font-family: var(--fieldset);
+  letter-spacing: 0.03em;
 }
 
 .star-frontiers.sheet.actor.character .window-content {
@@ -2884,7 +2905,8 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 .attack-dialog__summary,
 .attack-dialog__modifiers,
 .attack-dialog__controls {
-  border: 1px solid var(--color-border-light-tertiary, rgba(0, 0, 0, 0.15));
+  background: color-mix(in srgb, var(--sf-paper) 94%, transparent);
+  border: 1px solid var(--sf-line);
   border-radius: 8px;
   padding: 0.85rem;
 }
@@ -2958,8 +2980,9 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 .attack-dialog__identity-label,
 .attack-dialog__total span,
 .attack-dialog__modifier-source {
-  color: var(--color-text-light-6, rgba(0, 0, 0, 0.65));
+  color: var(--sf-muted);
   font-size: 0.85rem;
+  font-family: var(--fieldset);
   text-transform: uppercase;
 }
 
@@ -2976,6 +2999,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 .attack-dialog__controls h3,
 .sf-attack-card__notes h4,
 .sf-attack-card__gm-adjustment h4 {
+  font-family: var(--fieldset);
   margin: 0 0 0.75rem;
   text-transform: uppercase;
 }
@@ -2987,7 +3011,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 
 .attack-dialog__modifier-row {
   align-items: start;
-  border-bottom: 1px solid var(--color-border-light-tertiary, rgba(0, 0, 0, 0.15));
+  border-bottom: 1px solid var(--sf-row-line);
   display: grid;
   gap: 0.65rem;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3017,7 +3041,7 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 }
 
 .attack-dialog__modifier-notes {
-  color: var(--color-text-light-6, rgba(0, 0, 0, 0.65));
+  color: var(--sf-muted);
 }
 
 .attack-dialog__modifier-controls {
@@ -3041,6 +3065,12 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   gap: 0.35rem;
 }
 
+.attack-dialog__modifiers-controls {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
 .attack-dialog__controls {
   display: grid;
   gap: 0.85rem;
@@ -3056,6 +3086,10 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   gap: 0.4rem;
 }
 
+.attack-dialog__field > span {
+  font-family: var(--fieldset);
+}
+
 .attack-dialog__field--full,
 .attack-dialog__field--manual {
   grid-column: 1 / -1;
@@ -3065,6 +3099,17 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   align-items: center;
   grid-auto-flow: column;
   justify-content: start;
+}
+
+.attack-dialog__field--hint {
+  align-items: center;
+  column-gap: 0.55rem;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.attack-dialog__field--hint .form-hint {
+  grid-column: 2;
+  margin: 0;
 }
 
 .attack-dialog__field--manual {
@@ -3087,10 +3132,12 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 
 .attack-dialog__toggle {
   background: transparent;
-  border: 1px solid var(--color-border-light-tertiary, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--sf-line);
   border-radius: 999px;
+  color: var(--sf-ink);
   cursor: pointer;
   font: inherit;
+  font-family: var(--fieldset);
   padding: 0.25rem 0.7rem;
 }
 
@@ -3098,9 +3145,73 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   display: none;
 }
 
+.attack-dialog__per-shot {
+  background: color-mix(in srgb, var(--sf-paper) 94%, transparent);
+  border: 1px solid var(--sf-line);
+  border-radius: 8px;
+  padding: 0.85rem;
+}
+
+.attack-dialog__per-shot[hidden] {
+  display: none;
+}
+
+.attack-dialog__per-shot > summary {
+  cursor: pointer;
+  font-family: var(--fieldset);
+  margin-bottom: 0.5rem;
+}
+
+.attack-dialog__shot-panel {
+  border: 1px solid var(--sf-row-line);
+  border-radius: 6px;
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.85rem 0 0;
+  padding: 0.75rem;
+}
+
+.attack-dialog__shot-panel legend {
+  font-family: var(--fieldset);
+  padding: 0 0.35rem;
+}
+
+.attack-dialog__shot-target {
+  color: var(--sf-muted);
+  font-family: var(--fieldset);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.attack-dialog__shot-mod {
+  align-items: center;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: auto minmax(0, 1fr) 5.5rem;
+}
+
 .attack-dialog .dialog-field {
   display: grid;
   gap: 0.4rem;
+}
+
+.star-frontiers.attack-dialog input[type="checkbox"] {
+  accent-color: var(--sf-focus);
+  border-bottom: none;
+}
+
+.star-frontiers.attack-dialog-window button[data-action="roll"],
+.star-frontiers.attack-dialog-window button[data-action="cancel"] {
+  border: 1px solid var(--sf-line);
+  color: var(--sf-ink);
+  font-family: var(--fieldset);
+}
+
+.star-frontiers.attack-dialog-window button[data-action="roll"]:hover,
+.star-frontiers.attack-dialog-window button[data-action="roll"]:focus,
+.star-frontiers.attack-dialog-window button[data-action="cancel"]:hover,
+.star-frontiers.attack-dialog-window button[data-action="cancel"]:focus {
+  background: var(--sf-button-hover);
 }
 
 .sf-attack-card {
