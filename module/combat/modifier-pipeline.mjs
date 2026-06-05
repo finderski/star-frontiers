@@ -134,6 +134,7 @@ function normalizeDialogState(dialogState = {}) {
     attackerMovement: String(dialogState.attackerMovement ?? ""),
     targetMovement: String(dialogState.targetMovement ?? ""),
     creatureTargetMovement: String(dialogState.creatureTargetMovement ?? ""),
+    hasCover: Boolean(dialogState.hasCover),
     wrongHand: Boolean(dialogState.wrongHand),
     firingBurst: Boolean(dialogState.firingBurst),
     attackingFromBehind: Boolean(dialogState.attackingFromBehind),
@@ -167,15 +168,11 @@ function getTargetSizeModifier(size) {
 
 function getCharacterAttackBaseChance(actor, weapon, attackType, rulesEdition) {
   const dex = Number(actor.system.abilities?.dex?.value ?? 0);
+
+  if (rulesEdition === "basic") return dex;
+
   const str = Number(actor.system.abilities?.str?.value ?? 0);
   const usesStrength = weapon.system?.weaponSkillKey === "str" || weapon.system?.attributeKey === "str";
-
-  if (rulesEdition === "basic") {
-    if (usesStrength) return str;
-    if (attackType === ATTACK_TYPES.MELEE) return Math.max(str, dex);
-    return dex;
-  }
-
   if (usesStrength) return Math.ceil(str / 2);
   if (attackType === ATTACK_TYPES.MELEE) return Math.ceil(Math.max(str, dex) / 2);
   return Math.ceil(dex / 2);
@@ -336,7 +333,7 @@ function appendDerivedRows(modifiers, {
   rulesEdition,
   dialog
 }) {
-  if (attackType === ATTACK_TYPES.RANGED && attacker.system?.derived?.isWounded) {
+  if (rulesEdition === "expanded" && attackType === ATTACK_TYPES.RANGED && attacker.system?.derived?.isWounded) {
     modifiers.push(makeModifierRow({
       id: "attacker-wounded",
       label: game.i18n.localize("STARFRONTIERS.Modifier.AttackerWounded"),
@@ -347,7 +344,7 @@ function appendDerivedRows(modifiers, {
     }));
   }
 
-  if (weapon.system?.mechanics?.isHeavy && attackType !== ATTACK_TYPES.MELEE && !profile.skill) {
+  if (rulesEdition === "expanded" && weapon.system?.mechanics?.isHeavy && attackType !== ATTACK_TYPES.MELEE && !profile.skill) {
     modifiers.push(makeModifierRow({
       id: "heavy-weapon-penalty",
       label: game.i18n.localize("STARFRONTIERS.Modifier.HeavyWeaponPenalty"),
@@ -359,7 +356,7 @@ function appendDerivedRows(modifiers, {
   }
 
   const modeAttackModifier = getModeAttackModifier(mode);
-  if (modeAttackModifier) {
+  if (rulesEdition === "expanded" && modeAttackModifier) {
     modifiers.push(makeModifierRow({
       id: "weapon-mode-mod",
       label: getModeAttackModifier(mode)
@@ -379,7 +376,7 @@ function appendDerivedRows(modifiers, {
       ? attacker.system?.combatProfile?.meleeBonus ?? 0
       : attacker.system?.combatProfile?.rangedBonus ?? 0
   );
-  if (combatProfileBonus) {
+  if (rulesEdition === "expanded" && combatProfileBonus) {
     modifiers.push(makeModifierRow({
       id: "combat-profile-bonus",
       label: game.i18n.localize(attackType === ATTACK_TYPES.MELEE
@@ -429,7 +426,7 @@ function statusSideAppliesTo(sideDef, attackType) {
   return types.includes(attackType) || types.includes(ATTACK_TYPES.ALL);
 }
 
-function appendStatusRows(modifiers, blockers, { attacker, target, attackType }) {
+function appendStatusRows(modifiers, blockers, { attacker, target, attackType, rulesEdition }) {
   const attackerDialogStatusIds = new Set([SF_STATUS_IDS.WRONG_HAND]);
   const targetDialogStatusIds = new Set([
     SF_STATUS_IDS.SOFT_COVER,
@@ -448,7 +445,7 @@ function appendStatusRows(modifiers, blockers, { attacker, target, attackType })
           source: MODIFIER_SOURCES.STATUS,
           side: "attacker"
         });
-      } else if (!attackerDialogStatusIds.has(def.id) && statusSideAppliesTo(def.attacker, attackType)) {
+      } else if (rulesEdition === "expanded" && !attackerDialogStatusIds.has(def.id) && statusSideAppliesTo(def.attacker, attackType)) {
         modifiers.push(makeModifierRow({
           id: `status-${def.id}-attacker`,
           label: game.i18n.localize(def.attacker.label),
@@ -468,7 +465,7 @@ function appendStatusRows(modifiers, blockers, { attacker, target, attackType })
           source: MODIFIER_SOURCES.STATUS,
           side: "target"
         });
-      } else if (!targetDialogStatusIds.has(def.id) && statusSideAppliesTo(def.target, attackType)) {
+      } else if (rulesEdition === "expanded" && !targetDialogStatusIds.has(def.id) && statusSideAppliesTo(def.target, attackType)) {
         modifiers.push(makeModifierRow({
           id: `status-${def.id}-target`,
           label: game.i18n.localize(def.target.label),
@@ -494,8 +491,10 @@ function appendDialogRows(modifiers, {
     const selectedRangeKey = usingDerivedRange
       ? String(resolvedRangeBand?.key ?? "")
       : String(dialog.rangeBandKey ?? "");
-    const effectiveRangeKey = applyTelescopicSightShift(selectedRangeKey, dialog.usingScope);
-    const scopeShifted = dialog.usingScope && effectiveRangeKey !== selectedRangeKey;
+    const effectiveRangeKey = rulesEdition === "expanded"
+      ? applyTelescopicSightShift(selectedRangeKey, dialog.usingScope)
+      : selectedRangeKey;
+    const scopeShifted = rulesEdition === "expanded" && dialog.usingScope && effectiveRangeKey !== selectedRangeKey;
     if (effectiveRangeKey) {
       modifiers.push(makeModifierRow({
         id: "range-band",
@@ -510,6 +509,16 @@ function appendDialogRows(modifiers, {
         overridable: usingDerivedRange
       }));
     }
+  }
+
+  if (rulesEdition === "basic" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN) && dialog.hasCover) {
+    modifiers.push(makeModifierRow({
+      id: "basic-cover",
+      label: game.i18n.localize("STARFRONTIERS.Modifier.Cover"),
+      source: MODIFIER_SOURCES.DIALOG,
+      attackTypes: [ATTACK_TYPES.RANGED, ATTACK_TYPES.THROWN],
+      value: -10
+    }));
   }
 
   if (shouldShowTargetSizeModifier({ rulesEdition, attackType })) {
@@ -534,7 +543,7 @@ function appendDialogRows(modifiers, {
     }
   }
 
-  if (dialog.wrongHand) {
+  if (rulesEdition === "expanded" && dialog.wrongHand) {
     modifiers.push(makeModifierRow({
       id: "wrong-hand",
       label: game.i18n.localize("STARFRONTIERS.Modifier.WrongHand"),
@@ -544,7 +553,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.softCover) {
+  if (rulesEdition === "expanded" && dialog.softCover) {
     modifiers.push(makeModifierRow({
       id: "soft-cover",
       label: game.i18n.localize("STARFRONTIERS.Modifier.SoftCover"),
@@ -554,7 +563,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.hardCover) {
+  if (rulesEdition === "expanded" && dialog.hardCover) {
     modifiers.push(makeModifierRow({
       id: "hard-cover",
       label: game.i18n.localize("STARFRONTIERS.Modifier.HardCover"),
@@ -564,7 +573,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.targetProne) {
+  if (rulesEdition === "expanded" && dialog.targetProne) {
     modifiers.push(makeModifierRow({
       id: "target-prone",
       label: game.i18n.localize("STARFRONTIERS.Modifier.TargetProne"),
@@ -574,7 +583,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.targetDefending) {
+  if (rulesEdition === "expanded" && dialog.targetDefending) {
     modifiers.push(makeModifierRow({
       id: "target-defending",
       label: game.i18n.localize("STARFRONTIERS.Modifier.TargetDefending"),
@@ -584,7 +593,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.targetStunned) {
+  if (rulesEdition === "expanded" && dialog.targetStunned) {
     modifiers.push(makeModifierRow({
       id: "target-stunned",
       label: game.i18n.localize("STARFRONTIERS.Modifier.TargetStunned"),
@@ -594,7 +603,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.firingBurst) {
+  if (rulesEdition === "expanded" && dialog.firingBurst) {
     modifiers.push(makeModifierRow({
       id: "firing-burst",
       label: game.i18n.localize("STARFRONTIERS.Modifier.FiringBurst"),
@@ -604,7 +613,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.attackingFromBehind) {
+  if (rulesEdition === "expanded" && dialog.attackingFromBehind) {
     modifiers.push(makeModifierRow({
       id: "attacking-from-behind",
       label: game.i18n.localize("STARFRONTIERS.Modifier.AttackingFromBehind"),
@@ -674,7 +683,7 @@ function appendDialogRows(modifiers, {
     }
   }
 
-  if (dialog.opportunityShot) {
+  if (rulesEdition === "expanded" && dialog.opportunityShot) {
     modifiers.push(makeModifierRow({
       id: "opportunity-shot",
       label: game.i18n.localize("STARFRONTIERS.Modifier.OpportunityShot"),
@@ -685,7 +694,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.carefulAim) {
+  if (rulesEdition === "expanded" && dialog.carefulAim) {
     modifiers.push(makeModifierRow({
       id: "careful-aim",
       label: game.i18n.localize("STARFRONTIERS.Modifier.CarefulAim"),
@@ -695,7 +704,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.firingTwoWeapons) {
+  if (rulesEdition === "expanded" && dialog.firingTwoWeapons) {
     modifiers.push(makeModifierRow({
       id: "firing-two-weapons",
       label: game.i18n.localize("STARFRONTIERS.Modifier.FiringTwoWeapons"),
@@ -705,7 +714,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (dialog.rifleInMelee) {
+  if (rulesEdition === "expanded" && dialog.rifleInMelee) {
     modifiers.push(makeModifierRow({
       id: "rifle-in-melee",
       label: game.i18n.localize("STARFRONTIERS.Modifier.RifleInMelee"),
@@ -778,7 +787,7 @@ export function buildAttackModifierContext({
     rulesEdition,
     dialog
   });
-  appendStatusRows(modifiers, blockers, { attacker, target, attackType });
+  appendStatusRows(modifiers, blockers, { attacker, target, attackType, rulesEdition });
   appendDialogRows(modifiers, {
     attackType,
     rulesEdition,

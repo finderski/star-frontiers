@@ -873,6 +873,7 @@
       "AttackerMovementLabel": "Attacker Movement: {movement}",
       "AttackerWounded": "Wounded (STA <= 1/2)",
       "CarefulAim": "Careful Aim",
+      "Cover": "Target Has Cover",
       "CreatureTargetMovement": "Creature Target Movement",
       "CreatureTargetMovementLabel": "Creature Movement: {movement}",
       "FiringBurst": "Firing a Burst",

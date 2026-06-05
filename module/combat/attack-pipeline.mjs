@@ -129,8 +129,8 @@ export function formatAttackTarget(value) {
 }
 
 export function isHit(rollTotal, adjustedTarget, rulesEdition) {
-  if (rollTotal <= 5) return true;
-  if (rulesEdition === "expanded" && rollTotal >= 96) return false;
+  if (rulesEdition === "basic" && rollTotal >= 1 && rollTotal <= 5) return true;
+  if (rollTotal >= 96) return false;
   return rollTotal <= adjustedTarget;
 }
 
@@ -226,6 +226,7 @@ function getDefaultRangeBandKey(rangeBands = []) {
 
 const PER_SHOT_MODIFIER_IDS = new Set([
   "range-band",
+  "basic-cover",
   "target-size",
   "soft-cover",
   "hard-cover",
@@ -285,6 +286,7 @@ function areShotStatesEquivalent(a = {}, b = {}) {
   const keys = [
     "rangeBandKey",
     "useRangeOverride",
+    "hasCover",
     "targetSizeKey",
     "useTargetSizeOverride",
     "targetMovement",
@@ -342,6 +344,7 @@ function getDefaultShotState(setup, seed = {}) {
     showRangeSelect: base.showRangeSelect === undefined
       ? (setup.autoRangeBand ? Boolean(base.useRangeOverride) : false)
       : Boolean(base.showRangeSelect),
+    hasCover: base.hasCover === undefined ? Boolean(setup.targetHasCoverBasic) : Boolean(base.hasCover),
     targetSizeKey: String(base.targetSizeKey || setup.targetSizeDerived || "medium"),
     useTargetSizeOverride: base.useTargetSizeOverride === undefined ? !setup.targetSizeDerived : Boolean(base.useTargetSizeOverride),
     showTargetSizeSelect: base.showTargetSizeSelect === undefined
@@ -371,6 +374,7 @@ function normalizeShotState(setup, shotState = {}, index = 1, seed = null) {
     rangeBandKey: String(next.rangeBandKey ?? fallback.rangeBandKey),
     useRangeOverride: Boolean(next.useRangeOverride),
     showRangeSelect: Boolean(next.showRangeSelect),
+    hasCover: Boolean(next.hasCover),
     targetSizeKey: String(next.targetSizeKey || fallback.targetSizeKey),
     useTargetSizeOverride: Boolean(next.useTargetSizeOverride),
     showTargetSizeSelect: Boolean(next.showTargetSizeSelect),
@@ -428,6 +432,7 @@ function buildShotDialogState(sharedState, shotState) {
     useRangeOverride: shotState.useRangeOverride,
     targetSizeKey: shotState.targetSizeKey,
     useTargetSizeOverride: shotState.useTargetSizeOverride,
+    hasCover: shotState.hasCover,
     targetMovement: shotState.targetMovement,
     creatureTargetMovement: shotState.creatureTargetMovement,
     softCover: shotState.softCover,
@@ -508,17 +513,26 @@ function buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBa
     attackerHasWrongHand: actorHasSfStatus(actor, SF_STATUS_IDS.WRONG_HAND),
     targetHasSoftCover: actorHasSfStatus(targetActor, SF_STATUS_IDS.SOFT_COVER),
     targetHasHardCover: actorHasSfStatus(targetActor, SF_STATUS_IDS.HARD_COVER),
+    targetHasCoverBasic: actorHasSfStatus(targetActor, SF_STATUS_IDS.SOFT_COVER) || actorHasSfStatus(targetActor, SF_STATUS_IDS.HARD_COVER),
     targetHasProne: actorHasSfStatus(targetActor, SF_STATUS_IDS.PRONE),
     targetHasDefending: actorHasSfStatus(targetActor, SF_STATUS_IDS.DEFENDING),
     targetHasStunned: actorHasSfStatus(targetActor, SF_STATUS_IDS.STUNNED),
-    showWrongHand: attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.MELEE,
-    supportsBurst: attackType === ATTACK_TYPES.RANGED
+    showWrongHand: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.MELEE),
+    showFiringTwoWeapons: rulesEdition === "expanded",
+    showCoverBasic: rulesEdition === "basic" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
+    showTargetMovementControl: rulesEdition === "expanded",
+    showSoftCover: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
+    showHardCover: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
+    showTargetProne: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
+    showTargetDefending: rulesEdition === "expanded" && attackType === ATTACK_TYPES.MELEE,
+    showTargetStunned: rulesEdition === "expanded",
+    supportsBurst: rulesEdition === "expanded" && attackType === ATTACK_TYPES.RANGED
       && Boolean(activeMode?.burst?.available || activeMode?.burst || weapon.system?.mechanics?.burst?.available),
     showAttackingFromBehind: rulesEdition === "expanded" && attackType === ATTACK_TYPES.MELEE,
-    showTelescopicSight: attackType === ATTACK_TYPES.RANGED,
+    showTelescopicSight: rulesEdition === "expanded" && attackType === ATTACK_TYPES.RANGED,
     showOpportunityShot: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
-    showRifleInMelee: attackType === ATTACK_TYPES.RANGED,
-    showCarefulAim: attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN
+    showRifleInMelee: rulesEdition === "expanded" && attackType === ATTACK_TYPES.RANGED,
+    showCarefulAim: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN)
   };
 }
 
@@ -541,6 +555,7 @@ function readAttackDialogState(root, setup) {
       rangeBandKey: readValue(`shot.${index}.rangeBandKey`, setup.autoRangeBand?.key ?? getDefaultRangeBandKey(setup.rangeBands)),
       useRangeOverride: readValue(`shot.${index}.useRangeOverride`, setup.autoRangeBand ? "false" : "true") === "true",
       showRangeSelect: readValue(`shot.${index}.showRangeSelect`, "false") === "true",
+      hasCover: readChecked(`shot.${index}.hasCover`),
       targetSizeKey: readValue(`shot.${index}.targetSizeKey`, setup.targetSizeDerived || "medium") || (setup.targetSizeDerived || "medium"),
       useTargetSizeOverride: readValue(`shot.${index}.useTargetSizeOverride`, setup.targetSizeDerived ? "false" : "true") === "true",
       showTargetSizeSelect: readValue(`shot.${index}.showTargetSizeSelect`, "false") === "true",
@@ -616,6 +631,7 @@ function buildAttackDialogContext(setup, dialogState = {}) {
       targetSizeControl: buildShotTargetSizeControl(setup, shotState),
       targetMovementOptions,
       creatureTargetMovementOptions,
+      hasCover: shotState.hasCover,
       targetMovementSelected: shotState.targetMovement,
       creatureTargetMovementSelected: shotState.creatureTargetMovement,
       showTargetMovementSelect: shotState.showTargetMovementSelect,
@@ -634,12 +650,13 @@ function buildAttackDialogContext(setup, dialogState = {}) {
       warnings: Array.from(shotContext.warnings ?? []),
       modifiers: shotContext.modifiers,
       targetIsCreature: setup.targetIsCreature,
-      showTargetMovementControl: setup.rulesEdition === "expanded",
-      showSoftCover: setup.attackType === ATTACK_TYPES.RANGED || setup.attackType === ATTACK_TYPES.THROWN,
-      showHardCover: setup.attackType === ATTACK_TYPES.RANGED || setup.attackType === ATTACK_TYPES.THROWN,
-      showTargetProne: setup.attackType === ATTACK_TYPES.RANGED || setup.attackType === ATTACK_TYPES.THROWN,
-      showTargetDefending: setup.attackType === ATTACK_TYPES.MELEE,
-      showTargetStunned: true,
+      showCoverBasic: setup.showCoverBasic,
+      showTargetMovementControl: setup.showTargetMovementControl,
+      showSoftCover: setup.showSoftCover,
+      showHardCover: setup.showHardCover,
+      showTargetProne: setup.showTargetProne,
+      showTargetDefending: setup.showTargetDefending,
+      showTargetStunned: setup.showTargetStunned,
       showRifleInMelee: setup.showRifleInMelee,
       showTelescopicSight: setup.showTelescopicSight,
       showOpportunityShot: setup.showOpportunityShot,
@@ -686,6 +703,7 @@ function buildAttackDialogContext(setup, dialogState = {}) {
     miscModifierValue: state.miscModifierValue,
     shotPanels,
     showWrongHand: setup.showWrongHand,
+    showFiringTwoWeapons: setup.showFiringTwoWeapons,
     canAdjustDialogCheckboxes: setup.canAdjustDialogCheckboxes,
     maxShots: setup.rof,
     warnings: Array.from(activeShot?.warnings ?? [])
@@ -874,6 +892,12 @@ function renderAttackDialogShotPanels(shotPanels = []) {
           </label>
         `;
     const shotControls = [
+      shot.showCoverBasic ? checkboxField({
+        name: `shot.${shot.index}.hasCover`,
+        label: `${game.i18n.localize("STARFRONTIERS.Modifier.Cover")} (-10)`,
+        checked: shot.hasCover,
+        disabled: shot.checkboxDisabled
+      }) : "",
       shot.showSoftCover ? checkboxField({
         name: `shot.${shot.index}.softCover`,
         label: `${game.i18n.localize("STARFRONTIERS.Modifier.SoftCover")} (-10)`,
@@ -1066,6 +1090,7 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     attackerMovementSelected: initialContext.attackerMovementSelected,
     showWrongHand: initialContext.showWrongHand,
     wrongHand: initialContext.wrongHand,
+    showFiringTwoWeapons: initialContext.showFiringTwoWeapons,
     firingTwoWeapons: initialContext.firingTwoWeapons,
     dialogCheckboxDisabled: !initialContext.canAdjustDialogCheckboxes,
     gmCircumstanceLabel: initialContext.gmCircumstanceLabel,

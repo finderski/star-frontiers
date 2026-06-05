@@ -78,10 +78,12 @@
           </label>
         {{/if}}
 
-        <label class="attack-dialog__field attack-dialog__field--checkbox">
-          <input class="attack-dialog__inline-checkbox" type="checkbox" name="firingTwoWeapons" {{checked firingTwoWeapons}} {{#if dialogCheckboxDisabled}}disabled{{/if}} />
-          <span>{{localize "STARFRONTIERS.Modifier.FiringTwoWeapons"}} (-10)</span>
-        </label>
+        {{#if showFiringTwoWeapons}}
+          <label class="attack-dialog__field attack-dialog__field--checkbox">
+            <input class="attack-dialog__inline-checkbox" type="checkbox" name="firingTwoWeapons" {{checked firingTwoWeapons}} {{#if dialogCheckboxDisabled}}disabled{{/if}} />
+            <span>{{localize "STARFRONTIERS.Modifier.FiringTwoWeapons"}} (-10)</span>
+          </label>
+        {{/if}}
 
         <label class="attack-dialog__field attack-dialog__field--manual">
           <span>{{localize "STARFRONTIERS.Modifier.GMCircumstance"}}</span>

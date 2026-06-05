@@ -3029,7 +3029,8 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 .attack-dialog__subsection .attack-dialog__inline-input,
 .attack-dialog__controls .attack-dialog__inline-input,
 .attack-dialog__subsection .attack-dialog__inline-select {
-  background:rgba(9, 18, 28, 0.52);
+  /*background:rgba(9, 18, 28, 0.52);*/
+  background:transparent;
   border: 0;
   border-bottom: 2px solid var(--sf-line);
   color: var(--sf-ink);
@@ -3046,10 +3047,10 @@ label.attack-dialog__field--checkbox > input[type="checkbox"] {
   block-size: 1.25rem;
   margin: 0;
 
-  border: 1px solid var(--sf-cyan, #53dcff);
+  border: 1px solid var(--sf-ink);
   border-radius: 0.2rem;
-  background: rgba(5, 16, 25, 0.9);
-  box-shadow: inset 0 0 0 1px rgba(83, 220, 255, 0.25);
+  /* background: rgba(5, 16, 25, 0.9); */
+  /* box-shadow: inset 0 0 0 1px rgba(83, 220, 255, 0.25); */
   cursor: pointer;
   position: relative;
 }
@@ -3061,14 +3062,15 @@ label.attack-dialog__field--checkbox > input[type="checkbox"]::before {
 
 .attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked,
 label.attack-dialog__field--checkbox > input[type="checkbox"]:checked {
-  background: var(--sf-cyan, #53dcff);
-  border-color: var(--sf-cyan, #53dcff);
+  background: var(--sf-ink);
+  border-color: var(--sf-ink);
 }
 
 .attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked::after,
 label.attack-dialog__field--checkbox > input[type="checkbox"]:checked::after {
   content: "x";
-  color: var(--sf-bg, #071521);
+  /* color: var(--sf-bg, #071521); */
+  color: transparent;
   font-size: 1.5em;
   font-weight: 900;
   line-height: 1;
@@ -3080,7 +3082,7 @@ label.attack-dialog__field--checkbox > input[type="checkbox"]:checked::after {
 
 .attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:focus-visible,
 label.attack-dialog__field--checkbox > input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--sf-cyan, #53dcff);
+  outline: 2px solid var(--sf-ink);
   outline-offset: 2px;
 }
 /* end checkbox stuff */
