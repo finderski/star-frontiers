@@ -159,6 +159,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     context.weaponUsesSeu = item.type === "weapon" && item.system.ammo?.uses === "seu";
     context.weaponUsesAmmo = item.type === "weapon" && item.system.ammo?.uses !== "none";
     if (item.type === "weapon") {
+      context.weaponIsMelee = item.system.weaponType === "melee";
       const setting = item.system.ammo?.variableSetting ?? {};
       context.hasVariableSeuDial = item.system.ammo?.uses === "seu"
         && Number(setting.max ?? 0) > Number(setting.min ?? 0)
@@ -175,6 +176,7 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
         ? "STARFRONTIERS.Weapon.ModeRoundsPerShot"
         : "STARFRONTIERS.Weapon.ModeSeuPerShot";
     } else {
+      context.weaponIsMelee = false;
       context.hasVariableSeuDial = false;
       context.weaponModeRows = [];
       context.avoidanceAbilityChoices = {};
@@ -321,7 +323,10 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
 
   #prepareRangeRows(item) {
     if (item.type === "weapon") {
-      return Object.entries(item.system.rangeBands).map(([key, band]) => ({
+      const rangeBands = item.system.weaponType === "melee"
+        ? [["pointBlank", item.system.rangeBands?.pointBlank ?? {}]]
+        : Object.entries(item.system.rangeBands ?? {});
+      return rangeBands.map(([key, band]) => ({
         key,
         label: game.i18n.localize(`STARFRONTIERS.Range.${key}`),
         band
@@ -486,6 +491,12 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     }
 
     if (this.item.type !== "weapon") return;
+
+    const weaponType = String(foundry.utils.getProperty(data, "system.weaponType") ?? this.item.system.weaponType ?? "");
+    if (weaponType === "melee") {
+      foundry.utils.setProperty(data, "system.rangeBands.pointBlank.min", 0);
+      foundry.utils.setProperty(data, "system.rangeBands.pointBlank.max", 2);
+    }
 
     const rawModes = foundry.utils.getProperty(data, "system.mechanics.modes");
     if (!rawModes) return;

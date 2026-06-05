@@ -197,6 +197,7 @@
 
 ### Weapon/ammo
 - `weapon.system.mechanics.attackModifier` is the weapon-authored baseline attack modifier field, and `weapon.system.mechanics.modes[].attackModifier` is the per-mode baseline modifier. Both are additive optional fields with schema defaults; they do not require migration and they feed the shared attack modifier pipeline.
+- `weapon.system.mechanics.barehand` is an authored melee-weapon flag used to distinguish barehand/natural attacks from armed melee for future Expanded melee work. Nothing in the runtime attack pipeline consumes it yet; this pass is sheet/schema groundwork only.
 - Expanded-rules ranged attacks may apply a target-size modifier from `character/creature.system.size`. The default size table is GM-adjustable through world settings (`expandedTargetSizeModTiny` … `expandedTargetSizeModHuge`); Basic rules never apply target-size attack mods.
 - Weapon rows on the character sheet display **loaded ammo**, not spent ammo.
 - **Availability and loaded state are separate.** Availability is all compatible carried/equipped sources in inventory for reload/picker UI. Loaded state is `weapon.system.ammo.loadedSourceId`, the single source actually feeding the weapon. Dropping a clip or power source into inventory must never load a weapon.
@@ -276,6 +277,7 @@
 - **Variable SEU damage scaling**: `weapon.system.damageFormula` is treated as the **per-SEU unit** only when the weapon has a real variable dial (`ammo.uses === "seu"`, `variableSetting.max > variableSetting.min`, `variableSetting.min >= 1`, and `current >= 1`). Every display/roll path must call `AttackPipeline.buildEffectiveDamageFormula(weapon, bandKey)` instead of reading `weapon.system.damageFormula` directly.
 - **Weapon firing modes (Phase 1)**: weapons may define `system.mechanics.modes[]` and `system.activeModeKey`. The active mode overrides top-level `damageFormula`, `ammo.seuPerShot`, `mechanics.defenseTypes`, and `mechanics.onHitEffectIds` when present. An active mode with an empty `damageFormula` explicitly means "no damage" and must suppress the damage button.
 - `weapon.system.mechanics.hasModes` is the Weapon item sheet's authoring gate for the Modes editor only. It does NOT control runtime mode availability; the character sheet and attack flow still read `mechanics.modes[]` directly so toggling the checkbox off hides the editor without deleting or disabling the authored modes.
+- Melee weapon item sheets intentionally keep the same Linked Ammo / Ammo Use / Heavy Weapon / Has Modes controls as ranged weapons. The only melee-specific sheet changes are: expose `system.mechanics.barehand`, render only Point Blank in the range editor, and coerce Point Blank to `0` / `2` on submit while leaving the hidden short/medium/long/extreme values intact for later type switches.
 - **Active weapon mode resolution**: `AttackPipeline.getActiveWeaponMode(weapon)` is the single source of truth. If a weapon has modes but no `activeModeKey`, the first mode is treated as active for display, ammo use, and chat-card context.
 - Weapon-mode defense types are now edited on the item sheet as a multi-select using the same defense choices as the top-level weapon defense field. Save logic must normalize the submitted value back into `mode.defenseTypes[]`, including the empty-selection case.
 - Mode on-hit effects are authored as embedded Active Effects on the weapon item via the mode editor's `Add Effect` button, then linked by embedded effect ID in `mode.onHitEffectIds`. Removing a mode effect should also delete the embedded AE when no other mode still references it.
@@ -386,7 +388,7 @@
   - expose `attributeKey` dropdown (DEX / STR) — the base ability for attack rolls; replaces the old `weaponSkillKey` dropdown in the UI
   - expose `requiredSkillRef` as a drop zone accepting skill items — sets `system.requiredSkillRef` (ID or UUID)
   - expose `mechanics.isHeavy` checkbox inline with the ammo controls
-  - expose `mechanics.hasModes` as a **Has Firing Modes** checkbox; it gates the item-sheet editor only and must not delete `mechanics.modes[]` when toggled off
+  - expose `mechanics.hasModes` as a **Has Modes** checkbox; it gates the item-sheet editor only and must not delete `mechanics.modes[]` when toggled off
   - when `mechanics.hasModes` is on, hide the normal top-level Damage / Defense fields and expose a per-mode editor for `key`, `label`, `damageFormula`, ammo-per-shot, multi-select defense types, avoidance config, and embedded on-hit Active Effect authoring
   - do **not** expose `weaponSkillKey` on the sheet — it remains in the schema for backward compat with the existing attack roll code only
   - support linked ammo drop onto the ammo drop zone (`system.ammo.clipItem` is set; `uses` is NOT forced by the drop — the GM sets it via the dropdown). This links a preferred source only; it does not set `system.ammo.loadedSourceId` or load the weapon.

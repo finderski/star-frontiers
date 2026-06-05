@@ -131,6 +131,14 @@
             <span>{{localize "STARFRONTIERS.Weapon.HasModes"}}</span>
           </label>
         </div>
+        {{#if weaponIsMelee}}
+          <div class="fireMode-row">
+            <label class="checkbox-line">
+              <input type="checkbox" name="system.mechanics.barehand" {{checked system.mechanics.barehand}} />
+              <span>{{localize "STARFRONTIERS.Weapon.Barehand"}}</span>
+            </label>
+          </div>
+        {{/if}}
         <div class="compact-grid weapon-core-grid">
           <label>
             <span>{{localize "STARFRONTIERS.Item.WeaponType"}}</span>
@@ -168,8 +176,13 @@
           <span>{{localize "STARFRONTIERS.Item.RangeDamage"}}</span>
           {{#each rangeRows as |row|}}
             <span>{{row.label}}</span>
-            <input type="number" name="system.rangeBands.{{row.key}}.min" value="{{row.band.min}}" min="0" />
-            <input type="number" name="system.rangeBands.{{row.key}}.max" value="{{row.band.max}}" min="0" />
+            {{#if @root.weaponIsMelee}}
+              <input type="number" name="system.rangeBands.{{row.key}}.min" value="0" readonly />
+              <input type="number" name="system.rangeBands.{{row.key}}.max" value="2" readonly />
+            {{else}}
+              <input type="number" name="system.rangeBands.{{row.key}}.min" value="{{row.band.min}}" min="0" />
+              <input type="number" name="system.rangeBands.{{row.key}}.max" value="{{row.band.max}}" min="0" />
+            {{/if}}
             <input type="text" name="system.rangeBands.{{row.key}}.damageFormula" value="{{row.band.damageFormula}}" placeholder="—" />
           {{/each}}
         </div>
