@@ -119,6 +119,20 @@
             <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoBonusPicks"}}</p>
           {{/if}}
         </div>
+
+        <div class="compact-grid race-modifier-grid">
+          <label class="attack-dialog__field--checkbox">
+            <input class="attack-dialog__inline-checkbox" type="checkbox" name="system.elasticity.available" {{checked system.elasticity.available}} />
+            <span>{{localize "STARFRONTIERS.Item.ElasticityAvailable"}}</span>
+          </label>
+        </div>
+        {{#if system.elasticity.available}}
+          <div class="compact-grid three-columns">
+            <label><span>{{localize "STARFRONTIERS.Item.LimbsPerDexBucket"}}</span><input type="number" name="system.elasticity.limbsPerDexBucket" value="{{system.elasticity.limbsPerDexBucket}}" min="1" /></label>
+            <label><span>{{localize "STARFRONTIERS.Item.LimbGrowMinutes"}}</span><input type="number" name="system.elasticity.limbGrowMinutes" value="{{system.elasticity.limbGrowMinutes}}" min="0" /></label>
+            <label><span>{{localize "STARFRONTIERS.Item.MaxFiringLimbs"}}</span><input type="number" name="system.elasticity.maxFiringLimbs" value="{{system.elasticity.maxFiringLimbs}}" min="0" /></label>
+          </div>
+        {{/if}}
       </fieldset>
     {{/if}}
 
@@ -136,6 +150,12 @@
             <label class="checkbox-line">
               <input type="checkbox" name="system.mechanics.barehand" {{checked system.mechanics.barehand}} />
               <span>{{localize "STARFRONTIERS.Weapon.Barehand"}}</span>
+            </label>
+          </div>
+          <div class="fireMode-row">
+            <label class="checkbox-line">
+              <input type="checkbox" name="system.mechanics.isBlunt" {{checked system.mechanics.isBlunt}} />
+              <span>{{localize "STARFRONTIERS.Weapon.Blunt"}}</span>
             </label>
           </div>
         {{/if}}

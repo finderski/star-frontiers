@@ -368,6 +368,15 @@ Hooks.once("init", async () => {
     default: true
   });
 
+  game.settings.register(SYSTEM_ID, "autoHitUnconscious", {
+    name: "STARFRONTIERS.Settings.AutoHitUnconscious.Name",
+    hint: "STARFRONTIERS.Settings.AutoHitUnconscious.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
   game.settings.register(SYSTEM_ID, "homebrewPlayerCanOverrideModifiers", {
     name: "STARFRONTIERS.Settings.PlayerOverrideModifiers.Name",
     hint: "STARFRONTIERS.Settings.PlayerOverrideModifiers.Hint",

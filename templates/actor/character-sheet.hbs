@@ -177,6 +177,12 @@
         </div>
         <input type="number" value="{{system.derived.initiativeMod}}" readonly />
       </div>
+      {{#if system.derived.isElastic}}
+        <label class="single-stat">
+          <span>{{localize "STARFRONTIERS.Character.Limbs"}}</span>
+          <input type="number" name="system.limbsCurrent" value="{{system.limbsCurrent}}" min="4" max="{{system.derived.maxLimbs}}" />
+        </label>
+      {{/if}}
     </fieldset>
 
     <fieldset class="paper-box medical-record">

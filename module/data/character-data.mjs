@@ -159,6 +159,9 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
         hourly: numberField({ initial: 0, min: 0 }),
         isWounded: boolField(),
         derivedLimbs: numberField({ initial: 0, min: 0 }),
+        isElastic: boolField(),
+        maxLimbs: numberField({ initial: 4, min: 0 }),
+        barehandAttacks: numberField({ initial: 2, min: 1 }),
         totalMass: numberField({ initial: 0, min: 0, integer: false }),
         encumbranceThreshold: numberField({ initial: 0, min: 0, integer: false }),
         encumbered: boolField(),
@@ -169,6 +172,8 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
           perLdr: numberField({ initial: 30 })
         })
       }),
+
+      limbsCurrent: numberField({ initial: 4, min: 0 }),
 
       limbs: arrayField(schemaField({
         kind: textField({ choices: ["arm", "leg"] }),
@@ -235,11 +240,23 @@ export class StarFrontiersCharacterData extends foundry.abstract.TypeDataModel {
     this.derived.paired.dexRs = Math.max(abilities.dex.value, abilities.rs.value);
     this.derived.paired.intLog = Math.max(abilities.int.value, abilities.log.value);
     this.derived.paired.perLdr = Math.max(abilities.per.value, abilities.ldr.value);
-    this.derived.derivedLimbs = Math.ceil((abilities.dex.value || 0) / 10);
 
     const raceItem = this.parent?.items?.get(this.race)
       ?? this.parent?.items?.find((item) => item.type === "race" && item.name === this.race)
       ?? this.parent?.items?.find((item) => item.type === "race");
+    const dexValue = Number(abilities.dex.value || 0);
+    const elasticity = raceItem?.system?.elasticity;
+    this.derived.isElastic = Boolean(elasticity?.available);
+    const limbBucket = Number(elasticity?.limbsPerDexBucket) || 10;
+    this.derived.maxLimbs = this.derived.isElastic
+      ? Math.max(4, Math.floor(dexValue / limbBucket))
+      : 4;
+    const currentLimbs = Number.isFinite(Number(this.limbsCurrent)) ? Number(this.limbsCurrent) : 4;
+    const effectiveLimbs = Math.min(Math.max(currentLimbs, 4), this.derived.maxLimbs);
+    this.limbsCurrent = this.derived.isElastic ? effectiveLimbs : 4;
+    this.derived.barehandAttacks = Math.max(Math.floor(effectiveLimbs / 2), 1);
+    this.derived.derivedLimbs = this.derived.maxLimbs;
+
     const raceMovement = raceItem?.system?.movement
       ?? CONFIG.SF?.raceMovement?.[raceItem?.system?.key]
       ?? CONFIG.SF?.raceMovement?.[raceKeyFrom(this.race)]

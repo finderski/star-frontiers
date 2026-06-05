@@ -2480,10 +2480,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       foundry.utils.setProperty(data, "system.charGen.statsInitialized", true);
       foundry.utils.setProperty(data, "system.charGen.statsGenerated", false);
       StarFrontiersCharacterSheet.#syncStaminaIfNeeded(actor, data);
-      return;
-    }
-
-    if (raceChanged) {
+    } else if (raceChanged) {
       const updates = StarFrontiersCharacterSheet.#buildRaceCharacterUpdates(actor, selectedRace, {
         applyStats: statsInitialized,
         raceBonusSelections
@@ -2493,6 +2490,8 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
       }
     }
 
+    this.#prepareLimbsCurrentSubmitData(data, actor, selectedRace);
+
     foundry.utils.setProperty(
       data,
       "system.handedness.kind",
@@ -2501,6 +2500,22 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         actor
       )
     );
+  }
+
+  #prepareLimbsCurrentSubmitData(data, actor, selectedRace) {
+    const elasticity = selectedRace?.system?.elasticity;
+    const isElastic = Boolean(elasticity?.available);
+    const limbBucket = Number(elasticity?.limbsPerDexBucket) || 10;
+    const dexValue = Number(foundry.utils.getProperty(data, "system.abilities.dex.value") ?? actor.system.abilities.dex.value ?? 0);
+    const maxLimbs = isElastic ? Math.max(4, Math.floor(dexValue / limbBucket)) : 4;
+    const submittedLimbs = foundry.utils.getProperty(data, "system.limbsCurrent");
+    const currentLimbs = Number.isFinite(Number(submittedLimbs))
+      ? Number(submittedLimbs)
+      : Number(actor.system.limbsCurrent ?? 4);
+    const clampedLimbs = isElastic
+      ? Math.min(Math.max(currentLimbs, 4), maxLimbs)
+      : 4;
+    foundry.utils.setProperty(data, "system.limbsCurrent", clampedLimbs);
   }
 
   static #isStatsInitialized(actor) {

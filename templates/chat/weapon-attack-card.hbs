@@ -112,7 +112,7 @@
         <table class="sf-attack-card__shots">
           <thead>
             <tr>
-              <th>{{localize "STARFRONTIERS.Chat.Shot"}}</th>
+              <th>{{sequenceColumnLabel}}</th>
               <th>{{localize "STARFRONTIERS.Chat.Roll"}}</th>
               <th>{{localize "STARFRONTIERS.Chat.TargetNumber-abbr"}}</th>
               <th>{{localize "STARFRONTIERS.Chat.Result"}}</th>
@@ -122,7 +122,7 @@
             {{#each shotRows as |shot|}}
               <tr class="sf-attack-card__shot-row sf-attack-card__shot-row--{{shot.outcomeClass}}">
                 <td>
-                  {{!-- {{localize "STARFRONTIERS.Weapon.ShotsLabel"}} --}} {{shot.index}}
+                  {{shot.sequenceLabel}}
                   {{#if shot.shotPenalty}}
                     <small>{{shot.shotPenaltyDisplay}}</small>
                   {{/if}}
@@ -139,7 +139,7 @@
       {{#if shotOverrideSections.length}}
         <div class="sf-attack-card__notes">
           {{#each shotOverrideSections as |shot|}}
-            <h4>{{localize "STARFRONTIERS.Modifier.ShotN" n=shot.index}} {{localize "STARFRONTIERS.Chat.PerShotOverrides"}}</h4>
+            <h4>{{shot.sequenceLabel}} {{../perSequenceOverridesLabel}}</h4>
             <table class="sf-attack-card__modifiers sf-attack-card__modifiers--shot-overrides">
               <tbody>
                 {{#each shot.rows as |row|}}
@@ -153,6 +153,15 @@
                 {{/each}}
               </tbody>
             </table>
+          {{/each}}
+        </div>
+      {{/if}}
+
+      {{#if knockoutRows.length}}
+        <div class="sf-attack-card__notes">
+          <h4>{{localize "STARFRONTIERS.Chat.KnockoutFlags"}}</h4>
+          {{#each knockoutRows as |row|}}
+            <p><strong>{{row.sequenceLabel}}:</strong> {{row.reasonLabel}}. {{row.effectLabel}}</p>
           {{/each}}
         </div>
       {{/if}}
@@ -233,13 +242,7 @@
 
             {{#each shotRows as |shot|}}
               <label class="sf-attack-card__gm-field">
-                <span>
-                  {{#if ../isSingleShot}}
-                    {{localize "STARFRONTIERS.Chat.OverrideRollTotal"}}
-                  {{else}}
-                    {{localize "STARFRONTIERS.Chat.OverrideRollTotal"}} {{localize "STARFRONTIERS.Weapon.ShotsLabel"}} {{shot.index}}
-                  {{/if}}
-                </span>
+                <span>{{shot.rollOverrideLabel}}</span>
                 <input
                   type="number"
                   class="sf-attack-card__gm-input"

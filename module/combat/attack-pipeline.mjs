@@ -128,9 +128,10 @@ export function formatAttackTarget(value) {
   return value === null || value === undefined ? "" : String(value);
 }
 
-export function isHit(rollTotal, adjustedTarget, rulesEdition) {
-  if (rulesEdition === "basic" && rollTotal >= 1 && rollTotal <= 5) return true;
+export function isHit(rollTotal, adjustedTarget, rulesEdition, { targetUnconscious = false, autoHitUnconscious = false } = {}) {
+  if (rollTotal >= 1 && rollTotal <= 5) return true;
   if (rollTotal >= 96) return false;
+  if (autoHitUnconscious && targetUnconscious) return true;
   return rollTotal <= adjustedTarget;
 }
 
@@ -286,6 +287,80 @@ function buildLiveAttackProfile(setup, dialogState = {}) {
   return buildWeaponAttackProfile(setup.actor, setup.weapon, {
     meleeAttackAbility: dialogState?.meleeAttackAbility ?? setup.profile?.attackAbilityKey ?? ""
   });
+}
+
+function getMeleeAttackCap(actor, weapon) {
+  if (actor?.type === "creature" || actor?.type === "robot") return 1;
+  if (!weapon?.system?.mechanics?.barehand) return 1;
+  return Math.max(Number(actor?.system?.derived?.barehandAttacks ?? 1) || 1, 1);
+}
+
+function getAttackCountCap(actor, weapon, { attackType, rulesEdition } = {}) {
+  if (attackType === ATTACK_TYPES.MELEE) {
+    return rulesEdition === "expanded"
+      ? getMeleeAttackCap(actor, weapon)
+      : 1;
+  }
+  return rulesEdition === "expanded" ? Number(weapon.system.mechanics?.rateOfFire ?? 1) : 1;
+}
+
+function getAttackSequenceLabels(attackType) {
+  const isMelee = attackType === ATTACK_TYPES.MELEE;
+  return {
+    countLabel: game.i18n.localize(isMelee ? "STARFRONTIERS.Combat.Attacks" : "STARFRONTIERS.Combat.Shots"),
+    singleLabel: game.i18n.localize(isMelee ? "STARFRONTIERS.Chat.Attack" : "STARFRONTIERS.Chat.Shot"),
+    perLabel: game.i18n.localize(isMelee ? "STARFRONTIERS.Combat.PerAttack" : "STARFRONTIERS.Combat.PerShot"),
+    sharedLabel: game.i18n.localize(isMelee ? "STARFRONTIERS.Combat.AppliesToAllAttacks" : "STARFRONTIERS.Combat.AppliesToAllShots"),
+    sequenceN(n) {
+      return game.i18n.format(isMelee ? "STARFRONTIERS.Combat.AttackN" : "STARFRONTIERS.Combat.ShotN", { n });
+    },
+    overridesLabel: game.i18n.localize(isMelee ? "STARFRONTIERS.Chat.PerAttackOverrides" : "STARFRONTIERS.Chat.PerShotOverrides"),
+    pluralOutcomeLabel: game.i18n.localize(isMelee ? "STARFRONTIERS.Combat.Attacks" : "STARFRONTIERS.Weapon.ShotsLabel"),
+    clampWarning(weaponName, count) {
+      return isMelee
+        ? game.i18n.format("STARFRONTIERS.Combat.AttackCapExceeded", { weapon: weaponName, count })
+        : game.i18n.format("STARFRONTIERS.Combat.ROFExceeded", { weapon: weaponName, rof: count });
+    },
+    countHint(count) {
+      return isMelee
+        ? game.i18n.format("STARFRONTIERS.Combat.AttackHint", { rof: count })
+        : game.i18n.format("STARFRONTIERS.Combat.ROFHint", { rof: count });
+    }
+  };
+}
+
+function canFlagMeleeKnockout(model = {}) {
+  return model?.attackType === ATTACK_TYPES.MELEE && model?.rulesEdition === "expanded";
+}
+
+function isBluntMeleeAttack(model = {}) {
+  return Boolean(model?.weapon?.isBarehand || model?.weapon?.isBlunt);
+}
+
+function getShotKnockoutState(model, shot = {}) {
+  if (!canFlagMeleeKnockout(model) || !shot?.hit) return null;
+  const rollTotal = Number(shot.rollTotal ?? 0);
+  if (rollTotal >= 1 && rollTotal <= 2) {
+    return {
+      triggered: true,
+      reason: "auto",
+      reasonLabel: game.i18n.localize("STARFRONTIERS.Chat.KnockoutReasonAuto"),
+      effectLabel: game.i18n.localize("STARFRONTIERS.Chat.KnockoutFlagged"),
+      statusId: SF_STATUS_IDS.UNCONSCIOUS,
+      durationFormula: "1d100"
+    };
+  }
+  if (isBluntMeleeAttack(model) && rollTotal < 100 && rollTotal % 10 === 0) {
+    return {
+      triggered: true,
+      reason: "blunt",
+      reasonLabel: game.i18n.localize("STARFRONTIERS.Chat.KnockoutReasonBlunt"),
+      effectLabel: game.i18n.localize("STARFRONTIERS.Chat.KnockoutFlagged"),
+      statusId: SF_STATUS_IDS.UNCONSCIOUS,
+      durationFormula: "1d100"
+    };
+  }
+  return null;
 }
 
 function areShotStatesEquivalent(a = {}, b = {}) {
@@ -495,11 +570,12 @@ function buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBa
   const attackType = profile.attackType ?? getAttackTypeForWeapon(weapon);
   const rulesEdition = profile.rulesEdition ?? game.settings.get(SYSTEM_ID, "rulesEdition");
   const rangeBands = getAvailableWeaponRangeBands(weapon);
+  const sequenceLabels = getAttackSequenceLabels(attackType);
   const targetSizeDerived = shouldShowTargetSizeModifier({ rulesEdition, attackType })
     ? getActorTargetSize(targetActor)
     : "";
   const showRangeControl = attackType !== ATTACK_TYPES.MELEE && rangeBands.length > 0;
-  const rof = rulesEdition === "expanded" ? Number(weapon.system.mechanics?.rateOfFire ?? 1) : 1;
+  const rof = getAttackCountCap(actor, weapon, { attackType, rulesEdition });
   const activeMode = getActiveWeaponMode(weapon);
   return {
     actor,
@@ -514,6 +590,7 @@ function buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBa
     targetSizeDerived,
     showRangeControl,
     rangeBands,
+    sequenceLabels,
     showTargetSizeControl: shouldShowTargetSizeModifier({ rulesEdition, attackType }),
     targetIsCreature: targetActor?.type === "creature",
     rof,
@@ -605,6 +682,7 @@ function readAttackDialogState(root, setup) {
 function buildAttackDialogContext(setup, dialogState = {}) {
   const state = normalizeAttackDialogState(setup, dialogState);
   const liveProfile = buildLiveAttackProfile(setup, state);
+  const sequenceLabels = setup.sequenceLabels ?? getAttackSequenceLabels(setup.attackType);
   const meleeAbilityOptions = setup.showMeleeAbility
     ? [
         {
@@ -671,6 +749,7 @@ function buildAttackDialogContext(setup, dialogState = {}) {
       firingBurst: shotState.firingBurst,
       attackingFromBehind: shotState.attackingFromBehind,
       carefulAim: shotState.carefulAim,
+      sequenceLabel: sequenceLabels.sequenceN(index + 1),
       targetNumber: shotContext.targetNumber,
       warnings: Array.from(shotContext.warnings ?? []),
       modifiers: shotContext.modifiers,
@@ -723,6 +802,11 @@ function buildAttackDialogContext(setup, dialogState = {}) {
     showAttackerMovementControl: setup.showAttackerMovementControl,
     showMeleeAbility: setup.showMeleeAbility,
     showPerShotSection: setup.showPerShotSection,
+    sharedSectionLabel: sequenceLabels.sharedLabel,
+    perSequenceLabel: sequenceLabels.perLabel,
+    sequenceCountLabel: sequenceLabels.countLabel,
+    sequenceCountHint: sequenceLabels.countHint(setup.rof),
+    sequenceLabels,
     meleeAbilityOptions,
     meleeAttackAbilitySelected: state.meleeAttackAbility,
     wrongHand: state.wrongHand,
@@ -771,7 +855,7 @@ function renderAttackDialogWarnings(warnings = []) {
 function renderAttackDialogShotTabs(shotPanels = []) {
   if ((shotPanels?.length ?? 0) <= 1) return "";
   return shotPanels.map((shot) => {
-    const label = foundry.utils.escapeHTML(game.i18n.format("STARFRONTIERS.Combat.ShotN", { n: shot.index }));
+    const label = foundry.utils.escapeHTML(String(shot.sequenceLabel ?? game.i18n.format("STARFRONTIERS.Combat.ShotN", { n: shot.index })));
     const activeClass = shot.active ? " is-active" : "";
     const selected = shot.active ? "true" : "false";
     return `
@@ -1009,7 +1093,7 @@ function renderAttackDialogShotPanels(shotPanels = []) {
             ${shotControls}
           </div>
         </div>
-        <p class="attack-dialog__shot-target">${foundry.utils.escapeHTML(game.i18n.format("STARFRONTIERS.Combat.ShotN", { n: shot.index }))} ${targetNumberLabel}: ${shot.targetNumber}</p>
+        <p class="attack-dialog__shot-target">${foundry.utils.escapeHTML(String(shot.sequenceLabel ?? game.i18n.format("STARFRONTIERS.Combat.ShotN", { n: shot.index })))} ${targetNumberLabel}: ${shot.targetNumber}</p>
       </section>
     `;
   }).join("");
@@ -1123,6 +1207,10 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     attackerMovementSelected: initialContext.attackerMovementSelected,
     showAttackerMovementControl: initialContext.showAttackerMovementControl,
     showMeleeAbility: initialContext.showMeleeAbility,
+    sharedSectionLabel: initialContext.sharedSectionLabel,
+    perSequenceLabel: initialContext.perSequenceLabel,
+    sequenceCountLabel: initialContext.sequenceCountLabel,
+    sequenceCountHint: initialContext.sequenceCountHint,
     meleeAbilityOptions: initialContext.meleeAbilityOptions,
     meleeAttackAbilitySelected: initialContext.meleeAttackAbilitySelected,
     showWrongHand: initialContext.showWrongHand,
@@ -1134,6 +1222,7 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     gmCircumstanceValue: initialContext.gmCircumstanceValue,
     miscModifierLabel: initialContext.miscModifierLabel,
     miscModifierValue: initialContext.miscModifierValue,
+    showPerShotSection: initialContext.showPerShotSection,
     shots: initialContext.shotsCount,
     maxShots: initialContext.maxShots,
     shotTabsHtml: renderAttackDialogShotTabs(initialContext.shotPanels),
@@ -1220,10 +1309,7 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
           const raw = Number(target.value);
           const clamped = clampShotCount(raw, setup.rof);
           if (Number.isFinite(raw) && raw !== clamped) {
-            ui.notifications.warn(game.i18n.format("STARFRONTIERS.Combat.ROFExceeded", {
-              weapon: weapon.name,
-              rof: setup.rof
-            }));
+            ui.notifications.warn((setup.sequenceLabels ?? getAttackSequenceLabels(setup.attackType)).clampWarning(weapon.name, setup.rof));
           }
           target.value = String(clamped);
           syncAttackDialog(root, setup);
@@ -1600,6 +1686,8 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   const targetActor = targetedToken?.actor ?? null;
   const targetTokenUuid = targetedToken?.document?.uuid ?? "";
   const targetActorUuid = targetActor?.uuid ?? "";
+  const targetUnconscious = actorHasSfStatus(targetActor, SF_STATUS_IDS.UNCONSCIOUS);
+  const autoHitUnconscious = Boolean(game.settings.get(SYSTEM_ID, "autoHitUnconscious"));
 
   const ammoCheck = getAmmoConsumption(weapon);
   const loadedSource = await resolveLoadedSource(actor, weapon);
@@ -1736,7 +1824,8 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
       name: targetActor.name,
       uuid: targetActor.uuid,
       tokenUuid: targetTokenUuid,
-      size: getActorTargetSize(targetActor)
+      size: getActorTargetSize(targetActor),
+      unconscious: targetUnconscious
     } : null,
     weapon: {
       id: weapon.id,
@@ -1744,11 +1833,14 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
       uuid: weapon.uuid,
       modeKey: activeMode?.key ?? "",
       modeLabel: activeMode ? getWeaponModeLabel(activeMode) : "",
-      skillLabel: liveProfile.skillLabel
+      skillLabel: liveProfile.skillLabel,
+      isBarehand: Boolean(weapon.system?.mechanics?.barehand),
+      isBlunt: Boolean(weapon.system?.mechanics?.isBlunt)
     },
     attackType: liveProfile.attackType,
     attackAbilityKey: liveProfile.attackAbilityKey,
     rulesEdition: liveProfile.rulesEdition,
+    autoHitUnconscious,
     rollMode,
     rollHtml: allRollHtmls.join(""),
     baseChance: firstShotContext.baseChance,
@@ -2058,7 +2150,8 @@ function hasModifierAdjustment(modifier) {
 
 function getAttackOutcomeLabel(model) {
   if (Number(model?.shotCount ?? model?.shots?.length ?? 0) > 1) {
-    return `${model.hitCount}/${model.shots.length} ${game.i18n.localize("STARFRONTIERS.Weapon.ShotsLabel")}: ${game.i18n.localize(
+    const sequenceLabels = getAttackSequenceLabels(model?.attackType);
+    return `${model.hitCount}/${model.shots.length} ${sequenceLabels.pluralOutcomeLabel}: ${game.i18n.localize(
       model.hitCount > 0 ? "STARFRONTIERS.Character.Success" : "STARFRONTIERS.Character.Failure"
     )}`;
   }
@@ -2067,6 +2160,18 @@ function getAttackOutcomeLabel(model) {
 
 export function recomputeAttackCardModel(model = {}) {
   const next = foundry.utils.deepClone(model ?? {});
+  next.weapon = {
+    ...(next.weapon ?? {}),
+    isBarehand: Boolean(next.weapon?.isBarehand),
+    isBlunt: Boolean(next.weapon?.isBlunt)
+  };
+  next.target = next.target
+    ? {
+        ...next.target,
+        unconscious: Boolean(next.target?.unconscious)
+      }
+    : null;
+  next.autoHitUnconscious = Boolean(next.autoHitUnconscious);
   next.baseChance = Number(next.baseChance ?? 0);
   next.originalTargetNumber = clampAttackTarget(
     Number(next.originalTargetNumber ?? next.targetNumber ?? next.baseChance)
@@ -2150,7 +2255,16 @@ export function recomputeAttackCardModel(model = {}) {
     const rollTotal = rollTotalOverride ?? originalRollTotal;
     const targetBase = next.targetNumberOverride !== null ? next.targetNumber : computedShotTarget;
     const targetNumber = clampAttackTarget(targetBase + shotPenalty);
-    return {
+    const hit = isHit(
+      rollTotal,
+      targetNumber,
+      next.rulesEdition ?? game.settings.get(SYSTEM_ID, "rulesEdition"),
+      {
+        targetUnconscious: Boolean(next.target?.unconscious),
+        autoHitUnconscious: Boolean(next.autoHitUnconscious)
+      }
+    );
+    const computedShot = {
       index: Number(shot?.index ?? index + 1),
       shotPenalty,
       modifierOverridden: Boolean(shot?.modifierOverridden) || shotModifiers.some((modifier) => modifier.shotOverridden),
@@ -2159,12 +2273,18 @@ export function recomputeAttackCardModel(model = {}) {
       rollTotalOverride,
       rollTotal,
       targetNumber,
-      hit: isHit(rollTotal, targetNumber, next.rulesEdition ?? game.settings.get(SYSTEM_ID, "rulesEdition"))
+      hit
+    };
+    return {
+      ...computedShot,
+      knockout: getShotKnockoutState(next, computedShot)
     };
   });
 
   next.shotCount = next.shots.length;
   next.hitCount = next.shots.filter((shot) => shot.hit).length;
+  next.knockoutShots = next.shots.filter((shot) => shot.knockout?.triggered);
+  next.knockoutCount = next.knockoutShots.length;
   next.outcome = next.hitCount > 0 ? "success" : "failure";
   next.outcomeLabel = getAttackOutcomeLabel(next);
   if (next.blockerOverride && typeof next.blockerOverride === "object") {
@@ -2216,6 +2336,7 @@ function getAttackSummaryRollText(model) {
 }
 
 function buildAttackCardContext(model, { isGM = false } = {}) {
+  const sequenceLabels = getAttackSequenceLabels(model?.attackType);
   const modifierRows = Array.from(model.modifiers ?? []).map((modifier) => ({
     ...modifier,
     sourceLabel: localizeAttackModifierSource(modifier.source),
@@ -2225,6 +2346,7 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
   }));
   const shotRows = Array.from(model.shots ?? []).map((shot) => ({
     ...shot,
+    sequenceLabel: sequenceLabels.sequenceN(shot.index),
     rollTotalDisplay: formatRollTotal(shot.rollTotal),
     originalRollTotalDisplay: formatRollTotal(shot.originalRollTotal),
     shotPenaltyDisplay: signedModifierValue(shot.shotPenalty),
@@ -2232,12 +2354,16 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
     targetNumberDisplayWithOverrideFlag: shot.modifierOverridden ? `${shot.targetNumber}*` : String(shot.targetNumber),
     outcomeLabel: game.i18n.localize(shot.hit ? "STARFRONTIERS.Character.Success" : "STARFRONTIERS.Character.Failure"),
     outcomeClass: shot.hit ? "success" : "failure",
-    rollOverrideValue: shot.rollTotalOverride ?? ""
+    rollOverrideValue: shot.rollTotalOverride ?? "",
+    rollOverrideLabel: shot.index === 1 && Array.from(model.shots ?? []).length === 1
+      ? game.i18n.localize("STARFRONTIERS.Chat.OverrideRollTotal")
+      : `${game.i18n.localize("STARFRONTIERS.Chat.OverrideRollTotal")} ${sequenceLabels.sequenceN(shot.index)}`
   }));
   const shotOverrideSections = shotRows
     .filter((shot) => shot.modifierOverridden)
     .map((shot) => ({
       index: shot.index,
+      sequenceLabel: shot.sequenceLabel,
       rows: Array.from(shot.modifiers ?? [])
         .filter((modifier) => modifier.shotOverridden)
         .map((modifier) => ({
@@ -2247,6 +2373,14 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
             ? game.i18n.localize("STARFRONTIERS.Chat.Enabled")
             : game.i18n.localize("STARFRONTIERS.Effects.EffectDisabled")
         }))
+    }));
+  const knockoutRows = shotRows
+    .filter((shot) => shot.knockout?.triggered)
+    .map((shot) => ({
+      index: shot.index,
+      sequenceLabel: shot.sequenceLabel,
+      reasonLabel: shot.knockout?.reasonLabel ?? "",
+      effectLabel: shot.knockout?.effectLabel ?? ""
     }));
   const subtitleParts = [];
   if (model.weapon?.modeLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.ModeSummary", { mode: model.weapon.modeLabel }));
@@ -2279,9 +2413,12 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
     targetNumber: model.targetNumber,
     computedTargetNumber: model.computedTargetNumber,
     targetNumberLabel: game.i18n.localize("STARFRONTIERS.Chat.TargetNumber"),
+    sequenceColumnLabel: sequenceLabels.singleLabel,
+    perSequenceOverridesLabel: sequenceLabels.overridesLabel,
     modifierRows,
     shotRows,
     shotOverrideSections,
+    knockoutRows,
     isSingleShot: shotRows.length === 1,
     canRollDamage: Boolean(model.damageAvailable),
     damageButtonLabel: game.i18n.localize("STARFRONTIERS.Weapon.RollDamage"),

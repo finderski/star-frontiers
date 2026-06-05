@@ -361,12 +361,16 @@ function appendDerivedRows(modifiers, {
   rulesEdition,
   dialog
 }) {
-  if (rulesEdition === "expanded" && attackType === ATTACK_TYPES.RANGED && attacker.system?.derived?.isWounded) {
+  if (
+    rulesEdition === "expanded"
+    && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.MELEE)
+    && attacker.system?.derived?.isWounded
+  ) {
     modifiers.push(makeModifierRow({
       id: "attacker-wounded",
       label: game.i18n.localize("STARFRONTIERS.Modifier.AttackerWounded"),
       source: MODIFIER_SOURCES.DERIVED,
-      attackTypes: [ATTACK_TYPES.RANGED],
+      attackTypes: [attackType],
       value: -10,
       overridable: false
     }));

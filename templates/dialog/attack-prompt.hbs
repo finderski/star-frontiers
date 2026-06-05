@@ -58,7 +58,7 @@
     <h3>{{localize "STARFRONTIERS.Chat.DialogInputs"}}</h3>
 
     <div class="attack-dialog__subsection">
-      <h4 class="attack-dialog__subheading">{{localize "STARFRONTIERS.Combat.AppliesToAllShots"}}</h4>
+      <h4 class="attack-dialog__subheading">{{sharedSectionLabel}}</h4>
       <div data-attack-dialog-shared-rows>
         {{{sharedModifierRowsHtml}}}
       </div>
@@ -116,11 +116,11 @@
     {{#if showPerShotSection}}
       <div class="attack-dialog__subsection">
         <div class="attack-dialog__per-shot-header">
-          <h4 class="attack-dialog__subheading">{{localize "STARFRONTIERS.Combat.PerShot"}}</h4>
+          <h4 class="attack-dialog__subheading">{{perSequenceLabel}}</h4>
           <label class="attack-dialog__field attack-dialog__field--shots">
-            <span>{{localize "STARFRONTIERS.Combat.Shots"}}</span>
+            <span>{{sequenceCountLabel}}</span>
             <input class="attack-dialog__inline-input" type="number" name="shots" value="{{shots}}" min="1" max="{{maxShots}}" step="1" />
-            <small class="form-hint">{{localize "STARFRONTIERS.Combat.ROFHint" rof=maxShots}}</small>
+            <small class="form-hint">{{sequenceCountHint}}</small>
           </label>
         </div>
 
