@@ -166,15 +166,36 @@ function getTargetSizeModifier(size) {
   return Number(game.settings.get(SYSTEM_ID, key) ?? DEFAULT_TARGET_SIZE_MODIFIERS[size] ?? 0);
 }
 
-function getCharacterAttackBaseChance(actor, weapon, attackType, rulesEdition) {
+export function resolveMeleeAttackAbility(actor, weapon, selectedKey = "") {
+  if (actor?.type === "creature") {
+    return { key: "", value: Number(actor.system?.attackScore ?? weapon?._source?.system?.attackScore ?? 0) };
+  }
+
+  const dex = Number(actor?.system?.abilities?.dex?.value ?? 0);
+  const str = Number(actor?.system?.abilities?.str?.value ?? 0);
+  const requestedKey = String(selectedKey ?? "").trim().toLowerCase();
+  const key = requestedKey === "dex" || requestedKey === "str"
+    ? requestedKey
+    : (str > dex ? "str" : "dex");
+  return {
+    key,
+    value: key === "str" ? str : dex
+  };
+}
+
+function getCharacterAttackBaseChance(actor, weapon, attackType, rulesEdition, meleeAttackAbilityKey = "") {
   const dex = Number(actor.system.abilities?.dex?.value ?? 0);
+
+  if (attackType === ATTACK_TYPES.MELEE) {
+    const { value } = resolveMeleeAttackAbility(actor, weapon, meleeAttackAbilityKey);
+    return rulesEdition === "basic" ? value : Math.ceil(value / 2);
+  }
 
   if (rulesEdition === "basic") return dex;
 
   const str = Number(actor.system.abilities?.str?.value ?? 0);
   const usesStrength = weapon.system?.weaponSkillKey === "str" || weapon.system?.attributeKey === "str";
   if (usesStrength) return Math.ceil(str / 2);
-  if (attackType === ATTACK_TYPES.MELEE) return Math.ceil(Math.max(str, dex) / 2);
   return Math.ceil(dex / 2);
 }
 
@@ -237,7 +258,7 @@ export function resolveWeaponSkill(actor, weapon) {
     ?? null;
 }
 
-export function buildWeaponAttackProfile(actor, weapon) {
+export function buildWeaponAttackProfile(actor, weapon, { meleeAttackAbility = "" } = {}) {
   const rulesEdition = game.settings.get(SYSTEM_ID, "rulesEdition");
   const attackType = getAttackTypeForWeapon(weapon);
 
@@ -260,7 +281,12 @@ export function buildWeaponAttackProfile(actor, weapon) {
   }
 
   const skill = resolveWeaponSkill(actor, weapon);
-  const baseChance = clampAttackTarget(getCharacterAttackBaseChance(actor, weapon, attackType, rulesEdition));
+  const resolvedMeleeAbility = attackType === ATTACK_TYPES.MELEE
+    ? resolveMeleeAttackAbility(actor, weapon, meleeAttackAbility)
+    : { key: "", value: 0 };
+  const baseChance = clampAttackTarget(
+    getCharacterAttackBaseChance(actor, weapon, attackType, rulesEdition, resolvedMeleeAbility.key)
+  );
   const skillLevel = Number(skill?.system?.level ?? 0);
   const skillBonus = Number(skill?.system?.bonus ?? 0);
   const skillModifier = rulesEdition === "expanded" ? (skillLevel * 10) + skillBonus : 0;
@@ -268,7 +294,9 @@ export function buildWeaponAttackProfile(actor, weapon) {
 
   return {
     attackType,
-    attackAbilityKey: weapon.system?.weaponSkillKey === "str" ? "str" : "dex",
+    attackAbilityKey: attackType === ATTACK_TYPES.MELEE
+      ? resolvedMeleeAbility.key
+      : (weapon.system?.weaponSkillKey === "str" ? "str" : "dex"),
     baseChance,
     baseTarget: clampAttackTarget(baseChance + skillModifier + staticAttackModifier),
     rulesEdition,

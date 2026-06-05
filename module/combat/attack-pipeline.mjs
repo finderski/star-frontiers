@@ -282,6 +282,12 @@ function buildModifierMap(modifiers = []) {
   return map;
 }
 
+function buildLiveAttackProfile(setup, dialogState = {}) {
+  return buildWeaponAttackProfile(setup.actor, setup.weapon, {
+    meleeAttackAbility: dialogState?.meleeAttackAbility ?? setup.profile?.attackAbilityKey ?? ""
+  });
+}
+
 function areShotStatesEquivalent(a = {}, b = {}) {
   const keys = [
     "rangeBandKey",
@@ -407,6 +413,7 @@ function normalizeAttackDialogState(setup, dialogState = {}) {
 
   return {
     attackerMovement: String(dialogState.attackerMovement ?? (setup.rulesEdition === "basic" ? "stationary" : "stationary")),
+    meleeAttackAbility: String(dialogState.meleeAttackAbility ?? setup.profile?.attackAbilityKey ?? ""),
     wrongHand: dialogState.wrongHand === undefined ? Boolean(setup.attackerHasWrongHand) : Boolean(dialogState.wrongHand),
     firingTwoWeapons: Boolean(dialogState.firingTwoWeapons),
     gmCircumstanceLabel: String(dialogState.gmCircumstanceLabel ?? ""),
@@ -422,6 +429,7 @@ function normalizeAttackDialogState(setup, dialogState = {}) {
 function buildShotDialogState(sharedState, shotState) {
   return {
     attackerMovement: sharedState.attackerMovement,
+    meleeAttackAbility: sharedState.meleeAttackAbility,
     wrongHand: sharedState.wrongHand,
     firingTwoWeapons: sharedState.firingTwoWeapons,
     gmCircumstanceLabel: sharedState.gmCircumstanceLabel,
@@ -517,6 +525,9 @@ function buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBa
     targetHasProne: actorHasSfStatus(targetActor, SF_STATUS_IDS.PRONE),
     targetHasDefending: actorHasSfStatus(targetActor, SF_STATUS_IDS.DEFENDING),
     targetHasStunned: actorHasSfStatus(targetActor, SF_STATUS_IDS.STUNNED),
+    showMeleeAbility: attackType === ATTACK_TYPES.MELEE && actor?.type !== "creature",
+    showAttackerMovementControl: !(rulesEdition === "basic" && attackType === ATTACK_TYPES.MELEE),
+    showPerShotSection: !(rulesEdition === "basic" && attackType === ATTACK_TYPES.MELEE),
     showWrongHand: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.MELEE),
     showFiringTwoWeapons: rulesEdition === "expanded",
     showCoverBasic: rulesEdition === "basic" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
@@ -578,6 +589,7 @@ function readAttackDialogState(root, setup) {
 
   return normalizeAttackDialogState(setup, {
     attackerMovement: readValue("attackerMovement", setup.rulesEdition === "basic" ? "stationary" : "stationary"),
+    meleeAttackAbility: readValue("meleeAttackAbility", setup.profile?.attackAbilityKey ?? ""),
     wrongHand: readChecked("wrongHand"),
     firingTwoWeapons: readChecked("firingTwoWeapons"),
     gmCircumstanceLabel: readValue("gmCircumstanceLabel", ""),
@@ -592,6 +604,19 @@ function readAttackDialogState(root, setup) {
 
 function buildAttackDialogContext(setup, dialogState = {}) {
   const state = normalizeAttackDialogState(setup, dialogState);
+  const liveProfile = buildLiveAttackProfile(setup, state);
+  const meleeAbilityOptions = setup.showMeleeAbility
+    ? [
+        {
+          value: "dex",
+          label: `${game.i18n.localize("STARFRONTIERS.Ability.dex")} (${Number(setup.actor.system?.abilities?.dex?.value ?? 0)})`
+        },
+        {
+          value: "str",
+          label: `${game.i18n.localize("STARFRONTIERS.Ability.str")} (${Number(setup.actor.system?.abilities?.str?.value ?? 0)})`
+        }
+      ]
+    : [];
   const attackerMovementOptions = setup.rulesEdition === "basic"
     ? buildSelectChoices(["stationary", "moving"], (key) => localizeModifierValue(key), BASIC_ATTACKER_MOVEMENT_MODS)
     : buildSelectChoices(
@@ -618,7 +643,7 @@ function buildAttackDialogContext(setup, dialogState = {}) {
       weapon: setup.weapon,
       attackType: setup.attackType,
       mode: setup.activeMode,
-      profile: setup.profile,
+      profile: liveProfile,
       resolvedRangeBand: setup.autoRangeBand,
       measuredDistance: setup.measuredDistance,
       dialogState: shotDialogState
@@ -673,7 +698,7 @@ function buildAttackDialogContext(setup, dialogState = {}) {
     weapon: setup.weapon,
     attackType: setup.attackType,
     mode: setup.activeMode,
-    profile: setup.profile,
+    profile: liveProfile,
     resolvedRangeBand: setup.autoRangeBand,
     measuredDistance: setup.measuredDistance,
     dialogState: buildShotDialogState(state, state.shotStates[0])
@@ -695,6 +720,11 @@ function buildAttackDialogContext(setup, dialogState = {}) {
     sharedRows,
     attackerMovementOptions,
     attackerMovementSelected: state.attackerMovement,
+    showAttackerMovementControl: setup.showAttackerMovementControl,
+    showMeleeAbility: setup.showMeleeAbility,
+    showPerShotSection: setup.showPerShotSection,
+    meleeAbilityOptions,
+    meleeAttackAbilitySelected: state.meleeAttackAbility,
     wrongHand: state.wrongHand,
     firingTwoWeapons: state.firingTwoWeapons,
     gmCircumstanceLabel: state.gmCircumstanceLabel,
@@ -1019,6 +1049,9 @@ function syncAttackDialog(root, setup) {
   const warnings = root.querySelector("[data-attack-dialog-warnings]");
   if (warnings) warnings.innerHTML = renderAttackDialogWarnings(context.warnings);
 
+  const baseChance = root.querySelector("[data-attack-dialog-base-chance]");
+  if (baseChance) baseChance.textContent = String(context.baseChance);
+
   const targetNumber = root.querySelector("[data-attack-dialog-target-number]");
   if (targetNumber) targetNumber.textContent = String(context.targetNumber);
 
@@ -1088,6 +1121,10 @@ export async function promptWeaponAttack(actor, weapon, profile, autoRangeBand =
     warningsHtml: renderAttackDialogWarnings(initialContext.warnings),
     attackerMovementOptions: initialContext.attackerMovementOptions,
     attackerMovementSelected: initialContext.attackerMovementSelected,
+    showAttackerMovementControl: initialContext.showAttackerMovementControl,
+    showMeleeAbility: initialContext.showMeleeAbility,
+    meleeAbilityOptions: initialContext.meleeAbilityOptions,
+    meleeAttackAbilitySelected: initialContext.meleeAttackAbilitySelected,
     showWrongHand: initialContext.showWrongHand,
     wrongHand: initialContext.wrongHand,
     showFiringTwoWeapons: initialContext.showFiringTwoWeapons,
@@ -1589,6 +1626,7 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
 
   const attackSetup = buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBand, targetDistance);
   const dialogState = normalizeAttackDialogState(attackSetup, prompt.dialogState);
+  const liveProfile = buildLiveAttackProfile(attackSetup, dialogState);
   const firstShotState = dialogState.shotStates[0] ?? normalizeShotState(attackSetup, {}, 1);
   const firstShotDialogState = buildShotDialogState(dialogState, firstShotState);
   const firstShotContext = buildAttackModifierContext({
@@ -1597,7 +1635,7 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     weapon,
     attackType: profile.attackType,
     mode: activeMode,
-    profile,
+    profile: liveProfile,
     resolvedRangeBand: autoRangeBand,
     measuredDistance: targetDistance,
     dialogState: firstShotDialogState
@@ -1648,7 +1686,7 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     weapon,
     attackType: profile.attackType,
     mode: activeMode,
-    profile,
+    profile: liveProfile,
     resolvedRangeBand: autoRangeBand,
     measuredDistance: targetDistance,
     dialogState: buildShotDialogState(dialogState, shotState)
@@ -1706,10 +1744,11 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
       uuid: weapon.uuid,
       modeKey: activeMode?.key ?? "",
       modeLabel: activeMode ? getWeaponModeLabel(activeMode) : "",
-      skillLabel: profile.skillLabel
+      skillLabel: liveProfile.skillLabel
     },
-    attackType: profile.attackType,
-    rulesEdition: profile.rulesEdition,
+    attackType: liveProfile.attackType,
+    attackAbilityKey: liveProfile.attackAbilityKey,
+    rulesEdition: liveProfile.rulesEdition,
     rollMode,
     rollHtml: allRollHtmls.join(""),
     baseChance: firstShotContext.baseChance,
@@ -2220,6 +2259,12 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
     }));
   }
 
+  const baseChanceLabel = model.attackType === ATTACK_TYPES.MELEE && model.attackAbilityKey
+    ? game.i18n.format("STARFRONTIERS.Chat.BaseChanceAbility", {
+        ability: game.i18n.localize(`STARFRONTIERS.Ability.${model.attackAbilityKey}`)
+      })
+    : game.i18n.localize("STARFRONTIERS.Chat.BaseChance");
+
   return {
     title: getAttackSummaryTitle(model),
     subtitle: subtitleParts.join(" | "),
@@ -2230,7 +2275,7 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
     adjustedByGmLabel: game.i18n.localize("STARFRONTIERS.Chat.AdjustedByGM"),
     detailsLabel: game.i18n.localize("STARFRONTIERS.Chat.ShowDetails"),
     baseChance: model.baseChance,
-    baseChanceLabel: game.i18n.localize("STARFRONTIERS.Chat.BaseChance"),
+    baseChanceLabel,
     targetNumber: model.targetNumber,
     computedTargetNumber: model.computedTargetNumber,
     targetNumberLabel: game.i18n.localize("STARFRONTIERS.Chat.TargetNumber"),

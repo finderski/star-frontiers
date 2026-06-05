@@ -45,7 +45,7 @@
     <div class="attack-dialog__totals">
       <div class="attack-dialog__total">
         <span class="label">{{localize "STARFRONTIERS.Chat.BaseChance"}}</span>
-        <span class="value">{{baseChance}}</span>
+        <span class="value" data-attack-dialog-base-chance>{{baseChance}}</span>
       </div>
       <div class="attack-dialog__total">
         <span class="label">{{localize "STARFRONTIERS.Chat.TargetNumber"}}</span>
@@ -64,12 +64,23 @@
       </div>
 
       <div class="attack-dialog__shared-controls">
-        <label class="attack-dialog__field attack-dialog__field--wide">
-          <span>{{localize "STARFRONTIERS.Modifier.AttackerMovement"}}</span>
-          <select class="attack-dialog__inline-select" name="attackerMovement">
-            {{selectOptions attackerMovementOptions selected=attackerMovementSelected nameAttr="value" labelAttr="label"}}
-          </select>
-        </label>
+        {{#if showMeleeAbility}}
+          <label class="attack-dialog__field attack-dialog__field--wide">
+            <span>{{localize "STARFRONTIERS.Modifier.MeleeAttackAbility"}}</span>
+            <select class="attack-dialog__inline-select" name="meleeAttackAbility">
+              {{selectOptions meleeAbilityOptions selected=meleeAttackAbilitySelected nameAttr="value" labelAttr="label"}}
+            </select>
+          </label>
+        {{/if}}
+
+        {{#if showAttackerMovementControl}}
+          <label class="attack-dialog__field attack-dialog__field--wide">
+            <span>{{localize "STARFRONTIERS.Modifier.AttackerMovement"}}</span>
+            <select class="attack-dialog__inline-select" name="attackerMovement">
+              {{selectOptions attackerMovementOptions selected=attackerMovementSelected nameAttr="value" labelAttr="label"}}
+            </select>
+          </label>
+        {{/if}}
 
         {{#if showWrongHand}}
           <label class="attack-dialog__field attack-dialog__field--checkbox">
@@ -102,24 +113,26 @@
     <div class="attack-dialog__warnings" data-attack-dialog-warnings>
       {{{warningsHtml}}}
     </div>
-    <div class="attack-dialog__subsection">
-      <div class="attack-dialog__per-shot-header">
-        <h4 class="attack-dialog__subheading">{{localize "STARFRONTIERS.Combat.PerShot"}}</h4>
-        <label class="attack-dialog__field attack-dialog__field--shots">
-          <span>{{localize "STARFRONTIERS.Combat.Shots"}}</span>
-          <input class="attack-dialog__inline-input" type="number" name="shots" value="{{shots}}" min="1" max="{{maxShots}}" step="1" />
-          <small class="form-hint">{{localize "STARFRONTIERS.Combat.ROFHint" rof=maxShots}}</small>
-        </label>
-      </div>
+    {{#if showPerShotSection}}
+      <div class="attack-dialog__subsection">
+        <div class="attack-dialog__per-shot-header">
+          <h4 class="attack-dialog__subheading">{{localize "STARFRONTIERS.Combat.PerShot"}}</h4>
+          <label class="attack-dialog__field attack-dialog__field--shots">
+            <span>{{localize "STARFRONTIERS.Combat.Shots"}}</span>
+            <input class="attack-dialog__inline-input" type="number" name="shots" value="{{shots}}" min="1" max="{{maxShots}}" step="1" />
+            <small class="form-hint">{{localize "STARFRONTIERS.Combat.ROFHint" rof=maxShots}}</small>
+          </label>
+        </div>
 
-      <div class="attack-dialog__shot-tabs" role="tablist" data-attack-dialog-shot-tabs>
-        {{{shotTabsHtml}}}
-      </div>
+        <div class="attack-dialog__shot-tabs" role="tablist" data-attack-dialog-shot-tabs>
+          {{{shotTabsHtml}}}
+        </div>
 
-      <div data-attack-dialog-shot-panels>
-        {{{shotPanelsHtml}}}
+        <div data-attack-dialog-shot-panels>
+          {{{shotPanelsHtml}}}
+        </div>
       </div>
-    </div>
+    {{/if}}
   </section>
 
   {{#if forcedField}}

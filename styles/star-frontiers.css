@@ -3062,15 +3062,22 @@ label.attack-dialog__field--checkbox > input[type="checkbox"]::before {
 
 .attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked,
 label.attack-dialog__field--checkbox > input[type="checkbox"]:checked {
-  background: var(--sf-ink);
-  border-color: var(--sf-ink);
+  background: var(--sf-line);
+  border-color: var(--sf-line);
+}
+
+body[data-star-frontiers-theme="paper"]
+  .attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked,
+body[data-star-frontiers-theme="paper"]
+  label.attack-dialog__field--checkbox > input[type="checkbox"]:checked {
+  background: transparent;
+  border-color: var(--sf-line);
 }
 
 .attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked::after,
 label.attack-dialog__field--checkbox > input[type="checkbox"]:checked::after {
   content: "x";
-  /* color: var(--sf-bg, #071521); */
-  color: transparent;
+  color: var(--sf-bg, #071521);
   font-size: 1.5em;
   font-weight: 900;
   line-height: 1;
