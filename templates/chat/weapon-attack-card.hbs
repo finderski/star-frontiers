@@ -72,6 +72,13 @@
     {{/if}}
   {{/if}}
 
+  {{#if knockout}}
+    <div class="sf-attack-card__knockout">
+      <h4>{{localize "STARFRONTIERS.Chat.KnockoutFlags"}}</h4>
+      <p><strong>{{knockout.reasonLabel}}.</strong> {{knockout.effectLabel}}</p>
+    </div>
+  {{/if}}
+
   {{#if avoidance.effectLabel}}
     <p class="chat-card-actions__hint">{{avoidance.effectLabel}}</p>
   {{/if}}
@@ -153,15 +160,6 @@
                 {{/each}}
               </tbody>
             </table>
-          {{/each}}
-        </div>
-      {{/if}}
-
-      {{#if knockoutRows.length}}
-        <div class="sf-attack-card__notes">
-          <h4>{{localize "STARFRONTIERS.Chat.KnockoutFlags"}}</h4>
-          {{#each knockoutRows as |row|}}
-            <p><strong>{{row.sequenceLabel}}:</strong> {{row.reasonLabel}}. {{row.effectLabel}}</p>
           {{/each}}
         </div>
       {{/if}}

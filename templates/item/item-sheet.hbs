@@ -122,7 +122,7 @@
 
         <div class="compact-grid race-modifier-grid">
           <label class="attack-dialog__field--checkbox">
-            <input class="attack-dialog__inline-checkbox" type="checkbox" name="system.elasticity.available" {{checked system.elasticity.available}} />
+            <input class="item-sheet__inline-checkbox" type="checkbox" name="system.elasticity.available" {{checked system.elasticity.available}} />
             <span>{{localize "STARFRONTIERS.Item.ElasticityAvailable"}}</span>
           </label>
         </div>
@@ -139,26 +139,28 @@
     {{#if is.weapon}}
       <fieldset class="paper-box full-width">
         <legend>{{localize "STARFRONTIERS.Item.WeaponData"}}</legend>
-        <div class="fireMode-row">
-          <label class="checkbox-line">
-            <input type="checkbox" name="system.mechanics.hasModes" {{checked system.mechanics.hasModes}} />
-            <span>{{localize "STARFRONTIERS.Weapon.HasModes"}}</span>
-          </label>
+        <div class="fireMode-row__parent">
+          <div class="fireMode-row">
+            <label class="checkbox-line">
+              <input class="item-sheet__inline-checkbox" type="checkbox" name="system.mechanics.hasModes" {{checked system.mechanics.hasModes}} />
+              <span>{{localize "STARFRONTIERS.Weapon.HasModes"}}</span>
+            </label>
+          </div>
+          {{#if weaponIsMelee}}
+            <div class="fireMode-row">
+              <label class="checkbox-line">
+                <input class="item-sheet__inline-checkbox" type="checkbox" name="system.mechanics.barehand" {{checked system.mechanics.barehand}} />
+                <span>{{localize "STARFRONTIERS.Weapon.Barehand"}}</span>
+              </label>
+            </div>
+            <div class="fireMode-row">
+              <label class="checkbox-line">
+                <input class="item-sheet__inline-checkbox" type="checkbox" name="system.mechanics.isBlunt" {{checked system.mechanics.isBlunt}} />
+                <span>{{localize "STARFRONTIERS.Weapon.Blunt"}}</span>
+              </label>
+            </div>
+          {{/if}}
         </div>
-        {{#if weaponIsMelee}}
-          <div class="fireMode-row">
-            <label class="checkbox-line">
-              <input type="checkbox" name="system.mechanics.barehand" {{checked system.mechanics.barehand}} />
-              <span>{{localize "STARFRONTIERS.Weapon.Barehand"}}</span>
-            </label>
-          </div>
-          <div class="fireMode-row">
-            <label class="checkbox-line">
-              <input type="checkbox" name="system.mechanics.isBlunt" {{checked system.mechanics.isBlunt}} />
-              <span>{{localize "STARFRONTIERS.Weapon.Blunt"}}</span>
-            </label>
-          </div>
-        {{/if}}
         <div class="compact-grid weapon-core-grid">
           <label>
             <span>{{localize "STARFRONTIERS.Item.WeaponType"}}</span>
@@ -243,7 +245,7 @@
           {{#if weaponUsesAmmo}}
             <label><span>{{localize weaponAmmoPerShotLabel}}</span><input type="number" name="system.ammo.seuPerShot" value="{{system.ammo.seuPerShot}}" min="0" /></label>
           {{/if}}
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HeavyWeapon"}}</span><input type="checkbox" name="system.mechanics.isHeavy" {{checked system.mechanics.isHeavy}} /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HeavyWeapon"}}</span><input class="item-sheet__inline-checkbox" class="item-sheet__inline-checkbox" class="item-sheet__inline-checkbox" type="checkbox" name="system.mechanics.isHeavy" {{checked system.mechanics.isHeavy}} /></label>
           {{#if expandedRules}}
             <label><span>{{localize "STARFRONTIERS.Item.RateOfFire"}}</span><input type="number" name="system.mechanics.rateOfFire" value="{{system.mechanics.rateOfFire}}" min="1" /></label>
             {{#if weaponUsesSeu}}
@@ -256,7 +258,7 @@
         <div class="compact-grid two-columns">
           <label class="checkbox-line">
             <span>{{localize "STARFRONTIERS.Weapon.HasModes"}}</span>
-            <input type="checkbox" name="system.mechanics.hasModes" {{checked system.mechanics.hasModes}} />
+            <input class="item-sheet__inline-checkbox" type="checkbox" name="system.mechanics.hasModes" {{checked system.mechanics.hasModes}} />
           </label>
         </div>
         -->
@@ -319,7 +321,7 @@
                       <div class="compact-grid two-columns">
                         <label class="checkbox-line">
                           <span>{{localize "STARFRONTIERS.Weapon.AvoidanceEnabled"}}</span>
-                          <input type="checkbox" name="system.mechanics.modes.{{mode.index}}.avoidance.enabled" {{checked mode.avoidance.enabled}} />
+                          <input class="item-sheet__inline-checkbox" type="checkbox" name="system.mechanics.modes.{{mode.index}}.avoidance.enabled" {{checked mode.avoidance.enabled}} />
                         </label>
                         <label>
                           <span>{{localize "STARFRONTIERS.Weapon.AvoidanceAbility"}}</span>
@@ -408,8 +410,8 @@
 
         {{#if isMilitarySkill}}
           <div class="skill-combat-bonus-row">
-            <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ApplyMeleeBonus"}}</span><input type="checkbox" name="system.mechanics.applyMeleeBonus" {{checked system.mechanics.applyMeleeBonus}} /></label>
-            <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ApplyRangeBonus"}}</span><input type="checkbox" name="system.mechanics.applyRangeBonus" {{checked system.mechanics.applyRangeBonus}} /></label>
+            <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ApplyMeleeBonus"}}</span><input class="item-sheet__inline-checkbox" type="checkbox" name="system.mechanics.applyMeleeBonus" {{checked system.mechanics.applyMeleeBonus}} /></label>
+            <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ApplyRangeBonus"}}</span><input class="item-sheet__inline-checkbox" type="checkbox" name="system.mechanics.applyRangeBonus" {{checked system.mechanics.applyRangeBonus}} /></label>
           </div>
         {{/if}}
 
@@ -572,7 +574,7 @@
           </label>
           <label class="item-inline-field checkbox-line">
             <span>{{localize "STARFRONTIERS.Item.Active"}}</span>
-            <input type="checkbox" name="system.active" {{checked system.active}} />
+            <input class="item-sheet__inline-checkbox" type="checkbox" name="system.active" {{checked system.active}} />
           </label>
         </div>
 
@@ -623,7 +625,7 @@
           <label><span>{{localize "STARFRONTIERS.Item.SourceType"}}</span><select name="system.sourceType">{{selectOptions choices.sourceType selected=system.sourceType}}</select></label>
           <label><span>{{localize "STARFRONTIERS.Item.Capacity"}}</span><input type="number" name="system.capacity" value="{{system.capacity}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Remaining"}}</span><input type="number" name="system.remaining" value="{{system.remaining}}" min="0" /></label>
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Rechargeable"}}</span><input type="checkbox" name="system.rechargeable" {{checked system.rechargeable}} /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Rechargeable"}}</span><input class="item-sheet__inline-checkbox" type="checkbox" name="system.rechargeable" {{checked system.rechargeable}} /></label>
         </div>
         <fieldset class="paper-box full-width">
           <legend>{{localize "STARFRONTIERS.Item.Ports"}}</legend>
@@ -727,7 +729,7 @@
         <div class="compact-grid two-columns">
           <label class="checkbox-line">
             <span>{{localize "STARFRONTIERS.Item.Kit"}}</span>
-            <input type="checkbox" name="system.isKit" {{checked system.isKit}} />
+            <input class="item-sheet__inline-checkbox" type="checkbox" name="system.isKit" {{checked system.isKit}} />
           </label>
         </div>
         <div class="ammo-drop-zone">
@@ -766,8 +768,9 @@
                         <input type="number" name="system.contents.{{entry.index}}.remaining" value="{{entry.remaining}}" min="0" />
                       </label>
                       <label class="checkbox-line">
+                        <input class="item-sheet__inline-checkbox" type="checkbox" name="system.contents.{{entry.index}}.consumeOnUse" {{checked entry.consumeOnUse}} />
                         <span>{{localize "STARFRONTIERS.Item.ConsumeOnUse"}}</span>
-                        <input type="checkbox" name="system.contents.{{entry.index}}.consumeOnUse" {{checked entry.consumeOnUse}} />
+                        <input class="item-sheet__inline-checkbox" type="checkbox" name="system.contents.{{entry.index}}.consumeOnUse" {{checked entry.consumeOnUse}} />
                       </label>
                     </div>
                     <button type="button" data-action="removeKitContent" data-index="{{entry.index}}" title="{{localize "STARFRONTIERS.Item.RemoveKitContent"}}">
@@ -790,7 +793,7 @@
         <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Item.Uses"}}</span><input type="number" name="system.uses.value" value="{{system.uses.value}}" min="0" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.Max"}}</span><input type="number" name="system.uses.max" value="{{system.uses.max}}" min="0" /></label>
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ConsumeOnUse"}}</span><input type="checkbox" name="system.consumeOnUse" {{checked system.consumeOnUse}} /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.ConsumeOnUse"}}</span><input class="item-sheet__inline-checkbox" type="checkbox" name="system.consumeOnUse" {{checked system.consumeOnUse}} /></label>
         </div>
         <div class="ammo-drop-zone">
           <span>{{localize "STARFRONTIERS.Item.RequiredSkill"}}</span>
@@ -827,7 +830,7 @@
         <div class="compact-grid three-columns">
           <label><span>{{localize "STARFRONTIERS.Item.ParabatteryType"}}</span><input type="number" name="system.parabatteryType" value="{{system.parabatteryType}}" min="1" max="4" /></label>
           <label><span>{{localize "STARFRONTIERS.Item.RangeKm"}}</span><input type="number" name="system.rangeKm" value="{{system.rangeKm}}" min="0" /></label>
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Cover"}}</span><input type="checkbox" name="system.cover" {{checked system.cover}} /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.Cover"}}</span><input class="item-sheet__inline-checkbox" type="checkbox" name="system.cover" {{checked system.cover}} /></label>
         </div>
         <div class="ammo-drop-zone" data-drop-type="powerSource">
           <span>{{localize "STARFRONTIERS.Item.PowerSource"}}</span>
@@ -903,7 +906,7 @@
 
         <div class="compact-grid two-columns">
           <label><span>{{localize "STARFRONTIERS.Item.Targets"}}</span><input type="number" name="system.targets" value="{{system.targets}}" min="1" /></label>
-          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HasRange"}}</span><input type="checkbox" name="system.range.enabled" {{checked system.range.enabled}} /></label>
+          <label class="checkbox-line"><span>{{localize "STARFRONTIERS.Item.HasRange"}}</span><input class="item-sheet__inline-checkbox" type="checkbox" name="system.range.enabled" {{checked system.range.enabled}} /></label>
         </div>
 
         {{#if system.range.enabled}}
@@ -926,7 +929,7 @@
           <div class="compact-grid two-columns">
             <label class="checkbox-line">
               <span>{{localize "STARFRONTIERS.Weapon.AvoidanceEnabled"}}</span>
-              <input type="checkbox" name="system.avoidance.enabled" {{checked system.avoidance.enabled}} />
+              <input class="item-sheet__inline-checkbox" type="checkbox" name="system.avoidance.enabled" {{checked system.avoidance.enabled}} />
             </label>
             <label>
               <span>{{localize "STARFRONTIERS.Weapon.AvoidanceAbility"}}</span>

@@ -655,62 +655,64 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (rulesEdition === "basic") {
-    const value = Number(BASIC_ATTACKER_MOVEMENT_MODS[dialog.attackerMovement] ?? 0);
-    if (value) {
-      modifiers.push(makeModifierRow({
-        id: "attacker-movement",
-        label: game.i18n.format("STARFRONTIERS.Modifier.AttackerMovementLabel", {
-          movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.attackerMovement || "stationary"}`)
-        }),
-        source: MODIFIER_SOURCES.DIALOG,
-        attackTypes: [attackType],
-        value
-      }));
-    }
-  } else {
-    const attackerMovementValue = Number(EXPANDED_ATTACKER_MOVEMENT_MODS[dialog.attackerMovement] ?? 0);
-    if (attackerMovementValue) {
-      modifiers.push(makeModifierRow({
-        id: "attacker-movement",
-        label: game.i18n.format("STARFRONTIERS.Modifier.AttackerMovementLabel", {
-          movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.attackerMovement || "stationary"}`)
-        }),
-        source: MODIFIER_SOURCES.DIALOG,
-        attackTypes: [attackType],
-        value: attackerMovementValue
-      }));
-    }
-
-    if (target?.type === "creature") {
-      const creatureMovementValue = dialog.opportunityShot
-        ? 0
-        : Number(CREATURE_TARGET_MOVEMENT_MODS[dialog.creatureTargetMovement] ?? 0);
-      if (creatureMovementValue) {
+  if (attackType !== ATTACK_TYPES.MELEE) {
+    if (rulesEdition === "basic") {
+      const value = Number(BASIC_ATTACKER_MOVEMENT_MODS[dialog.attackerMovement] ?? 0);
+      if (value) {
         modifiers.push(makeModifierRow({
-          id: "creature-target-movement",
-          label: game.i18n.format("STARFRONTIERS.Modifier.CreatureTargetMovementLabel", {
-            movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.creatureTargetMovement || "medium"}`)
+          id: "attacker-movement",
+          label: game.i18n.format("STARFRONTIERS.Modifier.AttackerMovementLabel", {
+            movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.attackerMovement || "stationary"}`)
           }),
           source: MODIFIER_SOURCES.DIALOG,
           attackTypes: [attackType],
-          value: creatureMovementValue
+          value
         }));
       }
     } else {
-      const targetMovementValue = dialog.opportunityShot
-        ? 0
-        : Number(EXPANDED_TARGET_MOVEMENT_MODS[dialog.targetMovement] ?? 0);
-      if (targetMovementValue) {
+      const attackerMovementValue = Number(EXPANDED_ATTACKER_MOVEMENT_MODS[dialog.attackerMovement] ?? 0);
+      if (attackerMovementValue) {
         modifiers.push(makeModifierRow({
-          id: "target-movement",
-        label: game.i18n.format("STARFRONTIERS.Modifier.TargetMovementLabel", {
-            movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.targetMovement || "stationary"}`)
-        }),
+          id: "attacker-movement",
+          label: game.i18n.format("STARFRONTIERS.Modifier.AttackerMovementLabel", {
+            movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.attackerMovement || "stationary"}`)
+          }),
           source: MODIFIER_SOURCES.DIALOG,
           attackTypes: [attackType],
-          value: targetMovementValue
+          value: attackerMovementValue
         }));
+      }
+
+      if (target?.type === "creature") {
+        const creatureMovementValue = dialog.opportunityShot
+          ? 0
+          : Number(CREATURE_TARGET_MOVEMENT_MODS[dialog.creatureTargetMovement] ?? 0);
+        if (creatureMovementValue) {
+          modifiers.push(makeModifierRow({
+            id: "creature-target-movement",
+            label: game.i18n.format("STARFRONTIERS.Modifier.CreatureTargetMovementLabel", {
+              movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.creatureTargetMovement || "medium"}`)
+            }),
+            source: MODIFIER_SOURCES.DIALOG,
+            attackTypes: [attackType],
+            value: creatureMovementValue
+          }));
+        }
+      } else {
+        const targetMovementValue = dialog.opportunityShot
+          ? 0
+          : Number(EXPANDED_TARGET_MOVEMENT_MODS[dialog.targetMovement] ?? 0);
+        if (targetMovementValue) {
+          modifiers.push(makeModifierRow({
+            id: "target-movement",
+            label: game.i18n.format("STARFRONTIERS.Modifier.TargetMovementLabel", {
+              movement: game.i18n.localize(`STARFRONTIERS.Modifier.Value.${dialog.targetMovement || "stationary"}`)
+            }),
+            source: MODIFIER_SOURCES.DIALOG,
+            attackTypes: [attackType],
+            value: targetMovementValue
+          }));
+        }
       }
     }
   }
@@ -736,7 +738,7 @@ function appendDialogRows(modifiers, {
     }));
   }
 
-  if (rulesEdition === "expanded" && dialog.firingTwoWeapons) {
+  if (rulesEdition === "expanded" && dialog.firingTwoWeapons && attackType !== ATTACK_TYPES.MELEE) {
     modifiers.push(makeModifierRow({
       id: "firing-two-weapons",
       label: game.i18n.localize("STARFRONTIERS.Modifier.FiringTwoWeapons"),

@@ -345,7 +345,6 @@ function getShotKnockoutState(model, shot = {}) {
       triggered: true,
       reason: "auto",
       reasonLabel: game.i18n.localize("STARFRONTIERS.Chat.KnockoutReasonAuto"),
-      effectLabel: game.i18n.localize("STARFRONTIERS.Chat.KnockoutFlagged"),
       statusId: SF_STATUS_IDS.UNCONSCIOUS,
       durationFormula: "1d100"
     };
@@ -355,7 +354,6 @@ function getShotKnockoutState(model, shot = {}) {
       triggered: true,
       reason: "blunt",
       reasonLabel: game.i18n.localize("STARFRONTIERS.Chat.KnockoutReasonBlunt"),
-      effectLabel: game.i18n.localize("STARFRONTIERS.Chat.KnockoutFlagged"),
       statusId: SF_STATUS_IDS.UNCONSCIOUS,
       durationFormula: "1d100"
     };
@@ -603,12 +601,12 @@ function buildAttackDialogSetup(actor, targetActor, weapon, profile, autoRangeBa
     targetHasDefending: actorHasSfStatus(targetActor, SF_STATUS_IDS.DEFENDING),
     targetHasStunned: actorHasSfStatus(targetActor, SF_STATUS_IDS.STUNNED),
     showMeleeAbility: attackType === ATTACK_TYPES.MELEE && actor?.type !== "creature",
-    showAttackerMovementControl: !(rulesEdition === "basic" && attackType === ATTACK_TYPES.MELEE),
+    showAttackerMovementControl: attackType !== ATTACK_TYPES.MELEE,
     showPerShotSection: !(rulesEdition === "basic" && attackType === ATTACK_TYPES.MELEE),
     showWrongHand: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.MELEE),
-    showFiringTwoWeapons: rulesEdition === "expanded",
+    showFiringTwoWeapons: rulesEdition === "expanded" && attackType !== ATTACK_TYPES.MELEE,
     showCoverBasic: rulesEdition === "basic" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
-    showTargetMovementControl: rulesEdition === "expanded",
+    showTargetMovementControl: rulesEdition === "expanded" && attackType !== ATTACK_TYPES.MELEE,
     showSoftCover: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
     showHardCover: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
     showTargetProne: rulesEdition === "expanded" && (attackType === ATTACK_TYPES.RANGED || attackType === ATTACK_TYPES.THROWN),
@@ -1767,6 +1765,7 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   }
 
   const allRollHtmls = [];
+  const attackRolls = [];
   const shotResults = [];
   const shotContexts = dialogState.shotStates.map((shotState) => buildAttackModifierContext({
     attacker: actor,
@@ -1788,10 +1787,11 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     const shotContext = shotContexts[i] ?? firstShotContext;
     const shotPenalty = 0;
     const shotTarget = clampAttackTarget(shotContext.targetNumber + shotPenalty);
-    const { total: rollTotal, rollHtml } = await evaluatePercentileRoll({
+    const { roll, total: rollTotal, rollHtml } = await evaluatePercentileRoll({
       forcedTotal: prompt.forcedRoll,
       flavor: game.i18n.format("STARFRONTIERS.Weapon.AttackFlavor", { weapon: weapon.name })
     });
+    attackRolls.push(roll);
     allRollHtmls.push(rollHtml);
     const modifierOverridden = i > 0 && !areShotStatesEquivalent(shotState, firstShotState);
     shotResults.push({
@@ -1886,7 +1886,8 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
 
   await createWeaponAttackChatMessage(actor, weapon, {
     rollMode,
-    attack
+    attack,
+    rolls: attackRolls
   });
 
   const avoidanceEnabled = Boolean(getWeaponAvoidance(weapon)?.enabled);
@@ -2143,6 +2144,19 @@ function formatRollTotal(value) {
   return String(clampRollTotal(value)).padStart(2, "0");
 }
 
+function hasKnockoutDurationValue(durationTurns) {
+  if (durationTurns === null || durationTurns === undefined) return false;
+  if (typeof durationTurns === "string" && durationTurns.trim() === "") return false;
+  return Number.isFinite(Number(durationTurns));
+}
+
+function getKnockoutEffectLabel(durationTurns) {
+  if (hasKnockoutDurationValue(durationTurns)) {
+    return game.i18n.format("STARFRONTIERS.Chat.KnockoutFlagged", { turns: Number(durationTurns) });
+  }
+  return game.i18n.localize("STARFRONTIERS.Chat.KnockoutFlaggedPending");
+}
+
 function hasModifierAdjustment(modifier) {
   return Number(modifier?.value ?? 0) !== Number(modifier?.originalValue ?? 0)
     || Boolean(modifier?.enabled) !== Boolean(modifier?.originalEnabled ?? true);
@@ -2172,6 +2186,7 @@ export function recomputeAttackCardModel(model = {}) {
       }
     : null;
   next.autoHitUnconscious = Boolean(next.autoHitUnconscious);
+  next.knockoutDuration = getOptionalNumericOverride(next.knockoutDuration, clampRollTotal);
   next.baseChance = Number(next.baseChance ?? 0);
   next.originalTargetNumber = clampAttackTarget(
     Number(next.originalTargetNumber ?? next.targetNumber ?? next.baseChance)
@@ -2374,13 +2389,20 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
             : game.i18n.localize("STARFRONTIERS.Effects.EffectDisabled")
         }))
     }));
+  const knockout = model.knockoutCount > 0
+    ? {
+        durationTurns: model.knockoutDuration ?? null,
+        reasonLabel: model.knockoutShots?.[0]?.knockout?.reasonLabel ?? "",
+        effectLabel: getKnockoutEffectLabel(model.knockoutDuration)
+      }
+    : null;
   const knockoutRows = shotRows
     .filter((shot) => shot.knockout?.triggered)
     .map((shot) => ({
       index: shot.index,
       sequenceLabel: shot.sequenceLabel,
       reasonLabel: shot.knockout?.reasonLabel ?? "",
-      effectLabel: shot.knockout?.effectLabel ?? ""
+      effectLabel: getKnockoutEffectLabel(model.knockoutDuration)
     }));
   const subtitleParts = [];
   if (model.weapon?.modeLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.ModeSummary", { mode: model.weapon.modeLabel }));
@@ -2418,6 +2440,7 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
     modifierRows,
     shotRows,
     shotOverrideSections,
+    knockout,
     knockoutRows,
     isSingleShot: shotRows.length === 1,
     canRollDamage: Boolean(model.damageAvailable),
@@ -2521,13 +2544,24 @@ export async function handleAttackCardAdjustmentInput(message, element) {
 
 export async function createWeaponAttackChatMessage(actor, weapon, {
   attack,
+  rolls = [],
   rollMode = "public"
 }) {
   const model = recomputeAttackCardModel(attack);
+  let durationRoll = null;
+  if (model.knockoutCount > 0 && !hasKnockoutDurationValue(model.knockoutDuration)) {
+    durationRoll = await (new Roll("1d100")).evaluate({ allowInteractive: false });
+    model.knockoutDuration = Number(durationRoll.total ?? 0);
+  }
   const content = await renderAttackCardContent(model);
+  const chatRolls = [
+    ...Array.from(rolls ?? []).filter(Boolean),
+    ...(durationRoll ? [durationRoll] : [])
+  ];
   const chatData = {
     content,
     speaker: ChatMessage.getSpeaker({ actor }),
+    ...(chatRolls.length ? { rolls: chatRolls } : {}),
     flags: {
       [SYSTEM_ID]: {
         attack: model

@@ -351,6 +351,71 @@ body[data-star-frontiers-theme="retro"] .star-frontiers.attack-dialog button {
   box-shadow: 0 0 10px rgba(75, 220, 255, 0.15);
 }
 
+/* checkbox stuff */
+input[type="checkbox"].item-sheet__inline-checkbox,
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox,
+label.attack-dialog__field--checkbox > input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin: 0;
+
+  border: 1px solid var(--sf-ink);
+  border-radius: 0.2rem;
+  cursor: pointer;
+  position: relative;
+}
+
+input[type="checkbox"].item-sheet__inline-checkbox::before,
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox::before,
+label.attack-dialog__field--checkbox > input[type="checkbox"]::before {
+  content: "";
+}
+
+input[type="checkbox"].item-sheet__inline-checkbox:checked,
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked,
+label.attack-dialog__field--checkbox > input[type="checkbox"]:checked {
+  background: var(--sf-line);
+  border-color: var(--sf-line);
+}
+
+body[data-star-frontiers-theme="paper"] input[type="checkbox"].item-sheet__inline-checkbox:checked,
+body[data-star-frontiers-theme="paper"]
+  .attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked,
+body[data-star-frontiers-theme="paper"]
+  label.attack-dialog__field--checkbox > input[type="checkbox"]:checked {
+  background: transparent;
+  border-color: var(--sf-line);
+}
+
+input[type="checkbox"].item-sheet__inline-checkbox:checked::after,
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked::after,
+label.attack-dialog__field--checkbox > input[type="checkbox"]:checked::after {
+  content: "x";
+  color: var(--sf-bg, #071521);
+  font-size: 1.5em;
+  font-weight: 900;
+  line-height: 1;
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-30%, -55%);
+  font-family: var(--input);
+}
+
+.star-frontiers-item-sheet input[type="checkbox"].item-sheet__inline-checkbox:checked::after {
+  transform: translate(-38%, -60%);
+}
+
+input[type="checkbox"].item-sheet__inline-checkbox:focus-visible,
+.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:focus-visible,
+label.attack-dialog__field--checkbox > input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--sf-ink);
+  outline-offset: 2px;
+}
+/* end checkbox stuff */
+
 /* --- 3e. ProseMirror menu reset ---
  * Strips the default Foundry editor toolbar background so the editor
  * blends into the sheet instead of showing the OS-default chrome.
@@ -2421,11 +2486,13 @@ label.armor-inline-field {
 }
 
 /* --- 12e. Weapon modes editor --- */
-
-.fireMode-row {
+.fireMode-row__parent {
   display: flex;
-  margin: 0 0 20px 0;
+  gap: 12px;
+  margin-bottom: 20px;
+  justify-content: space-around;
 }
+
 .weapon-modes-editor__hint {
   color: var(--sf-muted);
   display: block;
@@ -3037,63 +3104,6 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   font-family: var(--input);
 }
 
-/* checkbox stuff */
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox,
-label.attack-dialog__field--checkbox > input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
-  margin: 0;
-
-  border: 1px solid var(--sf-ink);
-  border-radius: 0.2rem;
-  /* background: rgba(5, 16, 25, 0.9); */
-  /* box-shadow: inset 0 0 0 1px rgba(83, 220, 255, 0.25); */
-  cursor: pointer;
-  position: relative;
-}
-
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox::before,
-label.attack-dialog__field--checkbox > input[type="checkbox"]::before {
-  content: "";
-}
-
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked,
-label.attack-dialog__field--checkbox > input[type="checkbox"]:checked {
-  background: var(--sf-line);
-  border-color: var(--sf-line);
-}
-
-body[data-star-frontiers-theme="paper"]
-  .attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked,
-body[data-star-frontiers-theme="paper"]
-  label.attack-dialog__field--checkbox > input[type="checkbox"]:checked {
-  background: transparent;
-  border-color: var(--sf-line);
-}
-
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:checked::after,
-label.attack-dialog__field--checkbox > input[type="checkbox"]:checked::after {
-  content: "x";
-  color: var(--sf-bg, #071521);
-  font-size: 1.5em;
-  font-weight: 900;
-  line-height: 1;
-  position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-30%, -55%);
-  font-family: var(--input);
-}
-
-.attack-dialog__subsection input[type="checkbox"].attack-dialog__inline-checkbox:focus-visible,
-label.attack-dialog__field--checkbox > input[type="checkbox"]:focus-visible {
-  outline: 2px solid var(--sf-ink);
-  outline-offset: 2px;
-}
-/* end checkbox stuff */
-
 .attack-dialog__subheading {
   font-family: var(--fieldset);
   color: var(--sf-ink);
@@ -3388,7 +3398,8 @@ label.attack-dialog__field--checkbox > input[type="checkbox"]:focus-visible {
 }
 
 .sf-attack-card__summary,
-.sf-attack-card__ammo {
+.sf-attack-card__ammo,
+.sf-attack-card__knockout {
   border: 1px solid var(--sf-chat-line);
   padding: 0.6rem 0.75rem;
 }
@@ -3445,6 +3456,17 @@ label.attack-dialog__field--checkbox > input[type="checkbox"]:focus-visible {
   align-items: center;
   display: flex;
   justify-content: space-between;
+}
+
+.sf-attack-card__knockout {
+  background: color-mix(in srgb, var(--sf-chat-ink) 6%, transparent);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sf-attack-card__knockout h4,
+.sf-attack-card__knockout p {
+  margin: 0;
 }
 
 .sf-attack-card__details summary {
