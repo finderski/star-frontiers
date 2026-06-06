@@ -2936,6 +2936,12 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   justify-content: flex-end;
 }
 
+.sf-chat-card__apply-actions {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
 .chat-card-actions .sf-chat-action {
   background: transparent;
   border: 1px solid var(--sf-chat-line);
@@ -2949,6 +2955,11 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
 .chat-card-actions .sf-chat-action:hover,
 .chat-card-actions .sf-chat-action:focus-visible {
   background: color-mix(in srgb, var(--sf-chat-ink) 10%, transparent);
+}
+
+.chat-card-actions .sf-chat-action:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .chat-card-actions--avoidance {

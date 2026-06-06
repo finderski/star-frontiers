@@ -147,8 +147,12 @@
       "Weapons": "Weapons"
     },
     "Chat": {
+      "Applied": "Applied",
       "AdjustedByGM": "(adjusted by GM)",
       "AttackerLabel": "Attacker",
+      "ApplyDamage": "Apply Damage",
+      "ApplyKnockout": "Apply Knock-Out",
+      "ApplyStatus": "Apply {status}",
       "BaseChance": "Base Chance",
       "BaseChanceAbility": "Base Chance ({ability})",
       "Change": "Change...",
@@ -192,10 +196,16 @@
       "Warnings": "Warnings"
     },
     "Effects": {
+      "ArmorDestroyed": "{armor} is destroyed.",
+      "DamageAppliedToTarget": "{amount} damage applied to {target}.",
       "AppliedToTarget": "{effects} applied to {target}.",
       "EffectDisabled": "Disabled",
       "NoGmConnectedToApply": "No GM is connected to apply effects to that target.",
-      "NoPermissionToApply": "You don't have permission to apply effects to that target."
+      "NoPermissionToApply": "You don't have permission to apply effects to that target.",
+      "NoTargetsToApply": "No valid target is available for that application.",
+      "ScreenDepleted": "{screen} is depleted and deactivates.",
+      "StatusAppliedToTarget": "{status} applied to {target}.",
+      "UnknownHealthPool": "Couldn't determine which health pool to reduce for {actor}."
     },
     "Combat": {
       "AppliesToAllAttacks": "Applies to All Attacks",
@@ -221,7 +231,9 @@
       "DragToReorder": "Drag to reorder"
     },
     "Status": {
+      "Dead": "Dead / Destroyed",
       "Defending": "Defending",
+      "Dying": "Dying",
       "Flying": "Flying",
       "HardCover": "Hard Cover",
       "Hovering": "Hovering",

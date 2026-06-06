@@ -2001,15 +2001,18 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     return "";
   }
 
-  static async handleChatCardAction(element) {
-    const { action, itemUuid, rollMode, bandKey, targetTokenUuid, targetActorUuid } = element.dataset;
+  static async handleChatCardAction(element, message = null) {
+    const { action, itemUuid, rollMode, bandKey, targetTokenUuid, targetActorUuid, applyKey, effectRef, durationRounds } = element.dataset;
     if (!action || !globalThis.fromUuid) return;
 
     if (action === "rollWeaponDamage") {
       if (!itemUuid) return;
       const item = await globalThis.fromUuid(itemUuid);
       if (!item?.actor || (item.type !== "weapon" && item.type !== "creatureAttack")) return;
-      await AttackPipeline.rollWeaponDamage(item.actor, item, rollMode ?? "public", bandKey ?? "");
+      await AttackPipeline.rollWeaponDamage(item.actor, item, rollMode ?? "public", bandKey ?? "", {
+        targetTokenUuid: targetTokenUuid ?? "",
+        targetActorUuid: targetActorUuid ?? ""
+      });
       return;
     }
 
@@ -2034,7 +2037,59 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         weapon: item,
         target: targetActor,
         targetTokenUuid,
-        rollMode: rollMode ?? "public"
+        rollMode: rollMode ?? "public",
+        sourceAttackMessageId: message?.id ?? ""
+      });
+      return;
+    }
+
+    if (action === "applyDamage") {
+      const model = message?.flags?.[SYSTEM_ID]?.damage ?? null;
+      if (!message || !model) return;
+      await AttackPipeline.requestApplyDamage({
+        sourceMessageId: message.id,
+        targetActorUuid: targetActorUuid ?? model.target?.uuid ?? "",
+        targetTokenUuid: targetTokenUuid ?? model.target?.tokenUuid ?? "",
+        rawAmount: Number(model.damageTotal ?? 0),
+        damageTypes: Array.from(model.damageTypes ?? []),
+        applyKey: applyKey ?? "damage"
+      });
+      return;
+    }
+
+    if (action === "applyStatus") {
+      const model = message?.flags?.[SYSTEM_ID]?.attack ?? null;
+      if (!message || !model) return;
+      await AttackPipeline.requestApplyStatus({
+        sourceMessageId: message.id,
+        targetActorUuid: targetActorUuid ?? model.target?.uuid ?? "",
+        targetTokenUuid: targetTokenUuid ?? model.target?.tokenUuid ?? "",
+        applyKey: applyKey ?? (effectRef ? `status:${effectRef}` : ""),
+        mode: "effect",
+        effectIds: effectRef ? [effectRef] : [],
+        origin: {
+          weaponUuid: model.weapon?.uuid ?? "",
+          sourceItemUuid: model.weapon?.uuid ?? "",
+          modeKey: model.weapon?.modeKey ?? "",
+          sourceName: model.weapon?.modeLabel
+            ? `${model.weapon?.name ?? ""} (${model.weapon.modeLabel})`
+            : (model.weapon?.name ?? "")
+        }
+      });
+      return;
+    }
+
+    if (action === "applyKnockout") {
+      const model = message?.flags?.[SYSTEM_ID]?.attack ?? null;
+      if (!message || !model) return;
+      await AttackPipeline.requestApplyStatus({
+        sourceMessageId: message.id,
+        targetActorUuid: targetActorUuid ?? model.target?.uuid ?? "",
+        targetTokenUuid: targetTokenUuid ?? model.target?.tokenUuid ?? "",
+        applyKey: applyKey ?? "knockout",
+        mode: "status",
+        statusId: "sf-unconscious",
+        durationRounds: Number(durationRounds ?? model.knockoutDuration ?? 0)
       });
       return;
     }

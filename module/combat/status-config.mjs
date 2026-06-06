@@ -5,6 +5,8 @@ export const SF_STATUS_IDS = Object.freeze({
   DEFENDING: "sf-defending",
   STUNNED: "sf-stunned",
   UNCONSCIOUS: "sf-unconscious",
+  DYING: "sf-dying",
+  DEAD: "sf-dead",
   WRONG_HAND: "sf-wrong-hand",
   UNSTABLE_SLOW: "sf-unstable-slow",
   UNSTABLE_FAST: "sf-unstable-fast",
@@ -49,6 +51,16 @@ export const SF_STATUS_DEFINITIONS = Object.freeze([
     name: "STARFRONTIERS.Status.Unconscious",
     img: "icons/svg/unconscious.svg",
     attacker: { blocker: true, label: "STARFRONTIERS.Status.Unconscious" }
+  },
+  {
+    id: SF_STATUS_IDS.DYING,
+    name: "STARFRONTIERS.Status.Dying",
+    img: "icons/svg/blood.svg"
+  },
+  {
+    id: SF_STATUS_IDS.DEAD,
+    name: "STARFRONTIERS.Status.Dead",
+    img: "icons/svg/skull.svg"
   },
   {
     id: SF_STATUS_IDS.WRONG_HAND,

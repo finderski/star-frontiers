@@ -530,9 +530,10 @@ Hooks.on("preCreateActor", (document, data, options, userId) => {
 
 Hooks.on("renderChatMessageHTML", (message, html) => {
   for (const button of html.querySelectorAll(".sf-chat-action")) {
+    AttackPipeline.configureChatCardActionButton(message, button);
     button.addEventListener("click", (event) => {
       event.preventDefault();
-      StarFrontiersCharacterSheet.handleChatCardAction(button);
+      StarFrontiersCharacterSheet.handleChatCardAction(button, message);
     });
   }
 

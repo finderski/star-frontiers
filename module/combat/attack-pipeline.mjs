@@ -21,6 +21,8 @@ import { rememberDocumentSheetScroll } from "../sheets/scroll-preserving-sheet-m
 import { actorHasSfStatus, SF_STATUS_IDS } from "./status-config.mjs";
 
 export const APPLY_ON_HIT_EFFECTS_SOCKET_ACTION = "applyOnHitEffects";
+export const APPLY_DAMAGE_SOCKET_ACTION = "applyDamage";
+export const APPLY_STATUS_SOCKET_ACTION = "applyStatus";
 export { ATTACK_TYPES, MODIFIER_SOURCES, RANGE_BAND_MODS, RANGE_BAND_ORDER, clampAttackTarget };
 export { buildWeaponAttackProfile as getWeaponAttackProfile, resolveWeaponSkill as getWeaponSkill };
 
@@ -1409,6 +1411,89 @@ export function getAmmoConsumption(weapon) {
   return { amount: Math.max(variable || perShot, 0) };
 }
 
+function isHitBasedMeleeSeuAttack(weapon, attackType) {
+  return weapon?.type !== "creatureAttack"
+    && attackType === ATTACK_TYPES.MELEE
+    && String(weapon?.system?.ammo?.uses ?? "none") === "seu";
+}
+
+function clampResourceValue(value, min, max) {
+  return Math.min(Math.max(Number(value ?? 0), min), max);
+}
+
+async function applyWeaponAmmoDelta(weapon, {
+  loadedSource = null,
+  loadedSourceId = "",
+  deltaAmount = 0,
+  liveCapacity = null
+} = {}) {
+  const amount = Number(deltaAmount ?? 0);
+  if (!weapon || !amount) {
+    return {
+      consumed: Number(weapon?.system?.ammo?.consumed ?? 0),
+      remaining: loadedSource?.type === "powerSource"
+        ? Number(loadedSource.system?.remaining ?? 0)
+        : Math.max(Number(liveCapacity ?? weapon?.system?.ammo?.capacity ?? 0) - Number(weapon?.system?.ammo?.consumed ?? 0), 0),
+      capacity: Number(liveCapacity ?? weapon?.system?.ammo?.capacity ?? 0)
+    };
+  }
+
+  const actor = weapon.parent?.documentName === "Actor" ? weapon.parent : null;
+  let sourceDocument = loadedSource;
+  if (!sourceDocument && loadedSourceId) {
+    sourceDocument = await resolveLinkedItem(actor, loadedSourceId);
+  }
+
+  const capacity = Math.max(Number(
+    liveCapacity
+    ?? getLiveCapacity(weapon, sourceDocument)
+    ?? weapon.system?.ammo?.capacity
+    ?? 0
+  ), 0);
+  const currentConsumed = Math.max(Number(weapon.system?.ammo?.consumed ?? 0), 0);
+  const nextConsumed = clampResourceValue(currentConsumed + amount, 0, capacity || Math.max(currentConsumed + amount, 0));
+
+  if (nextConsumed !== currentConsumed) {
+    await weapon.update({ "system.ammo.consumed": nextConsumed });
+  }
+
+  let remaining;
+  if (sourceDocument?.type === "powerSource") {
+    const currentRemaining = Math.max(Number(sourceDocument.system?.remaining ?? 0), 0);
+    const maxRemaining = Math.max(Number(sourceDocument.system?.capacity ?? capacity ?? currentRemaining), 0);
+    const nextRemaining = clampResourceValue(currentRemaining - amount, 0, maxRemaining);
+    if (nextRemaining !== currentRemaining) {
+      await sourceDocument.update({ "system.remaining": nextRemaining });
+    }
+    remaining = nextRemaining;
+  } else {
+    remaining = Math.max(capacity - nextConsumed, 0);
+    if (sourceDocument?.type === "ammo") {
+      const ammoUpdates = {};
+      const currentMirror = Math.max(Number(sourceDocument.system?.consumed ?? 0), 0);
+      if (currentMirror !== nextConsumed) ammoUpdates["system.consumed"] = nextConsumed;
+
+      const currentQuantity = Math.max(Number(sourceDocument.system?.quantity ?? 0), 0);
+      const wasEmpty = capacity > 0 && currentConsumed >= capacity;
+      const isEmpty = capacity > 0 && nextConsumed >= capacity;
+      let nextQuantity = currentQuantity;
+      if (!wasEmpty && isEmpty) nextQuantity = Math.max(currentQuantity - 1, 0);
+      if (wasEmpty && !isEmpty) nextQuantity = currentQuantity + 1;
+      if (nextQuantity !== currentQuantity) ammoUpdates["system.quantity"] = nextQuantity;
+
+      if (Object.keys(ammoUpdates).length) {
+        await sourceDocument.update(ammoUpdates);
+      }
+    }
+  }
+
+  return {
+    consumed: nextConsumed,
+    remaining,
+    capacity
+  };
+}
+
 export function getActiveWeaponMode(weapon) {
   if (weapon.type === "creatureAttack") return null;
   const modes = Array.from(weapon.system.mechanics?.modes ?? []);
@@ -1490,10 +1575,543 @@ export function getWeaponOnHitEffectOrigin(weapon) {
   };
 }
 
+export function getWeaponDamageTypes(weapon) {
+  const activeMode = getActiveWeaponMode(weapon);
+  const defenseTypes = Array.from(activeMode?.defenseTypes ?? []).map((value) => String(value ?? "")).filter(Boolean);
+  if (defenseTypes.length) return defenseTypes;
+
+  const baseDamageType = String(weapon.system?.damageType ?? "").trim();
+  return baseDamageType ? [baseDamageType] : [];
+}
+
 function getActiveGmUser() {
   return game.users?.activeGM
     ?? game.users?.find?.((user) => user.active && user.isGM)
     ?? null;
+}
+
+function resolveActorUuidSync(actorUuid) {
+  const uuid = String(actorUuid ?? "").trim();
+  if (!uuid) return null;
+  try {
+    const resolved = globalThis.fromUuidSync?.(uuid);
+    if (resolved?.documentName === "Actor") return resolved;
+    if (resolved?.actor) return resolved.actor;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+async function resolveActorUuid(actorUuid) {
+  const syncResolved = resolveActorUuidSync(actorUuid);
+  if (syncResolved) return syncResolved;
+  if (!globalThis.fromUuid) return null;
+  try {
+    const resolved = await globalThis.fromUuid(String(actorUuid ?? ""));
+    if (resolved?.documentName === "Actor") return resolved;
+    if (resolved?.actor) return resolved.actor;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+async function resolveTokenActorUuid(tokenUuid) {
+  const uuid = String(tokenUuid ?? "").trim();
+  if (!uuid) return null;
+  try {
+    const syncResolved = globalThis.fromUuidSync?.(uuid);
+    if (syncResolved?.actor) return syncResolved.actor;
+  } catch {
+    /* ignore */
+  }
+  if (!globalThis.fromUuid) return null;
+  try {
+    const resolved = await globalThis.fromUuid(uuid);
+    return resolved?.actor ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getChatMessageAppliedState(message) {
+  return foundry.utils.deepClone(message?.flags?.[SYSTEM_ID]?.applied ?? {});
+}
+
+function isChatMessageActionApplied(message, applyKey) {
+  return Boolean(applyKey && getChatMessageAppliedState(message)[applyKey]);
+}
+
+async function markChatMessageActionApplied(message, applyKey) {
+  if (!message || !applyKey) return;
+  const applied = getChatMessageAppliedState(message);
+  if (applied[applyKey]) return;
+  applied[applyKey] = true;
+  await message.update({ [`flags.${SYSTEM_ID}.applied`]: applied });
+}
+
+function getStatusMetadata(statusId) {
+  const entry = Array.from(CONFIG.statusEffects ?? []).find((effect) => effect.id === statusId);
+  return {
+    name: entry?.name ? game.i18n.localize(entry.name) : statusId,
+    img: entry?.img || "icons/svg/aura.svg"
+  };
+}
+
+function buildStatusEffectDuration(durationRounds = null) {
+  const rounds = Number(durationRounds ?? 0);
+  if (!(rounds > 0)) return null;
+  const duration = { rounds };
+  if (game.combat) {
+    duration.startRound = game.combat.round ?? 0;
+    duration.startTurn = game.combat.turn ?? 0;
+  }
+  if (game.time?.worldTime !== undefined) duration.startTime = game.time.worldTime;
+  return duration;
+}
+
+async function applyActorStatus(actor, statusId, { durationRounds = null } = {}) {
+  if (!actor || !statusId) return { applied: false, refreshed: false };
+
+  const { name, img } = getStatusMetadata(statusId);
+  const duration = buildStatusEffectDuration(durationRounds);
+  const existing = actor.effects?.find?.((effect) => effect.statuses?.has?.(statusId)) ?? null;
+  const data = {
+    name,
+    img,
+    statuses: [statusId],
+    transfer: false,
+    disabled: false
+  };
+  if (duration) data.duration = duration;
+
+  rememberDocumentSheetScroll(actor, 5);
+  if (existing) {
+    await existing.update(data);
+    return { applied: false, refreshed: true };
+  }
+
+  await actor.createEmbeddedDocuments("ActiveEffect", [data]);
+  return { applied: true, refreshed: false };
+}
+
+function getActorHealthPool(actor) {
+  if (!actor) return null;
+  switch (actor.type) {
+    case "character":
+    case "npc":
+      return {
+        path: "system.stamina",
+        value: Number(actor.system?.stamina?.value ?? 0),
+        max: Number(actor.system?.stamina?.max ?? 0),
+        living: true,
+        secondaryPath: ""
+      };
+    case "creature":
+      return {
+        path: "system.abilities.sta",
+        value: Number(actor.system?.abilities?.sta?.value ?? 0),
+        max: Number(actor.system?.abilities?.sta?.max ?? 0),
+        living: true,
+        secondaryPath: ""
+      };
+    case "robot": {
+      const structuralPoints = Number(actor.system?.structuralPoints?.value ?? 0);
+      const staminaPoints = Number(actor.system?.abilities?.sta?.value ?? structuralPoints);
+      return {
+        path: "system.structuralPoints",
+        value: structuralPoints,
+        max: Number(actor.system?.structuralPoints?.max ?? 0),
+        living: false,
+        secondaryPath: "system.abilities.sta",
+        secondaryValue: staminaPoints,
+        secondaryMax: Number(actor.system?.abilities?.sta?.max ?? actor.system?.structuralPoints?.max ?? 0)
+      };
+    }
+    case "vehicle":
+      return {
+        path: "system.structuralPoints",
+        value: Number(actor.system?.structuralPoints?.value ?? 0),
+        max: Number(actor.system?.structuralPoints?.max ?? 0),
+        living: false,
+        secondaryPath: ""
+      };
+    default:
+      return null;
+  }
+}
+
+function getActorZeroStateStatusId(actor) {
+  const pool = getActorHealthPool(actor);
+  if (!pool) return "";
+  return pool.living ? SF_STATUS_IDS.DYING : SF_STATUS_IDS.DEAD;
+}
+
+function buildHealthPoolUpdates(actor, nextValue) {
+  const pool = getActorHealthPool(actor);
+  if (!pool) return null;
+
+  const clampedValue = Math.max(Number(nextValue ?? 0), 0);
+  const updates = {
+    [`${pool.path}.value`]: clampedValue
+  };
+
+  if (actor.type === "robot" && pool.secondaryPath) {
+    updates[`${pool.secondaryPath}.value`] = clampedValue;
+    if (Number.isFinite(pool.max)) updates[`${pool.secondaryPath}.max`] = Number(pool.max);
+  }
+
+  return {
+    pool,
+    updates,
+    nextValue: clampedValue
+  };
+}
+
+function resolveDamageReduction(layer, damageTypes = []) {
+  const wanted = new Set(Array.from(damageTypes ?? []).map((value) => String(value ?? "")).filter(Boolean));
+  if (!wanted.size) return null;
+  return Array.from(layer.system?.reductions ?? []).find((reduction) => wanted.has(String(reduction.damageType ?? ""))) ?? null;
+}
+
+function computeLayerAbsorption(amount, reduction) {
+  const current = Math.max(Number(amount ?? 0), 0);
+  const mode = String(reduction?.mode ?? "");
+  if (!(current > 0) || !mode) return { nextAmount: current, absorbed: 0 };
+
+  if (mode === "full") {
+    return { nextAmount: 0, absorbed: current };
+  }
+
+  if (mode === "half") {
+    const nextAmount = Math.floor(current / 2);
+    return { nextAmount, absorbed: current - nextAmount };
+  }
+
+  if (mode === "flat") {
+    const flatAmount = Math.max(Number(reduction?.amount ?? 0), 0);
+    const nextAmount = Math.max(current - flatAmount, 0);
+    return { nextAmount, absorbed: current - nextAmount };
+  }
+
+  return { nextAmount: current, absorbed: 0 };
+}
+
+async function resolveLinkedItem(actor, ref, expectedType = "") {
+  const value = String(ref ?? "").trim();
+  if (!value) return null;
+  const owned = actor?.items?.get?.(value) ?? null;
+  if (owned && (!expectedType || owned.type === expectedType)) return owned;
+  if (!globalThis.fromUuid) return null;
+  try {
+    const resolved = await globalThis.fromUuid(value);
+    if (!resolved) return null;
+    if (expectedType && resolved.type !== expectedType) return null;
+    return resolved;
+  } catch {
+    return null;
+  }
+}
+
+function getActiveArmorLayers(actor) {
+  const items = actor?.items?.filter?.((item) => item.type === "armor") ?? [];
+  return items.filter((item) => {
+    const sys = item.system ?? {};
+    const maxAbsorbed = sys.maxAbsorbed;
+    const accumulatedDamage = Math.max(Number(sys.accumulatedDamage ?? 0), 0);
+    if (maxAbsorbed !== null && maxAbsorbed !== undefined && accumulatedDamage >= Number(maxAbsorbed ?? 0)) return false;
+    if (actor?.type === "creature") return sys.carryState !== "stored";
+    return String(sys.carryState ?? "carried") === "ready";
+  });
+}
+
+async function getActiveScreenLayers(actor) {
+  const items = actor?.items?.filter?.((item) => item.type === "screen") ?? [];
+  const results = [];
+  for (const item of items) {
+    const sys = item.system ?? {};
+    if (!sys.active) continue;
+    if (actor?.type !== "creature" && String(sys.carryState ?? "carried") !== "ready") continue;
+    const powerSource = await resolveLinkedItem(actor, sys.powerSourceRef ?? "", "powerSource");
+    results.push({ item, powerSource });
+  }
+  return results;
+}
+
+function createSystemNoteContent(title, lines = []) {
+  const body = Array.from(lines ?? []).map((line) => `<p>${foundry.utils.escapeHTML(String(line ?? ""))}</p>`).join("");
+  return `<section class="star-frontiers check-roll-card sf-system-note"><header class="check-roll-card__header"><h3>${foundry.utils.escapeHTML(String(title ?? ""))}</h3></header>${body}</section>`;
+}
+
+async function createSystemNoteMessage(title, lines, actor = null) {
+  if (!Array.from(lines ?? []).length) return;
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker(actor ? { actor } : {}),
+    content: createSystemNoteContent(title, lines)
+  });
+}
+
+export async function mitigateDamage(rawAmount, weaponDamageTypes, actor) {
+  let remaining = Math.max(Number(rawAmount ?? 0), 0);
+  const damageTypes = Array.from(weaponDamageTypes ?? []).map((value) => String(value ?? "")).filter(Boolean);
+  const messages = [];
+
+  if (!(remaining > 0) || !actor) {
+    return { final: remaining, messages };
+  }
+
+  const screenLayers = await getActiveScreenLayers(actor);
+  for (const { item: screen, powerSource } of screenLayers) {
+    const reduction = resolveDamageReduction(screen, damageTypes);
+    if (!reduction || !(remaining > 0)) continue;
+
+    const seuPerHit = Math.max(Number(screen.system?.seuPerHit ?? 0), 0);
+    const availableSeu = powerSource ? Math.max(Number(powerSource.system?.remaining ?? 0), 0) : 0;
+    if (seuPerHit > 0 && availableSeu < seuPerHit) {
+      await screen.update({ "system.active": false });
+      messages.push(game.i18n.format("STARFRONTIERS.Effects.ScreenDepleted", { screen: screen.name }));
+      continue;
+    }
+
+    const { nextAmount } = computeLayerAbsorption(remaining, reduction);
+    remaining = nextAmount;
+
+    if (seuPerHit > 0 && powerSource) {
+      const nextRemaining = Math.max(availableSeu - seuPerHit, 0);
+      const screenUpdates = {};
+      if (nextRemaining < seuPerHit) screenUpdates["system.active"] = false;
+      await powerSource.update({ "system.remaining": nextRemaining });
+      if (Object.keys(screenUpdates).length) {
+        await screen.update(screenUpdates);
+        messages.push(game.i18n.format("STARFRONTIERS.Effects.ScreenDepleted", { screen: screen.name }));
+      }
+    }
+  }
+
+  const armorLayers = getActiveArmorLayers(actor);
+  for (const armor of armorLayers) {
+    const reduction = resolveDamageReduction(armor, damageTypes);
+    if (!reduction || !(remaining > 0)) continue;
+
+    const { absorbed } = computeLayerAbsorption(remaining, reduction);
+    if (!(absorbed > 0)) continue;
+
+    const maxAbsorbed = armor.system?.maxAbsorbed;
+    const currentDamage = Math.max(Number(armor.system?.accumulatedDamage ?? 0), 0);
+    if (maxAbsorbed === null || maxAbsorbed === undefined) {
+      remaining = Math.max(remaining - absorbed, 0);
+      await armor.update({ "system.accumulatedDamage": currentDamage + absorbed });
+      continue;
+    }
+
+    const remainingCapacity = Math.max(Number(maxAbsorbed ?? 0) - currentDamage, 0);
+    const actualAbsorbed = Math.min(absorbed, remainingCapacity);
+    remaining = Math.max(remaining - actualAbsorbed, 0);
+    const nextDamage = currentDamage + actualAbsorbed;
+    await armor.update({ "system.accumulatedDamage": nextDamage });
+
+    if (actualAbsorbed < absorbed || nextDamage >= Number(maxAbsorbed ?? 0)) {
+      messages.push(game.i18n.format("STARFRONTIERS.Effects.ArmorDestroyed", { armor: armor.name }));
+    }
+  }
+
+  return { final: Math.max(remaining, 0), messages };
+}
+
+async function resolveApplicationTargets({ targetActorUuid = "", targetTokenUuid = "", fallbackToControlled = false } = {}) {
+  const resolved = [];
+  const seen = new Set();
+  const pushActor = (actor) => {
+    if (!actor?.uuid || seen.has(actor.uuid)) return;
+    seen.add(actor.uuid);
+    resolved.push(actor);
+  };
+
+  const tokenActor = await resolveTokenActorUuid(targetTokenUuid);
+  if (tokenActor) pushActor(tokenActor);
+
+  const directActor = await resolveActorUuid(targetActorUuid);
+  if (directActor) pushActor(directActor);
+
+  if (!resolved.length && fallbackToControlled && canvas?.ready) {
+    for (const token of Array.from(canvas.tokens?.controlled ?? [])) {
+      pushActor(token?.actor ?? null);
+    }
+  }
+
+  return resolved;
+}
+
+function requestUserCanApplyToTargets(requestUserId, targets = []) {
+  const userId = String(requestUserId ?? "");
+  if (!userId) return true;
+  const user = game.users?.get?.(userId) ?? null;
+  if (!user) return false;
+  if (user.isGM) return true;
+  return Array.from(targets ?? []).every((actor) => actor?.testUserPermission?.(user, "OWNER"));
+}
+
+async function applyDamageToActor(actor, rawAmount, damageTypes) {
+  if (!getActorHealthPool(actor)) {
+    ui.notifications.warn(game.i18n.format("STARFRONTIERS.Effects.UnknownHealthPool", { actor: actor.name }));
+    return null;
+  }
+
+  rememberDocumentSheetScroll(actor, 5);
+  const mitigation = await mitigateDamage(rawAmount, damageTypes, actor);
+  const pool = getActorHealthPool(actor);
+  if (!pool) return null;
+  const nextValue = Math.max(pool.value - mitigation.final, 0);
+  const nextPool = buildHealthPoolUpdates(actor, nextValue);
+  if (!nextPool) return null;
+  await actor.update(nextPool.updates);
+
+  const lines = [
+    game.i18n.format("STARFRONTIERS.Effects.DamageAppliedToTarget", {
+      amount: Number(mitigation.final ?? 0),
+      target: actor.name
+    })
+  ];
+
+  if (nextValue <= 0) {
+    const statusId = getActorZeroStateStatusId(actor);
+    if (statusId) {
+      await applyActorStatus(actor, statusId);
+      lines.push(game.i18n.format("STARFRONTIERS.Effects.StatusAppliedToTarget", {
+        status: game.i18n.localize(statusId === SF_STATUS_IDS.DYING
+          ? "STARFRONTIERS.Status.Dying"
+          : "STARFRONTIERS.Status.Dead"),
+        target: actor.name
+      }));
+    }
+  }
+
+  lines.push(...Array.from(mitigation.messages ?? []));
+  return {
+    actor,
+    finalDamage: Number(mitigation.final ?? 0),
+    lines
+  };
+}
+
+async function applyDamageFromMessage({
+  sourceMessageId,
+  rawAmount,
+  damageTypes,
+  targetActorUuid = "",
+  targetTokenUuid = "",
+  applyKey = "damage",
+  requestUserId = ""
+} = {}) {
+  const message = game.messages?.get?.(String(sourceMessageId ?? "")) ?? null;
+  if (!message) return false;
+  if (isChatMessageActionApplied(message, applyKey)) return true;
+
+  const targets = await resolveApplicationTargets({
+    targetActorUuid,
+    targetTokenUuid,
+    fallbackToControlled: !targetActorUuid && !targetTokenUuid
+  });
+  if (!targets.length) {
+    ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoTargetsToApply"));
+    return false;
+  }
+  if (!requestUserCanApplyToTargets(requestUserId, targets)) return false;
+
+  await markChatMessageActionApplied(message, applyKey);
+
+  const lines = [];
+  for (const actor of targets) {
+    const result = await applyDamageToActor(actor, rawAmount, damageTypes);
+    if (!result) continue;
+    lines.push(...result.lines);
+  }
+
+  await createSystemNoteMessage(game.i18n.localize("STARFRONTIERS.Weapon.Damage"), lines, targets[0] ?? null);
+  return true;
+}
+
+async function applyStatusFromMessage({
+  sourceMessageId,
+  targetActorUuid = "",
+  targetTokenUuid = "",
+  applyKey = "",
+  mode = "status",
+  statusId = "",
+  durationRounds = null,
+  effectIds = [],
+  origin = {},
+  requestUserId = ""
+} = {}) {
+  const message = game.messages?.get?.(String(sourceMessageId ?? "")) ?? null;
+  if (!message) return false;
+  if (isChatMessageActionApplied(message, applyKey)) return true;
+
+  const targets = await resolveApplicationTargets({ targetActorUuid, targetTokenUuid, fallbackToControlled: false });
+  if (!targets.length) {
+    ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoTargetsToApply"));
+    return false;
+  }
+  if (!requestUserCanApplyToTargets(requestUserId, targets)) return false;
+
+  await markChatMessageActionApplied(message, applyKey);
+  const targetActor = targets[0];
+
+  if (mode === "effect") {
+    await applyOnHitEffects(targetActor, effectIds, origin);
+    return true;
+  }
+
+  if (mode === "status" && statusId) {
+    await applyActorStatus(targetActor, statusId, { durationRounds });
+    await createSystemNoteMessage(
+      game.i18n.localize("STARFRONTIERS.Chat.KnockoutFlags"),
+      [game.i18n.format("STARFRONTIERS.Effects.StatusAppliedToTarget", {
+        status: getStatusMetadata(statusId).name,
+        target: targetActor.name
+      })],
+      targetActor
+    );
+    return true;
+  }
+
+  return false;
+}
+
+function resolveTargetActorSync(targetActorUuid = "", targetTokenUuid = "") {
+  return resolveActorUuidSync(targetActorUuid)
+    ?? (() => {
+      try {
+        return globalThis.fromUuidSync?.(String(targetTokenUuid ?? ""))?.actor ?? null;
+      } catch {
+        return null;
+      }
+    })();
+}
+
+function canCurrentUserApplyToTarget(targetActorUuid = "", targetTokenUuid = "") {
+  if (game.user?.isGM) return true;
+  const targetActor = resolveTargetActorSync(targetActorUuid, targetTokenUuid);
+  return Boolean(targetActor?.isOwner);
+}
+
+export function configureChatCardActionButton(message, button) {
+  if (!(button instanceof HTMLButtonElement)) return;
+  const action = String(button.dataset.action ?? "");
+  if (!["applyDamage", "applyStatus", "applyKnockout"].includes(action)) return;
+
+  const targetActorUuid = String(button.dataset.targetActorUuid ?? "");
+  const targetTokenUuid = String(button.dataset.targetTokenUuid ?? "");
+  const visible = canCurrentUserApplyToTarget(targetActorUuid, targetTokenUuid);
+  button.hidden = !visible;
+  if (!visible) return;
+
+  const applyKey = String(button.dataset.applyKey ?? "");
+  if (isChatMessageActionApplied(message, applyKey)) {
+    button.disabled = true;
+    button.setAttribute("aria-disabled", "true");
+  }
 }
 
 function normalizeOnHitEffectOrigin(origin = {}, sourceDocument = null) {
@@ -1530,6 +2148,19 @@ async function resolveOnHitEffectSource(sourceDocument, ref) {
   }
 
   return null;
+}
+
+async function describeOnHitEffects(sourceDocument, effectRefs = []) {
+  const described = [];
+  for (const effectRef of Array.from(effectRefs ?? [])) {
+    const effect = await resolveOnHitEffectSource(sourceDocument, effectRef);
+    described.push({
+      key: String(effectRef ?? ""),
+      effectRef: String(effectRef ?? ""),
+      label: effect?.name || game.i18n.localize("STARFRONTIERS.Item.NewEffect")
+    });
+  }
+  return described.filter((entry) => entry.effectRef);
 }
 
 export async function applyOnHitEffects(targetActor, effectRefs, origin = {}, sourceDocument = null) {
@@ -1636,25 +2267,71 @@ export async function applyOnHitEffects(targetActor, effectRefs, origin = {}, so
 }
 
 export async function handleSystemSocketMessage(payload) {
-  if (payload?.action !== APPLY_ON_HIT_EFFECTS_SOCKET_ACTION) return false;
   if (!game.user?.isGM) return true;
 
   const activeGm = getActiveGmUser();
   if (activeGm && activeGm.id !== game.user.id) return true;
+  const action = String(payload?.action ?? "");
 
-  const targetActorUuid = String(payload.targetActorUuid ?? "");
-  if (!targetActorUuid || !globalThis.fromUuid) return true;
+  if (action === APPLY_ON_HIT_EFFECTS_SOCKET_ACTION) {
+    const targetActorUuid = String(payload.targetActorUuid ?? "");
+    if (!targetActorUuid || !globalThis.fromUuid) return true;
 
-  let targetActor = null;
-  try {
-    targetActor = await globalThis.fromUuid(targetActorUuid);
-  } catch {
-    targetActor = null;
+    let targetActor = null;
+    try {
+      targetActor = await globalThis.fromUuid(targetActorUuid);
+    } catch {
+      targetActor = null;
+    }
+    if (!targetActor) return true;
+
+    await applyOnHitEffects(targetActor, payload.effectIds ?? [], payload.origin ?? {});
+    return true;
   }
-  if (!targetActor) return true;
 
-  await applyOnHitEffects(targetActor, payload.effectIds ?? [], payload.origin ?? {});
+  if (action === APPLY_DAMAGE_SOCKET_ACTION) {
+    await applyDamageFromMessage(payload ?? {});
+    return true;
+  }
+
+  if (action === APPLY_STATUS_SOCKET_ACTION) {
+    await applyStatusFromMessage(payload ?? {});
+    return true;
+  }
+
+  return false;
+}
+
+function emitApplicationSocketRequest(action, payload = {}) {
+  const activeGm = getActiveGmUser();
+  if (!activeGm) {
+    ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoGmConnectedToApply"));
+    return false;
+  }
+  if (!game.socket?.emit) {
+    ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoPermissionToApply"));
+    return false;
+  }
+  game.socket.emit(`system.${SYSTEM_ID}`, { action, requestUserId: game.user?.id ?? "", ...payload });
   return true;
+}
+
+export async function requestApplyDamage(payload = {}) {
+  if (!game.user?.isGM && !canCurrentUserApplyToTarget(payload.targetActorUuid ?? "", payload.targetTokenUuid ?? "")) {
+    ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoPermissionToApply"));
+    return false;
+  }
+  if (game.user?.isGM) return applyDamageFromMessage(payload);
+  return emitApplicationSocketRequest(APPLY_DAMAGE_SOCKET_ACTION, payload);
+}
+
+export async function requestApplyStatus(payload = {}) {
+  if (!game.user?.isGM && !canCurrentUserApplyToTarget(payload.targetActorUuid ?? "", payload.targetTokenUuid ?? "")) {
+    ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoPermissionToApply"));
+    return false;
+  }
+  if (game.user?.isGM) return applyStatusFromMessage(payload);
+  return emitApplicationSocketRequest(APPLY_STATUS_SOCKET_ACTION, payload);
 }
 
 export function getAvoidanceEffectLabel(value) {
@@ -1680,6 +2357,8 @@ export function getWeaponDefenseLabel(weapon) {
 export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   const profile = buildWeaponAttackProfile(actor, weapon);
   const activeMode = getActiveWeaponMode(weapon);
+  const onHitEffectIds = getWeaponOnHitEffectIds(weapon);
+  const onHitEffects = await describeOnHitEffects(weapon, onHitEffectIds);
   const targetedToken = [...(game.user?.targets ?? [])][0] ?? null;
   const targetActor = targetedToken?.actor ?? null;
   const targetTokenUuid = targetedToken?.document?.uuid ?? "";
@@ -1730,6 +2409,7 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   const activeBandKey = selectedRangeBand.key;
   const shots = dialogState.shotsCount;
   const totalAmmo = ammoCheck.amount * shots;
+  const spendOnHit = isHitBasedMeleeSeuAttack(weapon, liveProfile.attackType);
 
   if (ammoCheck.amount > 0) {
     const loaded = getLoadedAmmo(weapon, liveCapacity, loadedSource);
@@ -1744,24 +2424,17 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   let displayedPowerRemaining = loadedSource?.type === "powerSource"
     ? Number(loadedSource.system?.remaining ?? 0)
     : null;
-  if (automateAmmo && ammoCheck.amount > 0) {
-    const nextConsumed = Math.min(displayedConsumed + totalAmmo, Math.max(liveCapacity, totalAmmo));
-    await weapon.update({ "system.ammo.consumed": nextConsumed });
-    displayedConsumed = nextConsumed;
-    if (loadedSource?.type === "powerSource") {
-      const nextRemaining = Math.max(displayedPowerRemaining - totalAmmo, 0);
-      await loadedSource.update({ "system.remaining": nextRemaining });
-      displayedPowerRemaining = nextRemaining;
-    } else if (loadedSource?.type === "ammo") {
-      const ammoUpdates = {
-        "system.consumed": Math.min(Math.max(nextConsumed, 0), liveCapacity)
-      };
-      if (nextConsumed >= liveCapacity) {
-        const currentQty = Number(loadedSource.system?.quantity ?? 0);
-        if (currentQty > 0) ammoUpdates["system.quantity"] = currentQty - 1;
-      }
-      await loadedSource.update(ammoUpdates);
-    }
+  if (automateAmmo && ammoCheck.amount > 0 && !spendOnHit) {
+    const ammoResult = await applyWeaponAmmoDelta(weapon, {
+      loadedSource,
+      loadedSourceId: weapon.system?.ammo?.loadedSourceId ?? "",
+      deltaAmount: totalAmmo,
+      liveCapacity
+    });
+    displayedConsumed = ammoResult.consumed;
+    displayedPowerRemaining = loadedSource?.type === "powerSource"
+      ? ammoResult.remaining
+      : displayedPowerRemaining;
   }
 
   const allRollHtmls = [];
@@ -1808,6 +2481,31 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
   }
 
   const effectiveDamageFormula = buildEffectiveDamageFormula(weapon, activeBandKey ?? "");
+  const hitCount = shotResults.filter((shot) => isHit(
+    shot.originalRollTotal,
+    shot.targetNumber,
+    liveProfile.rulesEdition,
+    {
+      targetUnconscious,
+      autoHitUnconscious
+    }
+  )).length;
+  const chargedUnits = automateAmmo && ammoCheck.amount > 0
+    ? (spendOnHit ? hitCount : shots)
+    : 0;
+  const chargedAmmo = ammoCheck.amount * chargedUnits;
+  if (automateAmmo && ammoCheck.amount > 0 && spendOnHit && chargedAmmo > 0) {
+    const ammoResult = await applyWeaponAmmoDelta(weapon, {
+      loadedSource,
+      loadedSourceId: weapon.system?.ammo?.loadedSourceId ?? "",
+      deltaAmount: chargedAmmo,
+      liveCapacity
+    });
+    displayedConsumed = ammoResult.consumed;
+    displayedPowerRemaining = loadedSource?.type === "powerSource"
+      ? ammoResult.remaining
+      : displayedPowerRemaining;
+  }
   const displayRemaining = ammoCheck.amount > 0
     ? (loadedSource?.type === "powerSource"
       ? Math.max(displayedPowerRemaining, 0)
@@ -1861,8 +2559,11 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
         ? game.i18n.localize(`STARFRONTIERS.Ability.${getWeaponAvoidance(weapon).ability}`)
         : "",
       onSuccessEffect: getWeaponAvoidance(weapon)?.onSuccessEffect ?? "",
-      effectLabel: getAvoidanceEffectLabel(getWeaponAvoidance(weapon)?.onSuccessEffect)
+      effectLabel: getAvoidanceEffectLabel(getWeaponAvoidance(weapon)?.onSuccessEffect),
+      resolved: false,
+      succeeded: null
     } : null,
+    onHitEffects,
     rangeBand: activeBandKey ? {
       key: activeBandKey,
       label: selectedRangeBand.label,
@@ -1873,7 +2574,12 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     ammo: ammoCheck.amount > 0 ? {
       loadedSourceType: loadedSource?.type ?? "",
       consumedPerShot: ammoCheck.amount,
-      totalConsumed: totalAmmo,
+      perUnit: ammoCheck.amount,
+      consumedUnits: chargedUnits,
+      totalConsumed: chargedAmmo,
+      spendOnHit,
+      weaponUuid: weapon.uuid,
+      loadedSourceId: weapon.system?.ammo?.loadedSourceId ?? "",
       remaining: displayRemaining,
       capacity: liveCapacity
     } : null,
@@ -1889,15 +2595,15 @@ export async function rollWeaponAttack(actor, weapon, rollMode = "public") {
     attack,
     rolls: attackRolls
   });
-
-  const avoidanceEnabled = Boolean(getWeaponAvoidance(weapon)?.enabled);
-  const onHitEffectIds = getWeaponOnHitEffectIds(weapon);
-  if (attack.hitCount > 0 && targetActor && onHitEffectIds.length && !avoidanceEnabled) {
-    await applyOnHitEffects(targetActor, onHitEffectIds, getWeaponOnHitEffectOrigin(weapon), weapon);
-  }
 }
 
-export async function rollWeaponDamage(actor, weapon, rollMode = "public", bandKey = "") {
+export async function rollWeaponDamage(
+  actor,
+  weapon,
+  rollMode = "public",
+  bandKey = "",
+  { targetActorUuid = "", targetTokenUuid = "" } = {}
+) {
   const formula = buildEffectiveDamageFormula(weapon, bandKey);
 
   if (!formula) {
@@ -1913,26 +2619,48 @@ export async function rollWeaponDamage(actor, weapon, rollMode = "public", bandK
     return;
   }
 
-  const rollHtml = await roll.render({
-    flavor: game.i18n.format("STARFRONTIERS.Weapon.DamageFlavor", { weapon: weapon.name })
-  });
-
-  await createCheckChatMessage(actor, {
-    title: game.i18n.format("STARFRONTIERS.Weapon.DamageTitle", {
-      name: getRollTitleName(actor),
-      weapon: weapon.name
-    }),
-    subtitle: getRollSubtitle(actor),
-    rows: [
-      { label: game.i18n.localize("STARFRONTIERS.Weapon.Defense"), value: getWeaponDefenseLabel(weapon) },
-      { label: game.i18n.localize("STARFRONTIERS.Weapon.DamageFormulaLabel"), value: formula }
-    ],
-    rollMode,
-    rollHtml
+  const activeMode = getActiveWeaponMode(weapon);
+  const targetActor = await resolveActorUuid(targetActorUuid) ?? await resolveTokenActorUuid(targetTokenUuid);
+  await createWeaponDamageChatMessage(actor, weapon, {
+    damage: {
+      attacker: {
+        id: actor.id,
+        name: actor.name,
+        uuid: actor.uuid
+      },
+      target: targetActor ? {
+        id: targetActor.id,
+        name: targetActor.name,
+        uuid: targetActor.uuid,
+        tokenUuid: String(targetTokenUuid ?? "")
+      } : null,
+      weapon: {
+        id: weapon.id,
+        name: weapon.name,
+        uuid: weapon.uuid,
+        modeKey: activeMode?.key ?? "",
+        modeLabel: activeMode ? getWeaponModeLabel(activeMode) : ""
+      },
+      damageFormula: formula,
+      damageTotal: Number(roll.total ?? 0),
+      damageTypes: getWeaponDamageTypes(weapon),
+      damageTypeLabel: getWeaponDefenseLabel(weapon),
+      rollMode,
+      bandKey: String(bandKey ?? "")
+    },
+    roll,
+    rollMode
   });
 }
 
-export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid = "", rollMode = "public" }) {
+export async function rollAvoidance({
+  attacker,
+  weapon,
+  target,
+  targetTokenUuid = "",
+  rollMode = "public",
+  sourceAttackMessageId = ""
+}) {
   const avoidance = getWeaponAvoidance(weapon);
   if (!avoidance?.enabled) return;
 
@@ -2039,10 +2767,11 @@ export async function rollAvoidance({ attacker, weapon, target, targetTokenUuid 
 
   applyChatMessageMode(chatData, rollMode);
   await ChatMessage.create(chatData);
-
-  const onHitEffectIds = getWeaponOnHitEffectIds(weapon);
-  if (!success && onHitEffectIds.length) {
-    await applyOnHitEffects(target, onHitEffectIds, getWeaponOnHitEffectOrigin(weapon), weapon);
+  if (sourceAttackMessageId) {
+    await updateAttackCardAvoidanceState(sourceAttackMessageId, {
+      resolved: true,
+      succeeded: success
+    });
   }
 }
 
@@ -2405,6 +3134,32 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
       effectLabel: getKnockoutEffectLabel(model.knockoutDuration)
     }));
   const subtitleParts = [];
+  const targetActorUuid = String(model.target?.uuid ?? "");
+  const automateActiveEffects = Boolean(game.settings.get(SYSTEM_ID, "automateActiveEffects"));
+  const avoidanceResolved = Boolean(model.avoidance?.resolved);
+  const avoidanceSucceeded = avoidanceResolved ? Boolean(model.avoidance?.succeeded) : false;
+  const canApplyHitStatuses = Boolean(
+    automateActiveEffects
+    && targetActorUuid
+    && model.hitCount > 0
+    && Array.from(model.onHitEffects ?? []).length
+    && (!model.avoidance?.enabled || (avoidanceResolved && !avoidanceSucceeded))
+  );
+  const canApplyKnockout = Boolean(
+    targetActorUuid
+    && model.knockoutCount > 0
+    && (!model.avoidance?.enabled || (avoidanceResolved && !avoidanceSucceeded))
+  );
+  const statusApplyButtons = canApplyHitStatuses
+    ? Array.from(model.onHitEffects ?? []).map((effect) => ({
+        label: game.i18n.format("STARFRONTIERS.Chat.ApplyStatus", { status: effect.label }),
+        applyKey: `status:${effect.effectRef}`,
+        effectRef: effect.effectRef,
+        targetActorUuid,
+        targetTokenUuid: model.target?.tokenUuid ?? "",
+        disabled: false
+      }))
+    : [];
   if (model.weapon?.modeLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.ModeSummary", { mode: model.weapon.modeLabel }));
   if (model.weapon?.skillLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.SkillSummary", { skill: model.weapon.skillLabel }));
   if (model.rangeBand?.label) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.RangeSummary", { range: model.rangeBand.label }));
@@ -2448,13 +3203,17 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
     itemUuid: model.weapon?.uuid ?? "",
     bandKey: model.rangeBand?.key ?? "",
     rollMode: model.rollMode ?? "public",
-    canRollAvoidance: Boolean(model.canRollAvoidance),
+    canRollAvoidance: Boolean(model.canRollAvoidance && !avoidanceResolved),
     avoidance: model.avoidance ?? null,
     avoidanceButtonLabel: model.avoidance
       ? game.i18n.format("STARFRONTIERS.Weapon.RollAvoidanceButton", { ability: model.avoidance.abilityLabel })
       : "",
     targetTokenUuid: model.target?.tokenUuid ?? "",
     targetActorUuid: model.target?.uuid ?? "",
+    canApplyHitStatuses,
+    statusApplyButtons,
+    canApplyKnockout,
+    applyKnockoutButtonLabel: game.i18n.localize("STARFRONTIERS.Chat.ApplyKnockout"),
     warnings: Array.from(model.warnings ?? []),
     notes: Array.from(model.notes ?? []),
     rollHtml: model.rollHtml ?? "",
@@ -2492,12 +3251,94 @@ async function updateAttackCardMessage(message, model) {
   return nextModel;
 }
 
-export async function handleAttackCardAdjustmentInput(message, element) {
-  if (!game.user?.isGM || !message || !(element instanceof HTMLInputElement)) return false;
+async function reconcileHitBasedMeleeAmmo(previousModel, nextModel) {
+  if (!game.settings.get(SYSTEM_ID, "automateAmmo")) return nextModel;
+  const ammo = nextModel?.ammo;
+  if (!ammo?.spendOnHit) return nextModel;
+  if (nextModel.attackType !== ATTACK_TYPES.MELEE) return nextModel;
+
+  const perUnit = Math.max(Number(ammo.perUnit ?? ammo.consumedPerShot ?? 0), 0);
+  const previousUnits = Math.max(Number(previousModel?.ammo?.consumedUnits ?? ammo.consumedUnits ?? 0), 0);
+  const nextUnits = Math.max(Number(nextModel.hitCount ?? 0), 0);
+  const deltaAmount = perUnit * (nextUnits - previousUnits);
+  const nextAmmo = {
+    ...ammo,
+    consumedUnits: nextUnits,
+    totalConsumed: perUnit * nextUnits
+  };
+
+  if (!deltaAmount) {
+    nextModel.ammo = nextAmmo;
+    return nextModel;
+  }
+
+  let weapon = null;
+  const weaponUuid = String(ammo.weaponUuid ?? nextModel.weapon?.uuid ?? "");
+  if (weaponUuid && globalThis.fromUuid) {
+    try {
+      weapon = await globalThis.fromUuid(weaponUuid);
+    } catch {
+      weapon = null;
+    }
+  }
+  if (!weapon || weapon.type === "creatureAttack") {
+    nextModel.ammo = nextAmmo;
+    return nextModel;
+  }
+
+  const actor = weapon.parent?.documentName === "Actor" ? weapon.parent : null;
+  const loadedSourceId = String(ammo.loadedSourceId ?? weapon.system?.ammo?.loadedSourceId ?? "");
+  const loadedSource = loadedSourceId
+    ? await resolveLinkedItem(actor, loadedSourceId)
+    : null;
+
+  const ammoResult = await applyWeaponAmmoDelta(weapon, {
+    loadedSource,
+    loadedSourceId,
+    deltaAmount,
+    liveCapacity: Number(ammo.capacity ?? 0)
+  });
+  nextAmmo.capacity = ammoResult.capacity;
+  nextAmmo.remaining = loadedSource?.type === "powerSource"
+    ? ammoResult.remaining
+    : Math.max(ammoResult.capacity - ammoResult.consumed, 0);
+  nextModel.ammo = nextAmmo;
+  return nextModel;
+}
+
+async function reconcileAndUpdateAttackCardMessage(message, previousModel, model) {
+  const recomputedModel = recomputeAttackCardModel(model);
+  const reconciledModel = await reconcileHitBasedMeleeAmmo(previousModel, recomputedModel);
+  const content = await renderAttackCardContent(reconciledModel);
+  await message.update({
+    content,
+    [`flags.${SYSTEM_ID}.attack`]: reconciledModel
+  });
+  return reconciledModel;
+}
+
+async function updateAttackCardAvoidanceState(messageId, { resolved = false, succeeded = null } = {}) {
+  const message = game.messages?.get?.(String(messageId ?? "")) ?? null;
+  if (!message) return false;
   const model = getAttackModelFromMessage(message);
-  if (!model) return false;
+  if (!model?.avoidance?.enabled) return false;
 
   const nextModel = foundry.utils.deepClone(model);
+  nextModel.avoidance = {
+    ...nextModel.avoidance,
+    resolved: Boolean(resolved),
+    succeeded: resolved ? Boolean(succeeded) : null
+  };
+  await updateAttackCardMessage(message, nextModel);
+  return true;
+}
+
+export async function handleAttackCardAdjustmentInput(message, element) {
+  if (!game.user?.isGM || !message || !(element instanceof HTMLInputElement)) return false;
+  const previousModel = getAttackModelFromMessage(message);
+  if (!previousModel) return false;
+
+  const nextModel = foundry.utils.deepClone(previousModel);
   const action = String(element.dataset.action ?? "");
 
   if (action === "adjustAttackModifier") {
@@ -2507,7 +3348,7 @@ export async function handleAttackCardAdjustmentInput(message, element) {
     modifier.value = element.value === ""
       ? Number(modifier.originalValue ?? modifier.value ?? 0)
       : (Number.isFinite(element.valueAsNumber) ? element.valueAsNumber : Number(modifier.originalValue ?? modifier.value ?? 0));
-    await updateAttackCardMessage(message, nextModel);
+    await reconcileAndUpdateAttackCardMessage(message, previousModel, nextModel);
     return true;
   }
 
@@ -2516,7 +3357,7 @@ export async function handleAttackCardAdjustmentInput(message, element) {
     const modifier = Array.from(nextModel.modifiers ?? []).find((entry) => entry.id === modifierId);
     if (!modifier) return false;
     modifier.enabled = Boolean(element.checked);
-    await updateAttackCardMessage(message, nextModel);
+    await reconcileAndUpdateAttackCardMessage(message, previousModel, nextModel);
     return true;
   }
 
@@ -2524,7 +3365,7 @@ export async function handleAttackCardAdjustmentInput(message, element) {
     nextModel.targetNumberOverride = element.value === ""
       ? null
       : clampAttackTarget(Number.isFinite(element.valueAsNumber) ? element.valueAsNumber : nextModel.targetNumber);
-    await updateAttackCardMessage(message, nextModel);
+    await reconcileAndUpdateAttackCardMessage(message, previousModel, nextModel);
     return true;
   }
 
@@ -2535,7 +3376,7 @@ export async function handleAttackCardAdjustmentInput(message, element) {
     shot.rollTotalOverride = element.value === ""
       ? null
       : clampRollTotal(Number.isFinite(element.valueAsNumber) ? element.valueAsNumber : shot.originalRollTotal);
-    await updateAttackCardMessage(message, nextModel);
+    await reconcileAndUpdateAttackCardMessage(message, previousModel, nextModel);
     return true;
   }
 
@@ -2565,6 +3406,74 @@ export async function createWeaponAttackChatMessage(actor, weapon, {
     flags: {
       [SYSTEM_ID]: {
         attack: model
+      }
+    }
+  };
+
+  applyChatMessageMode(chatData, rollMode);
+  await ChatMessage.create(chatData);
+}
+
+function buildWeaponDamageCardContext(model) {
+  const subtitleParts = [];
+  if (model.weapon?.modeLabel) subtitleParts.push(game.i18n.format("STARFRONTIERS.Chat.ModeSummary", { mode: model.weapon.modeLabel }));
+  if (model.target?.name) subtitleParts.push(`${game.i18n.localize("STARFRONTIERS.Character.Target")}: ${model.target.name}`);
+  return {
+    title: game.i18n.format("STARFRONTIERS.Weapon.DamageTitle", {
+      name: model.attacker?.name ?? game.i18n.localize("STARFRONTIERS.Character.CharacterName"),
+      weapon: model.weapon?.name ?? game.i18n.localize("STARFRONTIERS.Weapon.Name")
+    }),
+    subtitle: subtitleParts.join(" | "),
+    rows: [
+      {
+        label: game.i18n.localize("STARFRONTIERS.Character.Target"),
+        value: model.target?.name ?? game.i18n.localize("STARFRONTIERS.Weapon.NoTarget")
+      },
+      {
+        label: game.i18n.localize("STARFRONTIERS.Weapon.Defense"),
+        value: model.damageTypeLabel || game.i18n.localize("STARFRONTIERS.Choice.DefenseType.None")
+      },
+      {
+        label: game.i18n.localize("STARFRONTIERS.Weapon.DamageFormulaLabel"),
+        value: model.damageFormula
+      },
+      {
+        label: game.i18n.localize("STARFRONTIERS.Weapon.Damage"),
+        value: String(model.damageTotal ?? 0)
+      }
+    ],
+    damageTotal: String(model.damageTotal ?? 0),
+    damageButtonLabel: game.i18n.localize("STARFRONTIERS.Chat.ApplyDamage"),
+    itemUuid: model.weapon?.uuid ?? "",
+    targetActorUuid: model.target?.uuid ?? "",
+    targetTokenUuid: model.target?.tokenUuid ?? "",
+    applyKey: "damage",
+    rollHtml: model.rollHtml ?? ""
+  };
+}
+
+async function renderWeaponDamageCardContent(model) {
+  const context = buildWeaponDamageCardContext(model);
+  return foundry.applications.handlebars.renderTemplate("systems/star-frontiers/templates/chat/weapon-damage-card.hbs", context);
+}
+
+export async function createWeaponDamageChatMessage(actor, weapon, {
+  damage,
+  roll,
+  rollMode = "public"
+}) {
+  const nextModel = foundry.utils.deepClone(damage ?? {});
+  nextModel.rollHtml = await roll.render({
+    flavor: game.i18n.format("STARFRONTIERS.Weapon.DamageFlavor", { weapon: weapon.name })
+  });
+  const content = await renderWeaponDamageCardContent(nextModel);
+  const chatData = {
+    content,
+    speaker: ChatMessage.getSpeaker({ actor }),
+    rolls: roll ? [roll] : [],
+    flags: {
+      [SYSTEM_ID]: {
+        damage: nextModel
       }
     }
   };

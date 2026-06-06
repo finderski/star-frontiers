@@ -37,6 +37,8 @@
         data-item-uuid="{{itemUuid}}"
         data-band-key="{{bandKey}}"
         data-roll-mode="{{rollMode}}"
+        data-target-token-uuid="{{targetTokenUuid}}"
+        data-target-actor-uuid="{{targetActorUuid}}"
       >
         {{damageButtonLabel}}
       </button>
@@ -81,6 +83,40 @@
 
   {{#if avoidance.effectLabel}}
     <p class="chat-card-actions__hint">{{avoidance.effectLabel}}</p>
+  {{/if}}
+
+  {{#if canApplyHitStatuses}}
+    <div class="chat-card-actions sf-chat-card__apply-actions">
+      {{#each statusApplyButtons as |button|}}
+        <button
+          type="button"
+          class="sf-chat-action"
+          data-action="applyStatus"
+          data-apply-key="{{button.applyKey}}"
+          data-effect-ref="{{button.effectRef}}"
+          data-target-actor-uuid="{{button.targetActorUuid}}"
+          data-target-token-uuid="{{button.targetTokenUuid}}"
+        >
+          {{button.label}}
+        </button>
+      {{/each}}
+    </div>
+  {{/if}}
+
+  {{#if canApplyKnockout}}
+    <div class="chat-card-actions sf-chat-card__apply-actions">
+      <button
+        type="button"
+        class="sf-chat-action"
+        data-action="applyKnockout"
+        data-apply-key="knockout"
+        data-duration-rounds="{{knockout.durationTurns}}"
+        data-target-actor-uuid="{{targetActorUuid}}"
+        data-target-token-uuid="{{targetTokenUuid}}"
+      >
+        {{applyKnockoutButtonLabel}}
+      </button>
+    </div>
   {{/if}}
 
   <details class="sf-attack-card__details">
