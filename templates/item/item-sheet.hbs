@@ -466,36 +466,6 @@
           {{/if}}
         </div>
 
-        <div class="race-editor-block">
-          <div class="race-editor-block__header">
-            <span>{{localize "STARFRONTIERS.Item.Effects"}}</span>
-            <button type="button" data-action="addEffect">
-              <i class="fa-solid fa-plus"></i>
-              <span>{{localize "STARFRONTIERS.Item.AddEffect"}}</span>
-            </button>
-          </div>
-          {{#if itemEffects.length}}
-            <div class="effect-list">
-              {{#each itemEffects as |effect|}}
-                <div class="effect-row">
-                  <button type="button" class="effect-row__open" data-action="openEffect" data-effect-id="{{effect.id}}">
-                    <img class="effect-row__icon" src="{{effect.img}}" alt="" />
-                    <span class="effect-row__name">{{effect.name}}</span>
-                  </button>
-                  <div class="effect-row__badges">
-                    {{#if effect.transfer}}<span class="effect-row__badge" title="{{localize "STARFRONTIERS.Item.EffectTransfers"}}"><i class="fa-solid fa-arrow-up-from-bracket"></i></span>{{/if}}
-                    {{#if effect.disabled}}<span class="effect-row__badge effect-row__badge--off" title="{{localize "STARFRONTIERS.Item.EffectDisabled"}}"><i class="fa-solid fa-ban"></i></span>{{/if}}
-                  </div>
-                  <button type="button" class="effect-row__delete" data-action="deleteEffect" data-effect-id="{{effect.id}}" title="{{localize "STARFRONTIERS.Item.DeleteEffect"}}">
-                    <i class="fa-solid fa-trash"></i>
-                  </button>
-                </div>
-              {{/each}}
-            </div>
-          {{else}}
-            <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoEffects"}}</p>
-          {{/if}}
-        </div>
       </fieldset>
     {{/if}}
 
@@ -989,5 +959,39 @@
         </div>
       </fieldset>
     {{/if}}
+
+    <fieldset class="paper-box full-width item-effects-editor">
+      <legend>{{localize "STARFRONTIERS.Item.Effects"}}</legend>
+      <div class="race-editor-block">
+        <div class="race-editor-block__header">
+          <span>{{localize "STARFRONTIERS.Item.Effects"}}</span>
+          <button type="button" data-action="addEffect">
+            <i class="fa-solid fa-plus"></i>
+            <span>{{localize "STARFRONTIERS.Item.AddEffect"}}</span>
+          </button>
+        </div>
+        {{#if itemEffects.length}}
+          <div class="effect-list">
+            {{#each itemEffects as |effect|}}
+              <div class="effect-row">
+                <button type="button" class="effect-row__open" data-action="openEffect" data-effect-id="{{effect.id}}">
+                  <img class="effect-row__icon" src="{{effect.img}}" alt="" />
+                  <span class="effect-row__name">{{effect.name}}</span>
+                </button>
+                <div class="effect-row__badges">
+                  {{#if effect.transfer}}<span class="effect-row__badge" title="{{localize "STARFRONTIERS.Item.EffectTransfers"}}"><i class="fa-solid fa-arrow-up-from-bracket"></i></span>{{/if}}
+                  {{#if effect.disabled}}<span class="effect-row__badge effect-row__badge--off" title="{{localize "STARFRONTIERS.Item.EffectDisabled"}}"><i class="fa-solid fa-ban"></i></span>{{/if}}
+                </div>
+                <button type="button" class="effect-row__delete" data-action="deleteEffect" data-effect-id="{{effect.id}}" title="{{localize "STARFRONTIERS.Item.DeleteEffect"}}">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            {{/each}}
+          </div>
+        {{else}}
+          <p class="race-editor-block__empty">{{localize "STARFRONTIERS.Item.NoEffects"}}</p>
+        {{/if}}
+      </div>
+    </fieldset>
   </main>
 </section>

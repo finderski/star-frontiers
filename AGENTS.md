@@ -375,10 +375,15 @@
   - do **not** show `system.key`
   - do **not** show `system.raceKey` (it is managed by race-drop/import logic, not by hand)
   - do **not** show `system.currentChance` — current chance is actor progress, not item-template data
-  - currently expose `description`, `rollType`, `baseChance`, `cap`, `xpPerPoint`, and an embedded Active Effects list/editor
+  - currently expose `description`, `rollType`, `baseChance`, `cap`, and `xpPerPoint`; embedded AE authoring comes from the universal item Active Effects editor
   - do **not** currently expose `triggersEffectId` or `cooldown.duration` in the sheet UI; actor-side AE toggling falls back to the sole embedded effect when only one exists
 - Item sheet header (all types):
   - the name label is type-specific only where useful (`Race`, `Racial Ability`); other item types use the generic `Name`
+- Generic item Active Effects editor:
+  - renders once near the bottom of every item sheet
+  - lists embedded AEs on the item with Open and Delete buttons; Add creates a new AE and opens Foundry's `ActiveEffectConfig` dialog
+  - deleting an embedded AE from the universal list must also clear item-local refs from weapon on-hit arrays, `creatureAttack.system.onHitEffectIds`, and consumable `system.effectIds`
+  - is distinct from weapon mode and `creatureAttack` on-hit effect editors, which link embedded AE ids into mode/attack runtime behavior
 - Skill item sheets:
   - 4-column row: PSA | Category | Attribute | Roll Formula
   - `category` choices: `main` · `subskill`
@@ -391,7 +396,7 @@
   - Roll formula placeholder is `ceil(@dex*.5) + @level`; `@level` in roll data = `skill.system.level * 10`
 - Trained Ability (Racial Ability) item sheets:
   - 4-column row: Roll Type | Base Chance | Cap | XP/Point
-  - Active Effects block below: lists embedded AEs on the item with Open and Delete buttons; Add creates a new AE and opens Foundry's `ActiveEffectConfig` dialog
+  - use the same universal item Active Effects editor as every other item type
   - do **not** show `system.key`, `system.raceKey`, or `system.currentChance` (that field no longer exists)
 - Consumable item sheets:
   - expose the `requiredSkillRef` drop zone using the same linked-skill pattern as weapons
@@ -543,7 +548,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - Equipment expansion follow-through:
   - Foundry smoke-test the new inventory/assets split, add-item hover menu, consumable use flow, and power-source link/unlink UX
   - specifically verify PowerSource port limits and hidden drop zones across both item sheets and the character-sheet weapon selector
-  - decide whether consumables need first-class Active Effect authoring UI (the use flow already supports `effectIds`, but the sheet does not yet expose a dedicated editor)
+  - decide whether consumables need first-class effect-use mapping from embedded AEs into `system.effectIds`; the universal embedded AE editor now exists, but the Use flow still keys off that explicit list
 - Canvas UX:
   - smoke-test the token-hover range preview with single selected tokens, multiple ready weapons, out-of-range targets, and non-weapon actors
 - Damage application:
@@ -620,6 +625,7 @@ This reflects the current local notes and implemented work, not a live Asana syn
 - All `submitOnChange` sheet classes should inherit `ScrollPreservingSheetMixin`, which owns `_onChangeForm`, `_rememberScrollPosition()`, and `_restoreScrollPosition()` based on the class's `PARTS.sheet.scrollable` selector. Do not reintroduce one-off per-sheet scroll hacks unless the shared mixin proves insufficient.
 - Sheet action handlers that trigger document writes (item updates, embedded-doc CRUD) must call `this._rememberScrollPosition()` before the async work — `_onChangeForm` only fires for form-input changes, not for action-button clicks. Notably, `#onRollWeaponAttack` and `#onRollWeaponDamage` now call it because the attack pipeline can issue multiple item updates per roll (weapon.consumed, loaded-source quantity on fire-empty, loaded-source remaining for powerSource). The mixin's 3-render persistence covers consecutive re-renders so the scroll survives the whole flow. Symptoms before the fix were most visible on weapons with firing modes / Active Effects (Electrostunner), where the extra render passes pushed the scroll back to the top.
 - Item-sheet mutations follow the same rule: add/remove AE, add/remove mode, link/unlink drops, power-source/program/kit mutations, and custom async callbacks/listeners that call `item.update()` must arm `_rememberScrollPosition()` explicitly because they bypass `_onChangeForm`.
+- The generic item Active Effects editor is universal and must live once near the bottom of `templates/item/item-sheet.hbs`, outside item-type conditionals. Do not move it back under `trainedAbility` or clone it per item type. Weapon mode and `creatureAttack` on-hit effect editors are separate reference-management UIs and should remain in their type-specific sections. Generic AE deletion must keep those item-local refs clean rather than leaving "Unknown Effect" rows behind.
 - For non-sheet code paths that mutate an open document (combat automation, chat-card actions, Active Effect toggles, target-actor AE application), call `rememberDocumentSheetScroll(document, renders)` from `module/sheets/scroll-preserving-sheet-mixin.mjs` before the write. This is the shared escape hatch when you do not have a sheet instance or the mutation targets a different actor/item than the currently open sheet.
 - All player-initiated d100 target-vs-roll checks from the character sheet must prompt for a misc. modifier through `#promptModifier(label, targetValue)`. That includes ability checks, skill checks, and active racial ability rolls. Weapon attacks intentionally use their own range-band-plus-modifier prompt.
 - Skills on the character sheet are grouped by PSA block, but the skills INSIDE each block are still auto-sorted alphabetically by parent skill with referenced subskills directly beneath their parent. Only the PSA blocks themselves are user-reorderable.

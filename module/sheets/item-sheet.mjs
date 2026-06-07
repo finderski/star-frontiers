@@ -290,15 +290,13 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
       context.armorPresetChoices = {};
       context.screenPresetChoices = {};
     }
-    context.itemEffects = item.type === "trainedAbility"
-      ? Array.from(item.effects ?? []).map(e => ({
-          id: e.id,
-          name: e.name,
-          img: e.img || "icons/svg/aura.svg",
-          transfer: e.transfer,
-          disabled: e.disabled
-        }))
-      : [];
+    context.itemEffects = Array.from(item.effects ?? []).map((effect) => ({
+      id: effect.id,
+      name: effect.name,
+      img: effect.img || "icons/svg/aura.svg",
+      transfer: effect.transfer,
+      disabled: effect.disabled
+    }));
     context.imageUsesMask = (item.img ?? "").startsWith("icons/svg/");
     context.sheetTheme = game.settings.get(SYSTEM_ID, "sheetTheme");
     context.themeClass = `theme-${context.sheetTheme}`;
@@ -1625,11 +1623,51 @@ export class StarFrontiersItemSheet extends ScrollPreservingSheetMixin(Handlebar
     effect?.sheet?.render(true);
   }
 
+  static #getEffectReferenceCleanupUpdates(item, effectId) {
+    const updates = {};
+    if (!effectId) return updates;
+
+    if (item.type === "weapon") {
+      const currentTopLevel = Array.from(item.system.mechanics?.onHitEffectIds ?? []);
+      const nextTopLevel = currentTopLevel.filter((entry) => entry !== effectId);
+      if (nextTopLevel.length !== currentTopLevel.length) {
+        updates["system.mechanics.onHitEffectIds"] = nextTopLevel;
+      }
+
+      const modes = StarFrontiersItemSheet.#copyWeaponModes(item.system.mechanics?.modes ?? []);
+      let modesChanged = false;
+      for (const mode of modes) {
+        const current = Array.from(mode.onHitEffectIds ?? []);
+        const next = current.filter((entry) => entry !== effectId);
+        if (next.length === current.length) continue;
+        mode.onHitEffectIds = next;
+        modesChanged = true;
+      }
+      if (modesChanged) updates["system.mechanics.modes"] = modes;
+    }
+
+    if (item.type === "creatureAttack") {
+      const current = Array.from(item.system.onHitEffectIds ?? []);
+      const next = current.filter((entry) => entry !== effectId);
+      if (next.length !== current.length) updates["system.onHitEffectIds"] = next;
+    }
+
+    if (item.type === "consumable") {
+      const current = Array.from(item.system.effectIds ?? []);
+      const next = current.filter((entry) => entry !== effectId);
+      if (next.length !== current.length) updates["system.effectIds"] = next;
+    }
+
+    return updates;
+  }
+
   static async #onDeleteEffect(event, target) {
     target ??= event.currentTarget;
     const effectId = target.dataset.effectId ?? "";
     if (effectId) {
       this._rememberScrollPosition();
+      const cleanupUpdates = StarFrontiersItemSheet.#getEffectReferenceCleanupUpdates(this.item, effectId);
+      if (Object.keys(cleanupUpdates).length) await this.item.update(cleanupUpdates);
       await this.item.deleteEmbeddedDocuments("ActiveEffect", [effectId]);
     }
   }

@@ -2579,6 +2579,20 @@ select.multiSelect option:checked {
   margin: 0;
 }
 
+.item-effects-editor .race-editor-block {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.item-effects-editor .race-editor-block__header {
+  justify-content: flex-end;
+}
+
+.item-effects-editor .race-editor-block__header > span {
+  display: none;
+}
+
 .linked-ability-drop-zone {
   align-items: center;
   border: 1px dashed var(--sf-line);
