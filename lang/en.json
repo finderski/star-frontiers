@@ -1053,6 +1053,7 @@
       "AvoidanceFailure": "Failed — {effect}",
       "AvoidanceFlavor": "{target} rolls {ability} avoidance",
       "AvoidanceNoPermission": "Only the target's owner or the GM can roll this avoidance check.",
+      "AvoidanceNoTarget": "Target or select a token first to roll avoidance for.",
       "AvoidanceSuccess": "Avoided — no effect",
       "AvoidanceTargetGone": "The target token is no longer available.",
       "AvoidanceTargetLabel": "Target Score",

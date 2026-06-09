@@ -1659,6 +1659,27 @@ function getStatusMetadata(statusId) {
   };
 }
 
+const STATUS_ID_SET = new Set(Object.values(SF_STATUS_IDS));
+const AVOIDANCE_EFFECT_STATUS_ALIASES = new Map([
+  ["stun", SF_STATUS_IDS.STUNNED],
+  ["stunned", SF_STATUS_IDS.STUNNED],
+  ["unconscious", SF_STATUS_IDS.UNCONSCIOUS],
+  ["knocked unconscious", SF_STATUS_IDS.UNCONSCIOUS],
+  ["knocked out", SF_STATUS_IDS.UNCONSCIOUS],
+  ["knock out", SF_STATUS_IDS.UNCONSCIOUS],
+  ["knockout", SF_STATUS_IDS.UNCONSCIOUS],
+  ["unconscious for d100 turns", SF_STATUS_IDS.UNCONSCIOUS]
+]);
+
+function normalizeEffectMatchText(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function buildStatusEffectDuration(durationRounds = null) {
   const rounds = Number(durationRounds ?? 0);
   if (!(rounds > 0)) return null;
@@ -1681,6 +1702,12 @@ async function applyActorStatus(actor, statusId, { durationRounds = null } = {})
     name,
     img,
     statuses: [statusId],
+    showIcon: CONST.ACTIVE_EFFECT_SHOW_ICON.ALWAYS,
+    flags: {
+      core: {
+        statusId
+      }
+    },
     transfer: false,
     disabled: false
   };
@@ -2065,8 +2092,11 @@ async function applyStatusFromMessage({
 
   if (mode === "status" && statusId) {
     await applyActorStatus(targetActor, statusId, { durationRounds });
+    const noteTitle = statusId === SF_STATUS_IDS.UNCONSCIOUS && Number(durationRounds ?? 0) > 0
+      ? game.i18n.localize("STARFRONTIERS.Chat.KnockoutFlags")
+      : game.i18n.localize("STARFRONTIERS.Chat.Applied");
     await createSystemNoteMessage(
-      game.i18n.localize("STARFRONTIERS.Chat.KnockoutFlags"),
+      noteTitle,
       [game.i18n.format("STARFRONTIERS.Effects.StatusAppliedToTarget", {
         status: getStatusMetadata(statusId).name,
         target: targetActor.name
@@ -2157,7 +2187,8 @@ async function describeOnHitEffects(sourceDocument, effectRefs = []) {
     described.push({
       key: String(effectRef ?? ""),
       effectRef: String(effectRef ?? ""),
-      label: effect?.name || game.i18n.localize("STARFRONTIERS.Item.NewEffect")
+      label: effect?.name || game.i18n.localize("STARFRONTIERS.Item.NewEffect"),
+      statusIds: Array.from(effect?.statuses ?? []).map((statusId) => String(statusId ?? "")).filter(Boolean)
     });
   }
   return described.filter((entry) => entry.effectRef);
@@ -2338,6 +2369,41 @@ export function getAvoidanceEffectLabel(value) {
   const label = String(value ?? "").trim();
   if (!label) return "";
   return game.i18n.has(label) ? game.i18n.localize(label) : label;
+}
+
+export function getAvoidanceEffectStatusId(value) {
+  const rawValue = String(value ?? "").trim();
+  if (!rawValue) return "";
+  if (STATUS_ID_SET.has(rawValue)) return rawValue;
+
+  const candidates = [rawValue];
+  if (game.i18n.has(rawValue)) candidates.push(game.i18n.localize(rawValue));
+
+  for (const candidate of candidates) {
+    const normalized = normalizeEffectMatchText(candidate);
+    const statusId = AVOIDANCE_EFFECT_STATUS_ALIASES.get(normalized);
+    if (statusId) return statusId;
+  }
+
+  return "";
+}
+
+function isAvoidanceGatedOnHitEffect(effect, avoidance = null) {
+  if (!avoidance?.enabled) return false;
+
+  const avoidanceStatusId = getAvoidanceEffectStatusId(avoidance.onSuccessEffect);
+  if (!avoidanceStatusId) return false;
+
+  const effectStatusIds = new Set(Array.from(effect?.statusIds ?? []).map((statusId) => String(statusId ?? "")));
+  if (avoidanceStatusId && effectStatusIds.has(avoidanceStatusId)) return true;
+
+  const normalizedEffectLabel = normalizeEffectMatchText(effect?.label ?? "");
+  if (!normalizedEffectLabel) return false;
+
+  return [
+    avoidance.effectLabel,
+    avoidance.onSuccessEffect
+  ].some((candidate) => normalizeEffectMatchText(candidate) === normalizedEffectLabel);
 }
 
 export function getWeaponAvoidance(weapon) {
@@ -2681,6 +2747,7 @@ export async function rollAvoidance({
   const abilityLabel = game.i18n.localize(`STARFRONTIERS.Ability.${ability}`);
   const modeLabel = activeMode ? getWeaponModeLabel(activeMode) : "";
   const effectLabel = getAvoidanceEffectLabel(avoidance.onSuccessEffect);
+  const avoidanceStatusId = getAvoidanceEffectStatusId(avoidance.onSuccessEffect);
 
   const prompt = await promptModifier(abilityLabel, targetScore);
   if (!prompt) return;
@@ -2743,7 +2810,14 @@ export async function rollAvoidance({
     rows,
     outcome,
     outcomeClass,
-    rollHtml
+    rollHtml,
+    applyEffect: !success && avoidanceStatusId ? {
+      applyKey: `status:${avoidanceStatusId}`,
+      statusId: avoidanceStatusId,
+      label: effectLabel || getStatusMetadata(avoidanceStatusId).name,
+      targetActorUuid: target.uuid,
+      targetTokenUuid
+    } : null
   });
 
   const chatData = {
@@ -2759,7 +2833,8 @@ export async function rollAvoidance({
           targetTokenUuid,
           weaponUuid: weapon.uuid,
           modeKey: activeMode?.key ?? "",
-          onSuccessEffect: avoidance.onSuccessEffect
+          onSuccessEffect: avoidance.onSuccessEffect,
+          statusId: avoidanceStatusId
         }
       }
     };
@@ -3041,7 +3116,7 @@ export function recomputeAttackCardModel(model = {}) {
     next.blockerOverride = null;
   }
   next.damageAvailable = Boolean(next.damageFormula) && next.hitCount > 0;
-  next.canRollAvoidance = Boolean(next.avoidance?.enabled && next.target?.uuid && next.hitCount > 0 && next.shots.length > 0);
+  next.canRollAvoidance = Boolean(next.avoidance?.enabled && next.hitCount > 0 && next.shots.length > 0);
   next.adjustedByGm = next.targetNumberOverride !== null
     || next.modifiers.some((modifier) => hasModifierAdjustment(modifier))
     || next.shots.some((shot) => shot.rollTotalOverride !== null);
@@ -3137,21 +3212,15 @@ function buildAttackCardContext(model, { isGM = false } = {}) {
   const targetActorUuid = String(model.target?.uuid ?? "");
   const automateActiveEffects = Boolean(game.settings.get(SYSTEM_ID, "automateActiveEffects"));
   const avoidanceResolved = Boolean(model.avoidance?.resolved);
-  const avoidanceSucceeded = avoidanceResolved ? Boolean(model.avoidance?.succeeded) : false;
+  const attackCardOnHitEffects = Array.from(model.onHitEffects ?? []);
   const canApplyHitStatuses = Boolean(
     automateActiveEffects
-    && targetActorUuid
     && model.hitCount > 0
-    && Array.from(model.onHitEffects ?? []).length
-    && (!model.avoidance?.enabled || (avoidanceResolved && !avoidanceSucceeded))
+    && attackCardOnHitEffects.length
   );
-  const canApplyKnockout = Boolean(
-    targetActorUuid
-    && model.knockoutCount > 0
-    && (!model.avoidance?.enabled || (avoidanceResolved && !avoidanceSucceeded))
-  );
+  const canApplyKnockout = Boolean(model.knockoutCount > 0);
   const statusApplyButtons = canApplyHitStatuses
-    ? Array.from(model.onHitEffects ?? []).map((effect) => ({
+    ? attackCardOnHitEffects.map((effect) => ({
         label: game.i18n.format("STARFRONTIERS.Chat.ApplyStatus", { status: effect.label }),
         applyKey: `status:${effect.effectRef}`,
         effectRef: effect.effectRef,

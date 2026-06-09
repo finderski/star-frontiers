@@ -2001,8 +2001,23 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     return "";
   }
 
+  static #resolveClickTimeTarget(storedActorUuid, storedTokenUuid) {
+    if (storedActorUuid || storedTokenUuid) {
+      return { actorUuid: storedActorUuid ?? "", tokenUuid: storedTokenUuid ?? "" };
+    }
+    const targeted = [...(game.user?.targets ?? [])][0];
+    if (targeted?.actor) {
+      return { actorUuid: targeted.actor.uuid ?? "", tokenUuid: targeted.document?.uuid ?? "" };
+    }
+    const controlled = canvas?.tokens?.controlled?.[0];
+    if (controlled?.actor) {
+      return { actorUuid: controlled.actor.uuid ?? "", tokenUuid: controlled.document?.uuid ?? "" };
+    }
+    return null;
+  }
+
   static async handleChatCardAction(element, message = null) {
-    const { action, itemUuid, rollMode, bandKey, targetTokenUuid, targetActorUuid, applyKey, effectRef, durationRounds } = element.dataset;
+    const { action, itemUuid, rollMode, bandKey, targetTokenUuid, targetActorUuid, applyKey, effectRef, durationRounds, statusId } = element.dataset;
     if (!action || !globalThis.fromUuid) return;
 
     if (action === "rollWeaponDamage") {
@@ -2017,10 +2032,18 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     }
 
     if (action === "rollAvoidance") {
-      if (!itemUuid || !targetActorUuid) return;
+      if (!itemUuid) return;
+
+      const resolvedTarget = StarFrontiersCharacterSheet.#resolveClickTimeTarget(targetActorUuid, targetTokenUuid);
+      if (!resolvedTarget?.actorUuid && !resolvedTarget?.tokenUuid) {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceNoTarget"));
+        return;
+      }
 
       const item = await globalThis.fromUuid(itemUuid);
-      const targetActor = await globalThis.fromUuid(targetActorUuid);
+      const targetActor = resolvedTarget.actorUuid
+        ? await globalThis.fromUuid(resolvedTarget.actorUuid)
+        : (await globalThis.fromUuid(resolvedTarget.tokenUuid))?.actor ?? null;
       if (!item?.actor || (item.type !== "weapon" && item.type !== "creatureAttack") || !targetActor) {
         ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Weapon.AvoidanceTargetGone"));
         return;
@@ -2036,7 +2059,7 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
         attacker: item.actor,
         weapon: item,
         target: targetActor,
-        targetTokenUuid,
+        targetTokenUuid: resolvedTarget.tokenUuid,
         rollMode: rollMode ?? "public",
         sourceAttackMessageId: message?.id ?? ""
       });
@@ -2058,23 +2081,60 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     }
 
     if (action === "applyStatus") {
-      const model = message?.flags?.[SYSTEM_ID]?.attack ?? null;
-      if (!message || !model) return;
+      if (!message) return;
+      const model = message.flags?.[SYSTEM_ID]?.attack ?? null;
+      if (model) {
+        const resolvedTarget = StarFrontiersCharacterSheet.#resolveClickTimeTarget(
+          targetActorUuid || model.target?.uuid || "",
+          targetTokenUuid || model.target?.tokenUuid || ""
+        );
+        if (!resolvedTarget) {
+          ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoTargetsToApply"));
+          return;
+        }
+        await AttackPipeline.requestApplyStatus({
+          sourceMessageId: message.id,
+          targetActorUuid: resolvedTarget.actorUuid,
+          targetTokenUuid: resolvedTarget.tokenUuid,
+          applyKey: applyKey ?? (effectRef ? `status:${effectRef}` : ""),
+          mode: "effect",
+          effectIds: effectRef ? [effectRef] : [],
+          origin: {
+            weaponUuid: model.weapon?.uuid ?? "",
+            sourceItemUuid: model.weapon?.uuid ?? "",
+            modeKey: model.weapon?.modeKey ?? "",
+            sourceName: model.weapon?.modeLabel
+              ? `${model.weapon?.name ?? ""} (${model.weapon.modeLabel})`
+              : (model.weapon?.name ?? "")
+          }
+        });
+        return;
+      }
+
+      const avoidanceFailure = message.flags?.[SYSTEM_ID]?.avoidanceFailure ?? null;
+      const resolvedStatusId = String(
+        statusId
+        || avoidanceFailure?.statusId
+        || AttackPipeline.getAvoidanceEffectStatusId(avoidanceFailure?.onSuccessEffect ?? "")
+      );
+      if (!resolvedStatusId) return;
+
+      const resolvedTarget = StarFrontiersCharacterSheet.#resolveClickTimeTarget(
+        targetActorUuid || avoidanceFailure?.targetActorUuid || "",
+        targetTokenUuid || avoidanceFailure?.targetTokenUuid || ""
+      );
+      if (!resolvedTarget) {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoTargetsToApply"));
+        return;
+      }
+
       await AttackPipeline.requestApplyStatus({
         sourceMessageId: message.id,
-        targetActorUuid: targetActorUuid ?? model.target?.uuid ?? "",
-        targetTokenUuid: targetTokenUuid ?? model.target?.tokenUuid ?? "",
-        applyKey: applyKey ?? (effectRef ? `status:${effectRef}` : ""),
-        mode: "effect",
-        effectIds: effectRef ? [effectRef] : [],
-        origin: {
-          weaponUuid: model.weapon?.uuid ?? "",
-          sourceItemUuid: model.weapon?.uuid ?? "",
-          modeKey: model.weapon?.modeKey ?? "",
-          sourceName: model.weapon?.modeLabel
-            ? `${model.weapon?.name ?? ""} (${model.weapon.modeLabel})`
-            : (model.weapon?.name ?? "")
-        }
+        targetActorUuid: resolvedTarget.actorUuid,
+        targetTokenUuid: resolvedTarget.tokenUuid,
+        applyKey: applyKey ?? `status:${resolvedStatusId}`,
+        mode: "status",
+        statusId: resolvedStatusId
       });
       return;
     }
@@ -2082,10 +2142,18 @@ export class StarFrontiersCharacterSheet extends ScrollPreservingSheetMixin(Hand
     if (action === "applyKnockout") {
       const model = message?.flags?.[SYSTEM_ID]?.attack ?? null;
       if (!message || !model) return;
+      const resolvedTarget = StarFrontiersCharacterSheet.#resolveClickTimeTarget(
+        targetActorUuid || model.target?.uuid || "",
+        targetTokenUuid || model.target?.tokenUuid || ""
+      );
+      if (!resolvedTarget) {
+        ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoTargetsToApply"));
+        return;
+      }
       await AttackPipeline.requestApplyStatus({
         sourceMessageId: message.id,
-        targetActorUuid: targetActorUuid ?? model.target?.uuid ?? "",
-        targetTokenUuid: targetTokenUuid ?? model.target?.tokenUuid ?? "",
+        targetActorUuid: resolvedTarget.actorUuid,
+        targetTokenUuid: resolvedTarget.tokenUuid,
         applyKey: applyKey ?? "knockout",
         mode: "status",
         statusId: "sf-unconscious",

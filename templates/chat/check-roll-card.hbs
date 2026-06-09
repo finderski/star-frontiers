@@ -21,5 +21,21 @@
     </div>
   {{/if}}
 
+  {{#if applyEffect}}
+    <div class="chat-card-actions sf-chat-card__apply-actions">
+      <button
+        type="button"
+        class="sf-chat-action"
+        data-action="applyStatus"
+        data-apply-key="{{applyEffect.applyKey}}"
+        data-status-id="{{applyEffect.statusId}}"
+        data-target-actor-uuid="{{applyEffect.targetActorUuid}}"
+        data-target-token-uuid="{{applyEffect.targetTokenUuid}}"
+      >
+        {{localize "STARFRONTIERS.Chat.ApplyStatus" status=applyEffect.label}}
+      </button>
+    </div>
+  {{/if}}
+
   {{{rollHtml}}}
 </section>
