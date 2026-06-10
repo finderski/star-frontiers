@@ -596,3 +596,13 @@ Zebulon's adds defensive suits with mechanics that don't fit the current `half /
 - Damage Application Pipeline (item #2) — required.
 - Combat tracker integration (for per-turn reset) — minor.
 - 0.3.1 Armor sheet pass (in flight) — provides the reductions editor scaffold this builds on.
+
+---
+
+## Apply Damage — Future Considerations
+
+- Future option: support manual or semi-automated recurring condition damage for poison, burning, infection, disease, and similar effects. This should not assume every table uses the Combat Tracker as a strict round/turn engine. Prefer a GM-controlled/manual tick workflow over fully automatic round hooks unless explicitly revisited.
+- Future option: bulk multi-hit / multi-target damage application. Current Apply Damage workflow is intentionally one-target/one-application per click. If bulk apply is implemented, the confirmation dialog should still surface per-target previews.
+- Future option: vehicle-specific damage tables (component damage, crashes, forced landings, burning, steering jammed, etc.). Vehicles currently lose Structure through the generic workflow. Deferred until the vehicle workstream.
+- Future option: computer items as damage targets. Computers are items today, so the damage workflow (which targets actors/tokens) cannot reach them. Intended rule: computer → `structuralPoints`. Wiring this needs a click-to-target affordance for embedded items.
+- Schema cleanup: robot `system.structuralPoints` is no longer used by the damage workflow but remains on the schema. A future migration can drop the field; in the meantime the docs and AGENTS.md note `robot → system.abilities.sta` as the live damage pool.

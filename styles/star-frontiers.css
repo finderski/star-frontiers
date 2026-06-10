@@ -3051,6 +3051,35 @@ body[data-star-frontiers-theme="retro"] .chat-message .star-frontiers.check-roll
   gap: 0.4rem;
 }
 
+.sf-apply-damage-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sf-apply-damage-dialog__layers {
+  margin: 0.15rem 0 0 1.25rem;
+  padding: 0;
+}
+
+.sf-apply-damage-dialog__layers li {
+  list-style: disc;
+}
+
+.sf-apply-damage-dialog__final {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.sf-apply-damage-dialog__final input {
+  width: 6em;
+}
+
+.sf-apply-damage-dialog__pool {
+  margin: 0;
+}
+
 .attack-dialog__summary {
   display: grid;
   gap: 0.9rem;

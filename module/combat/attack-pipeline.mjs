@@ -1733,7 +1733,7 @@ function getActorHealthPool(actor) {
         value: Number(actor.system?.stamina?.value ?? 0),
         max: Number(actor.system?.stamina?.max ?? 0),
         living: true,
-        secondaryPath: ""
+        label: "STARFRONTIERS.Effects.PoolStamina"
       };
     case "creature":
       return {
@@ -1741,28 +1741,27 @@ function getActorHealthPool(actor) {
         value: Number(actor.system?.abilities?.sta?.value ?? 0),
         max: Number(actor.system?.abilities?.sta?.max ?? 0),
         living: true,
-        secondaryPath: ""
+        label: "STARFRONTIERS.Effects.PoolStamina"
       };
-    case "robot": {
-      const structuralPoints = Number(actor.system?.structuralPoints?.value ?? 0);
-      const staminaPoints = Number(actor.system?.abilities?.sta?.value ?? structuralPoints);
+    case "robot":
+      // Alpha Dawn Expanded: robots have Stamina points, not Structure points. Structure points
+      // are reserved for vehicles and (in future) computer items. `system.structuralPoints`
+      // remains on the robot schema as legacy data but is intentionally NOT mirrored from
+      // damage application. TODO: cleanup field after a schema-pass migration.
       return {
-        path: "system.structuralPoints",
-        value: structuralPoints,
-        max: Number(actor.system?.structuralPoints?.max ?? 0),
+        path: "system.abilities.sta",
+        value: Number(actor.system?.abilities?.sta?.value ?? 0),
+        max: Number(actor.system?.abilities?.sta?.max ?? 0),
         living: false,
-        secondaryPath: "system.abilities.sta",
-        secondaryValue: staminaPoints,
-        secondaryMax: Number(actor.system?.abilities?.sta?.max ?? actor.system?.structuralPoints?.max ?? 0)
+        label: "STARFRONTIERS.Effects.PoolStamina"
       };
-    }
     case "vehicle":
       return {
         path: "system.structuralPoints",
         value: Number(actor.system?.structuralPoints?.value ?? 0),
         max: Number(actor.system?.structuralPoints?.max ?? 0),
         living: false,
-        secondaryPath: ""
+        label: "STARFRONTIERS.Effects.PoolStructure"
       };
     default:
       return null;
@@ -1783,11 +1782,6 @@ function buildHealthPoolUpdates(actor, nextValue) {
   const updates = {
     [`${pool.path}.value`]: clampedValue
   };
-
-  if (actor.type === "robot" && pool.secondaryPath) {
-    updates[`${pool.secondaryPath}.value`] = clampedValue;
-    if (Number.isFinite(pool.max)) updates[`${pool.secondaryPath}.max`] = Number(pool.max);
-  }
 
   return {
     pool,
@@ -1879,71 +1873,216 @@ async function createSystemNoteMessage(title, lines, actor = null) {
   });
 }
 
-export async function mitigateDamage(rawAmount, weaponDamageTypes, actor) {
-  let remaining = Math.max(Number(rawAmount ?? 0), 0);
+/**
+ * Pure preview: computes how `rawAmount` would interact with `actor`'s active
+ * screens and armor. Performs NO writes. Returns a structured plan that drives
+ * both the apply-damage confirmation dialog and the final chat note, and that
+ * can be handed off to `commitDamageMitigation` to apply the layer mutations.
+ */
+export async function previewDamageMitigation(rawAmount, weaponDamageTypes, actor) {
+  const raw = Math.max(Number(rawAmount ?? 0), 0);
   const damageTypes = Array.from(weaponDamageTypes ?? []).map((value) => String(value ?? "")).filter(Boolean);
+  const layers = [];
   const messages = [];
 
-  if (!(remaining > 0) || !actor) {
-    return { final: remaining, messages };
+  if (!(raw > 0) || !actor) {
+    return { raw, final: raw, damageTypes, layers, messages };
   }
+
+  let remaining = raw;
 
   const screenLayers = await getActiveScreenLayers(actor);
   for (const { item: screen, powerSource } of screenLayers) {
     const reduction = resolveDamageReduction(screen, damageTypes);
-    if (!reduction || !(remaining > 0)) continue;
+    if (!reduction) {
+      layers.push({
+        kind: "screen",
+        itemUuid: screen.uuid ?? "",
+        itemName: screen.name,
+        matched: false,
+        before: remaining,
+        after: remaining,
+        absorbed: 0,
+        reductionMode: "",
+        seuPerHit: Math.max(Number(screen.system?.seuPerHit ?? 0), 0),
+        seuConsumed: 0,
+        powerSourceUuid: powerSource?.uuid ?? "",
+        powerSourceName: powerSource?.name ?? "",
+        powerBefore: powerSource ? Math.max(Number(powerSource.system?.remaining ?? 0), 0) : null,
+        powerAfter: powerSource ? Math.max(Number(powerSource.system?.remaining ?? 0), 0) : null,
+        deactivated: false
+      });
+      continue;
+    }
 
     const seuPerHit = Math.max(Number(screen.system?.seuPerHit ?? 0), 0);
     const availableSeu = powerSource ? Math.max(Number(powerSource.system?.remaining ?? 0), 0) : 0;
     if (seuPerHit > 0 && availableSeu < seuPerHit) {
-      await screen.update({ "system.active": false });
+      layers.push({
+        kind: "screen",
+        itemUuid: screen.uuid ?? "",
+        itemName: screen.name,
+        matched: true,
+        before: remaining,
+        after: remaining,
+        absorbed: 0,
+        reductionMode: String(reduction.mode ?? ""),
+        seuPerHit,
+        seuConsumed: 0,
+        powerSourceUuid: powerSource?.uuid ?? "",
+        powerSourceName: powerSource?.name ?? "",
+        powerBefore: powerSource ? availableSeu : null,
+        powerAfter: powerSource ? availableSeu : null,
+        deactivated: true
+      });
       messages.push(game.i18n.format("STARFRONTIERS.Effects.ScreenDepleted", { screen: screen.name }));
       continue;
     }
 
-    const { nextAmount } = computeLayerAbsorption(remaining, reduction);
+    const before = remaining;
+    const { nextAmount, absorbed } = computeLayerAbsorption(remaining, reduction);
     remaining = nextAmount;
 
+    let powerAfter = powerSource ? availableSeu : null;
+    let deactivated = false;
+    let seuConsumed = 0;
     if (seuPerHit > 0 && powerSource) {
-      const nextRemaining = Math.max(availableSeu - seuPerHit, 0);
-      const screenUpdates = {};
-      if (nextRemaining < seuPerHit) screenUpdates["system.active"] = false;
-      await powerSource.update({ "system.remaining": nextRemaining });
-      if (Object.keys(screenUpdates).length) {
-        await screen.update(screenUpdates);
-        messages.push(game.i18n.format("STARFRONTIERS.Effects.ScreenDepleted", { screen: screen.name }));
-      }
+      powerAfter = Math.max(availableSeu - seuPerHit, 0);
+      seuConsumed = seuPerHit;
+      if (powerAfter < seuPerHit) deactivated = true;
+    }
+
+    layers.push({
+      kind: "screen",
+      itemUuid: screen.uuid ?? "",
+      itemName: screen.name,
+      matched: true,
+      before,
+      after: remaining,
+      absorbed,
+      reductionMode: String(reduction.mode ?? ""),
+      seuPerHit,
+      seuConsumed,
+      powerSourceUuid: powerSource?.uuid ?? "",
+      powerSourceName: powerSource?.name ?? "",
+      powerBefore: powerSource ? availableSeu : null,
+      powerAfter,
+      deactivated
+    });
+
+    if (deactivated) {
+      messages.push(game.i18n.format("STARFRONTIERS.Effects.ScreenDepleted", { screen: screen.name }));
     }
   }
 
   const armorLayers = getActiveArmorLayers(actor);
   for (const armor of armorLayers) {
     const reduction = resolveDamageReduction(armor, damageTypes);
-    if (!reduction || !(remaining > 0)) continue;
-
-    const { absorbed } = computeLayerAbsorption(remaining, reduction);
-    if (!(absorbed > 0)) continue;
-
-    const maxAbsorbed = armor.system?.maxAbsorbed;
-    const currentDamage = Math.max(Number(armor.system?.accumulatedDamage ?? 0), 0);
-    if (maxAbsorbed === null || maxAbsorbed === undefined) {
-      remaining = Math.max(remaining - absorbed, 0);
-      await armor.update({ "system.accumulatedDamage": currentDamage + absorbed });
+    if (!reduction) {
+      layers.push({
+        kind: "armor",
+        itemUuid: armor.uuid ?? "",
+        itemName: armor.name,
+        matched: false,
+        before: remaining,
+        after: remaining,
+        absorbed: 0,
+        reductionMode: "",
+        accumulatedBefore: Math.max(Number(armor.system?.accumulatedDamage ?? 0), 0),
+        accumulatedAfter: Math.max(Number(armor.system?.accumulatedDamage ?? 0), 0),
+        maxAbsorbed: armor.system?.maxAbsorbed ?? null,
+        destroyed: false
+      });
       continue;
     }
 
-    const remainingCapacity = Math.max(Number(maxAbsorbed ?? 0) - currentDamage, 0);
-    const actualAbsorbed = Math.min(absorbed, remainingCapacity);
-    remaining = Math.max(remaining - actualAbsorbed, 0);
-    const nextDamage = currentDamage + actualAbsorbed;
-    await armor.update({ "system.accumulatedDamage": nextDamage });
+    const before = remaining;
+    const { absorbed } = computeLayerAbsorption(remaining, reduction);
+    const maxAbsorbed = armor.system?.maxAbsorbed;
+    const accumulatedBefore = Math.max(Number(armor.system?.accumulatedDamage ?? 0), 0);
 
-    if (actualAbsorbed < absorbed || nextDamage >= Number(maxAbsorbed ?? 0)) {
+    let actualAbsorbed = absorbed;
+    if (maxAbsorbed !== null && maxAbsorbed !== undefined) {
+      const remainingCapacity = Math.max(Number(maxAbsorbed ?? 0) - accumulatedBefore, 0);
+      actualAbsorbed = Math.min(absorbed, remainingCapacity);
+    }
+    const accumulatedAfter = accumulatedBefore + actualAbsorbed;
+    remaining = Math.max(remaining - actualAbsorbed, 0);
+
+    const destroyed = maxAbsorbed !== null && maxAbsorbed !== undefined
+      && (actualAbsorbed < absorbed || accumulatedAfter >= Number(maxAbsorbed ?? 0));
+
+    layers.push({
+      kind: "armor",
+      itemUuid: armor.uuid ?? "",
+      itemName: armor.name,
+      matched: true,
+      before,
+      after: remaining,
+      absorbed: actualAbsorbed,
+      reductionMode: String(reduction.mode ?? ""),
+      accumulatedBefore,
+      accumulatedAfter,
+      maxAbsorbed: maxAbsorbed ?? null,
+      destroyed
+    });
+
+    if (destroyed) {
       messages.push(game.i18n.format("STARFRONTIERS.Effects.ArmorDestroyed", { armor: armor.name }));
     }
   }
 
-  return { final: Math.max(remaining, 0), messages };
+  return {
+    raw,
+    final: Math.max(remaining, 0),
+    damageTypes,
+    layers,
+    messages
+  };
+}
+
+/**
+ * Applies the screen/armor item updates described by `layers`. Pool/actor updates
+ * are NOT performed here; the caller owns the actor pool update so it can also
+ * honour a manual final-damage override and post the chat note in one place.
+ */
+async function commitDamageMitigation(actor, layers = []) {
+  for (const layer of layers ?? []) {
+    if (!layer || !layer.matched) continue;
+
+    if (layer.kind === "screen") {
+      const screen = await resolveLinkedItem(actor, layer.itemUuid ?? "", "screen");
+      const powerSource = layer.powerSourceUuid
+        ? await resolveLinkedItem(actor, layer.powerSourceUuid ?? "", "powerSource")
+        : null;
+      if (!screen) continue;
+
+      if (powerSource && Number.isFinite(Number(layer.powerAfter)) && Number(layer.seuConsumed ?? 0) > 0) {
+        await powerSource.update({ "system.remaining": Math.max(Number(layer.powerAfter), 0) });
+      }
+      if (layer.deactivated) {
+        await screen.update({ "system.active": false });
+      }
+      continue;
+    }
+
+    if (layer.kind === "armor") {
+      const armor = await resolveLinkedItem(actor, layer.itemUuid ?? "", "armor");
+      if (!armor) continue;
+      if (Number.isFinite(Number(layer.accumulatedAfter))) {
+        await armor.update({ "system.accumulatedDamage": Math.max(Number(layer.accumulatedAfter), 0) });
+      }
+    }
+  }
+}
+
+// Backward-compatible export for any external callers (deprecated path —
+// schedules screen/armor item updates inline; prefer previewDamageMitigation +
+// commitDamageMitigation when you need a confirmation step).
+export async function mitigateDamage(rawAmount, weaponDamageTypes, actor) {
+  const preview = await previewDamageMitigation(rawAmount, weaponDamageTypes, actor);
+  await commitDamageMitigation(actor, preview.layers);
+  return { final: preview.final, messages: preview.messages };
 }
 
 async function resolveApplicationTargets({ targetActorUuid = "", targetTokenUuid = "", fallbackToControlled = false } = {}) {
@@ -1979,45 +2118,150 @@ function requestUserCanApplyToTargets(requestUserId, targets = []) {
   return Array.from(targets ?? []).every((actor) => actor?.testUserPermission?.(user, "OWNER"));
 }
 
-async function applyDamageToActor(actor, rawAmount, damageTypes) {
-  if (!getActorHealthPool(actor)) {
+function localizeDamageTypeLabel(value) {
+  const key = `STARFRONTIERS.Choice.DefenseType.${String(value || "")}`;
+  return game.i18n.has(key) ? game.i18n.localize(key) : String(value || "");
+}
+
+function localizeReductionModeLabel(mode) {
+  switch (String(mode || "")) {
+    case "full": return game.i18n.localize("STARFRONTIERS.Effects.ReductionFull");
+    case "half": return game.i18n.localize("STARFRONTIERS.Effects.ReductionHalf");
+    case "flat": return game.i18n.localize("STARFRONTIERS.Effects.ReductionFlat");
+    default: return "";
+  }
+}
+
+function describePreviewLayer(layer) {
+  if (!layer) return "";
+
+  if (layer.kind === "screen") {
+    if (!layer.matched) {
+      return game.i18n.format("STARFRONTIERS.Effects.ScreenNoMatch", { item: layer.itemName });
+    }
+    if (layer.absorbed === 0 && layer.deactivated) {
+      return game.i18n.format("STARFRONTIERS.Effects.ScreenInsufficientPower", { item: layer.itemName });
+    }
+    const mode = localizeReductionModeLabel(layer.reductionMode);
+    const seuParts = layer.seuConsumed > 0
+      ? game.i18n.format("STARFRONTIERS.Effects.ScreenSeuConsumed", {
+          seu: layer.seuConsumed,
+          power: layer.powerSourceName || "—",
+          after: Number(layer.powerAfter ?? 0)
+        })
+      : "";
+    return game.i18n.format("STARFRONTIERS.Effects.ScreenAbsorbed", {
+      item: layer.itemName,
+      mode,
+      absorbed: layer.absorbed,
+      seu: seuParts
+    });
+  }
+
+  if (layer.kind === "armor") {
+    if (!layer.matched) {
+      return game.i18n.format("STARFRONTIERS.Effects.ArmorNoMatch", { item: layer.itemName });
+    }
+    const mode = localizeReductionModeLabel(layer.reductionMode);
+    if (layer.maxAbsorbed === null || layer.maxAbsorbed === undefined) {
+      return game.i18n.format("STARFRONTIERS.Effects.ArmorAbsorbed", {
+        item: layer.itemName,
+        mode,
+        absorbed: layer.absorbed
+      });
+    }
+    return game.i18n.format("STARFRONTIERS.Effects.ArmorAbsorbedWithCap", {
+      item: layer.itemName,
+      mode,
+      absorbed: layer.absorbed,
+      accumulated: layer.accumulatedAfter,
+      max: Number(layer.maxAbsorbed)
+    });
+  }
+
+  return "";
+}
+
+function buildDamageNoteLines(actor, preview, { finalDamage, poolBefore, poolAfter, statusApplied } = {}) {
+  const lines = [];
+  const damageTypeText = preview.damageTypes?.length
+    ? preview.damageTypes.map(localizeDamageTypeLabel).join(", ")
+    : "";
+
+  lines.push(game.i18n.format("STARFRONTIERS.Effects.NoteTarget", { target: actor.name }));
+  lines.push(game.i18n.format("STARFRONTIERS.Effects.NoteOriginalDamage", {
+    amount: preview.raw,
+    types: damageTypeText
+  }));
+
+  const layerDescriptions = (preview.layers ?? []).map(describePreviewLayer).filter(Boolean);
+  if (!layerDescriptions.length) {
+    lines.push(game.i18n.localize("STARFRONTIERS.Effects.NoteNoDefenses"));
+  } else {
+    lines.push(...layerDescriptions);
+  }
+
+  lines.push(game.i18n.format("STARFRONTIERS.Effects.NoteFinalDamage", { amount: Number(finalDamage ?? 0) }));
+  lines.push(game.i18n.format("STARFRONTIERS.Effects.NotePoolDelta", {
+    pool: game.i18n.localize(getActorHealthPool(actor)?.label ?? "STARFRONTIERS.Effects.PoolStamina"),
+    before: Number(poolBefore ?? 0),
+    after: Number(poolAfter ?? 0)
+  }));
+
+  if (statusApplied) {
+    lines.push(game.i18n.format("STARFRONTIERS.Effects.NoteStatusApplied", { status: statusApplied }));
+  }
+
+  return lines;
+}
+
+async function applyDamageToActor(actor, { preview = null, rawAmount = 0, damageTypes = [], finalDamageOverride = null } = {}) {
+  const pool = getActorHealthPool(actor);
+  if (!pool) {
     ui.notifications.warn(game.i18n.format("STARFRONTIERS.Effects.UnknownHealthPool", { actor: actor.name }));
     return null;
   }
 
+  const resolvedPreview = preview ?? await previewDamageMitigation(rawAmount, damageTypes, actor);
+
   rememberDocumentSheetScroll(actor, 5);
-  const mitigation = await mitigateDamage(rawAmount, damageTypes, actor);
-  const pool = getActorHealthPool(actor);
-  if (!pool) return null;
-  const nextValue = Math.max(pool.value - mitigation.final, 0);
-  const nextPool = buildHealthPoolUpdates(actor, nextValue);
-  if (!nextPool) return null;
-  await actor.update(nextPool.updates);
+  await commitDamageMitigation(actor, resolvedPreview.layers);
 
-  const lines = [
-    game.i18n.format("STARFRONTIERS.Effects.DamageAppliedToTarget", {
-      amount: Number(mitigation.final ?? 0),
-      target: actor.name
-    })
-  ];
+  const computedFinal = Number(resolvedPreview.final ?? 0);
+  const finalDamage = Number.isFinite(Number(finalDamageOverride))
+    ? Math.max(Number(finalDamageOverride), 0)
+    : computedFinal;
 
+  const poolBefore = pool.value;
+  const nextValue = Math.max(poolBefore - finalDamage, 0);
+  const poolUpdates = buildHealthPoolUpdates(actor, nextValue);
+  if (poolUpdates) {
+    await actor.update(poolUpdates.updates);
+  }
+
+  let statusAppliedLabel = "";
   if (nextValue <= 0) {
     const statusId = getActorZeroStateStatusId(actor);
     if (statusId) {
       await applyActorStatus(actor, statusId);
-      lines.push(game.i18n.format("STARFRONTIERS.Effects.StatusAppliedToTarget", {
-        status: game.i18n.localize(statusId === SF_STATUS_IDS.DYING
-          ? "STARFRONTIERS.Status.Dying"
-          : "STARFRONTIERS.Status.Dead"),
-        target: actor.name
-      }));
+      statusAppliedLabel = game.i18n.localize(statusId === SF_STATUS_IDS.DYING
+        ? "STARFRONTIERS.Status.Dying"
+        : "STARFRONTIERS.Status.Dead");
     }
   }
 
-  lines.push(...Array.from(mitigation.messages ?? []));
+  const lines = buildDamageNoteLines(actor, resolvedPreview, {
+    finalDamage,
+    poolBefore,
+    poolAfter: nextValue,
+    statusApplied: statusAppliedLabel
+  });
+
   return {
     actor,
-    finalDamage: Number(mitigation.final ?? 0),
+    finalDamage,
+    poolBefore,
+    poolAfter: nextValue,
     lines
   };
 }
@@ -2029,7 +2273,8 @@ async function applyDamageFromMessage({
   targetActorUuid = "",
   targetTokenUuid = "",
   applyKey = "damage",
-  requestUserId = ""
+  requestUserId = "",
+  commitPlan = null
 } = {}) {
   const message = game.messages?.get?.(String(sourceMessageId ?? "")) ?? null;
   if (!message) return false;
@@ -2050,7 +2295,14 @@ async function applyDamageFromMessage({
 
   const lines = [];
   for (const actor of targets) {
-    const result = await applyDamageToActor(actor, rawAmount, damageTypes);
+    const preview = commitPlan?.preview ?? null;
+    const finalOverride = commitPlan?.finalDamage;
+    const result = await applyDamageToActor(actor, {
+      preview,
+      rawAmount,
+      damageTypes,
+      finalDamageOverride: finalOverride
+    });
     if (!result) continue;
     lines.push(...result.lines);
   }
@@ -2347,13 +2599,108 @@ function emitApplicationSocketRequest(action, payload = {}) {
   return true;
 }
 
+async function promptApplyDamageConfirmation(actor, preview, { poolBefore = 0 } = {}) {
+  const damageTypeText = preview.damageTypes?.length
+    ? preview.damageTypes.map(localizeDamageTypeLabel).join(", ")
+    : "";
+
+  const layerLines = (preview.layers ?? []).map(describePreviewLayer).filter(Boolean);
+  const layerHtml = layerLines.length
+    ? layerLines.map((line) => `<li>${foundry.utils.escapeHTML(line)}</li>`).join("")
+    : `<li>${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Effects.NoteNoDefenses"))}</li>`;
+
+  const poolLabel = game.i18n.localize(getActorHealthPool(actor)?.label ?? "STARFRONTIERS.Effects.PoolStamina");
+  const initialFinal = Number(preview.final ?? 0);
+
+  const content = `
+    <form class="star-frontiers sf-apply-damage-dialog" autocomplete="off">
+      <p><strong>${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Effects.DialogTargetLabel"))}:</strong> ${foundry.utils.escapeHTML(actor.name)}</p>
+      <p><strong>${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Effects.DialogRawLabel"))}:</strong> ${Number(preview.raw ?? 0)} ${foundry.utils.escapeHTML(damageTypeText)}</p>
+      <div>
+        <strong>${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Effects.DialogMitigationLabel"))}:</strong>
+        <ul class="sf-apply-damage-dialog__layers">${layerHtml}</ul>
+      </div>
+      <label class="sf-apply-damage-dialog__final">
+        <span>${foundry.utils.escapeHTML(game.i18n.localize("STARFRONTIERS.Effects.DialogFinalLabel"))}</span>
+        <input type="number" name="finalDamage" value="${initialFinal}" min="0" step="1" autofocus />
+      </label>
+      <p class="sf-apply-damage-dialog__pool">
+        <strong>${foundry.utils.escapeHTML(poolLabel)}:</strong>
+        <span data-pool-before>${Number(poolBefore)}</span> →
+        <span data-pool-after>${Math.max(Number(poolBefore) - initialFinal, 0)}</span>
+      </p>
+    </form>
+  `;
+
+  return foundry.applications.api.DialogV2.wait({
+    window: {
+      title: game.i18n.localize("STARFRONTIERS.Effects.DialogTitle")
+    },
+    content,
+    buttons: [
+      {
+        action: "apply",
+        label: game.i18n.localize("STARFRONTIERS.Effects.DialogApply"),
+        default: true,
+        callback: (event, button, dialog) => {
+          const root = dialog.element;
+          const input = root.querySelector("input[name='finalDamage']");
+          const finalDamage = Math.max(Math.round(Number(input?.valueAsNumber ?? initialFinal)), 0);
+          return { finalDamage };
+        }
+      },
+      { action: "cancel", label: game.i18n.localize("Cancel") }
+    ],
+    render: (event, dialog) => {
+      const root = dialog.element;
+      const input = root.querySelector("input[name='finalDamage']");
+      const after = root.querySelector("[data-pool-after]");
+      const recompute = () => {
+        const next = Math.max(Number(poolBefore) - Math.max(Math.round(Number(input?.valueAsNumber ?? initialFinal)), 0), 0);
+        if (after) after.textContent = String(next);
+      };
+      input?.addEventListener("input", recompute);
+    },
+    modal: true,
+    rejectClose: false
+  });
+}
+
 export async function requestApplyDamage(payload = {}) {
   if (!game.user?.isGM && !canCurrentUserApplyToTarget(payload.targetActorUuid ?? "", payload.targetTokenUuid ?? "")) {
     ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoPermissionToApply"));
     return false;
   }
-  if (game.user?.isGM) return applyDamageFromMessage(payload);
-  return emitApplicationSocketRequest(APPLY_DAMAGE_SOCKET_ACTION, payload);
+
+  const targets = await resolveApplicationTargets({
+    targetActorUuid: payload.targetActorUuid ?? "",
+    targetTokenUuid: payload.targetTokenUuid ?? "",
+    fallbackToControlled: !payload.targetActorUuid && !payload.targetTokenUuid
+  });
+  if (!targets.length) {
+    ui.notifications.warn(game.i18n.localize("STARFRONTIERS.Effects.NoTargetsToApply"));
+    return false;
+  }
+
+  const actor = targets[0];
+  const pool = getActorHealthPool(actor);
+  if (!pool) {
+    ui.notifications.warn(game.i18n.format("STARFRONTIERS.Effects.UnknownHealthPool", { actor: actor.name }));
+    return false;
+  }
+
+  const preview = await previewDamageMitigation(payload.rawAmount, payload.damageTypes, actor);
+  const confirmation = await promptApplyDamageConfirmation(actor, preview, { poolBefore: pool.value });
+  if (!confirmation || typeof confirmation !== "object") return false;
+
+  const commitPlan = {
+    preview,
+    finalDamage: Number(confirmation.finalDamage ?? preview.final ?? 0)
+  };
+  const commitPayload = { ...payload, commitPlan };
+
+  if (game.user?.isGM) return applyDamageFromMessage(commitPayload);
+  return emitApplicationSocketRequest(APPLY_DAMAGE_SOCKET_ACTION, commitPayload);
 }
 
 export async function requestApplyStatus(payload = {}) {
