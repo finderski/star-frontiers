@@ -7,8 +7,16 @@
 // - Single Item object: { name, type: "<item type>", system: {...} }
 // - Single Creature actor: { name, type: "creature", system: {...}, naturalWeapons: [...] }
 //
+// Folder behavior:
+// - By default the importer prefers an existing matching folder before creating a new path.
+// - This prevents test imports from creating duplicate root folders like Armor, Skills,
+//   Weapons, or Power Sources when those folders already exist in the world.
+// - If multiple folders share the same name, the importer prefers a root-level match.
+// - Set preferExistingFolders to false in the macro dialog if you deliberately want the
+//   full payload folderPath created exactly as authored.
+//
 // Current data-model conveniences:
-// - Weapon linkedAmmoName / linkedPowerSourceName now populates ammo.loadedSourceId,
+// - Weapon linkedAmmoName / linkedPowerSourceName populates ammo.loadedSourceId,
 //   keeps ammo.clipItem as a compatibility/availability ref, and marks the weapon as
 //   not internally charged.
 // - Weapons with ammo capacity but no linked source are marked as internally charged.
@@ -20,13 +28,6 @@
 //   reduction values are accepted as import conveniences and normalized when possible.
 // - Power-source ports get rules-friendly defaults from sourceType when omitted.
 // - Computer structuralPoints default from mass when omitted.
-//
-// Creature import notes:
-// - Creature actors are created as Actor documents, not Item documents.
-// - Natural attacks are embedded Item documents of type "creatureAttack".
-// - Nested carriedWeapons / armors are embedded copies.
-// - weaponNames / armorNames copy matching existing World Items into the creature.
-// - createFolders creates both Item and Actor folders as needed.
 
 const ITEM_TYPES = new Set([
   "weapon", "ammo", "armor", "screen", "gear", "consumable", "powerSource",
@@ -41,8 +42,8 @@ const DEFAULT_CREATURE_IMG = "icons/svg/mystery-man.svg";
 const TYPE_FOLDER_NAMES = {
   weapon: "Weapons",
   ammo: "Ammunition",
-  armor: "Defenses",
-  screen: "Defenses",
+  armor: "Armor",
+  screen: "Screens",
   gear: "Gear",
   consumable: "Consumables",
   powerSource: "Power Sources",
@@ -372,13 +373,12 @@ function cleanSkill(input, category = null) {
 
 function cleanCreatureActor(input) {
   if (!input.name) throw new Error("Each creature needs a name.");
-  const system = deepClone(input.system ?? {});
   return {
     name: input.name,
     type: "creature",
     img: input.img || DEFAULT_CREATURE_IMG,
     folder: input.folder || null,
-    system,
+    system: deepClone(input.system ?? {}),
     prototypeToken: deepClone(input.prototypeToken ?? {}),
     items: [],
     effects: deepClone(input.effects ?? [])
@@ -435,10 +435,34 @@ function resolveRefByName(registry, name, expectedType = null, sourceItem = null
   return sourceItem ? refForItemInSameContext(sourceItem, item) : refForCreatedItem(item);
 }
 
+function getFolderParentId(folder) {
+  return folder?.folder?.id ?? folder?.parent?.id ?? null;
+}
+
 async function findFolderByName(name, type, parent = null) {
   return game.folders.find((folder) =>
-    folder.type === type && folder.name === name && ((folder.folder?.id ?? null) === (parent?.id ?? null))
+    folder.type === type && folder.name === name && (getFolderParentId(folder) === (parent?.id ?? null))
   ) ?? null;
+}
+
+function getFolderDepth(folder) {
+  let depth = 0;
+  let cursor = folder;
+  while (cursor?.folder) {
+    depth += 1;
+    cursor = cursor.folder;
+  }
+  return depth;
+}
+
+function findBestExistingFolderByName(name, type) {
+  const folderName = String(name ?? "").trim();
+  if (!folderName) return null;
+  const matches = game.folders.filter((folder) => folder.type === type && folder.name === folderName);
+  if (!matches.length) return null;
+  const root = matches.find((folder) => getFolderParentId(folder) === null);
+  if (root) return root;
+  return matches.sort((a, b) => getFolderDepth(a) - getFolderDepth(b))[0] ?? null;
 }
 
 async function getOrCreateFolder(name, type, parent = null) {
@@ -456,80 +480,83 @@ async function getOrCreateActorFolder(name, parent = null) {
   return getOrCreateFolder(name, "Actor", parent);
 }
 
-function getTopItemFolderName(input) {
-  if (input.folderPath?.length) return input.folderPath[0];
-  return TYPE_FOLDER_NAMES[input.type] ?? "Items";
-}
-
-function getSubItemFolderName(input) {
-  if (input.folderPath?.length > 1) return input.folderPath.slice(1).join("/");
+function getItemFolderPath(input) {
+  if (input.folderPath?.length) return input.folderPath.map(String).filter(Boolean);
+  if (input.folderName) return [String(input.folderName)];
   if (input.type === "weapon") {
     const skillKey = input.system?.weaponSkillKey || input.system?.weaponType || "";
-    return WEAPON_SKILL_FOLDER_NAMES[skillKey] ?? null;
+    const sub = WEAPON_SKILL_FOLDER_NAMES[skillKey] ?? null;
+    return sub ? [TYPE_FOLDER_NAMES.weapon, sub] : [TYPE_FOLDER_NAMES.weapon];
   }
   if (input.type === "skill") {
     const psa = input.system?.psa || "";
     const psaFolder = PSA_FOLDER_NAMES[psa] ?? null;
-    if (!psaFolder) return null;
-    return input.system?.category === "subskill" ? `${psaFolder}/Sub-skills` : psaFolder;
+    if (!psaFolder) return [TYPE_FOLDER_NAMES.skill];
+    return input.system?.category === "subskill"
+      ? [TYPE_FOLDER_NAMES.skill, psaFolder, "Sub-skills"]
+      : [TYPE_FOLDER_NAMES.skill, psaFolder];
   }
-  if (input.type === "armor") return "Armor";
-  if (input.type === "screen") return "Screens";
-  if (input.type === "powerSource") {
-    const sourceType = input.system?.sourceType ?? "";
-    return sourceType.startsWith("parabattery") ? "Parabatteries" : "Portable Power";
-  }
-  if (input.type === "program") return "Computer Programs";
-  if (input.type === "computer") return Number(input.system?.level ?? 0) >= 4 ? "Installed Computers" : "Portable Computers";
-  if (input.type === "gear" && input.system?.isKit) return "Kits";
-  if (input.type === "creatureAttack") return "Natural Attacks";
-  return null;
+  if (input.type === "powerSource") return [TYPE_FOLDER_NAMES.powerSource];
+  return [TYPE_FOLDER_NAMES[input.type] ?? "Items"];
 }
 
-function getTopActorFolderName(input) {
-  if (input.folderPath?.length) return input.folderPath[0];
-  return ACTOR_FOLDER_NAMES[input.type] ?? "Actors";
-}
-
-function getSubActorFolderName(input) {
-  if (input.folderPath?.length > 1) return input.folderPath.slice(1).join("/");
+function getActorFolderPath(input) {
+  if (input.folderPath?.length) return input.folderPath.map(String).filter(Boolean);
+  if (input.folderName) return [String(input.folderName)];
   if (input.type === "creature") {
     const ecology = input.system?.ecology ?? "";
-    return CREATURE_ECOLOGY_FOLDER_NAMES[ecology] ?? null;
+    const sub = CREATURE_ECOLOGY_FOLDER_NAMES[ecology] ?? null;
+    return sub ? [ACTOR_FOLDER_NAMES.creature, sub] : [ACTOR_FOLDER_NAMES.creature];
   }
-  return null;
+  return [ACTOR_FOLDER_NAMES[input.type] ?? "Actors"];
 }
 
-async function assignItemFolderData(itemData, input, createFolders) {
-  if (!createFolders || itemData.folder) return itemData;
-  const topFolder = await getOrCreateItemFolder(getTopItemFolderName(input));
-  let folder = topFolder;
-  const subName = getSubItemFolderName(input);
-  if (subName) {
-    for (const part of String(subName).split("/").filter(Boolean)) {
-      folder = await getOrCreateItemFolder(part, folder);
+async function getOrCreateFolderPath(parts, type, createFn) {
+  let folder = null;
+  for (const part of parts.filter(Boolean)) {
+    folder = await createFn(part, folder);
+  }
+  return folder;
+}
+
+async function assignItemFolderData(itemData, input, options = {}) {
+  if (!options.createFolders || itemData.folder) return itemData;
+  const path = getItemFolderPath(input);
+  const leafName = path[path.length - 1];
+
+  if (options.preferExistingFolders !== false) {
+    const existingLeaf = findBestExistingFolderByName(leafName, "Item");
+    if (existingLeaf) {
+      itemData.folder = existingLeaf.id;
+      return itemData;
     }
   }
+
+  const folder = await getOrCreateFolderPath(path, "Item", getOrCreateItemFolder);
   if (folder) itemData.folder = folder.id;
   return itemData;
 }
 
-async function assignActorFolderData(actorData, input, createFolders) {
-  if (!createFolders || actorData.folder) return actorData;
-  const topFolder = await getOrCreateActorFolder(getTopActorFolderName(input));
-  let folder = topFolder;
-  const subName = getSubActorFolderName(input);
-  if (subName) {
-    for (const part of String(subName).split("/").filter(Boolean)) {
-      folder = await getOrCreateActorFolder(part, folder);
+async function assignActorFolderData(actorData, input, options = {}) {
+  if (!options.createFolders || actorData.folder) return actorData;
+  const path = getActorFolderPath(input);
+  const leafName = path[path.length - 1];
+
+  if (options.preferExistingFolders !== false) {
+    const existingLeaf = findBestExistingFolderByName(leafName, "Actor");
+    if (existingLeaf) {
+      actorData.folder = existingLeaf.id;
+      return actorData;
     }
   }
+
+  const folder = await getOrCreateFolderPath(path, "Actor", getOrCreateActorFolder);
   if (folder) actorData.folder = folder.id;
   return actorData;
 }
 
 async function createNormalItem(input, registry, options) {
-  const data = await assignItemFolderData(cleanItem(input), input, options.createFolders);
+  const data = await assignItemFolderData(cleanItem(input), input, options);
   const item = await Item.create(data);
   addToRegistry(registry, item);
   return item;
@@ -546,7 +573,7 @@ async function createRaceBundle(input, registry, linkQueue, options) {
     img: input.img || DEFAULT_ITEM_IMG,
     system: normalizeItemSystem("race", raceSystem),
     effects: deepClone(input.effects ?? [])
-  }, input, options.createFolders);
+  }, input, options);
   const race = await Item.create(raceData);
   addToRegistry(registry, race);
   const createdAbilities = [];
@@ -557,7 +584,7 @@ async function createRaceBundle(input, registry, linkQueue, options) {
       folderPath: abilityInput.folderPath ?? ["Racial Abilities", race.name],
       system: { raceKey, ...(abilityInput.system ?? {}) }
     };
-    const abilityData = await assignItemFolderData(cleanTrainedAbility(childInput, raceKey), childInput, options.createFolders);
+    const abilityData = await assignItemFolderData(cleanTrainedAbility(childInput, raceKey), childInput, options);
     const ability = await Item.create(abilityData);
     createdAbilities.push(ability);
     addToRegistry(registry, ability);
@@ -585,7 +612,7 @@ async function createSkillBundle(input, registry, linkQueue, options) {
       folderPath: subInput.folderPath ?? ["Skills", PSA_FOLDER_NAMES[psa] ?? "Other", "Sub-skills"],
       system: { psa, ...(subInput.system ?? {}), category: "subskill" }
     };
-    const subskillData = await assignItemFolderData(cleanSkill(childInput, "subskill"), childInput, options.createFolders);
+    const subskillData = await assignItemFolderData(cleanSkill(childInput, "subskill"), childInput, options);
     const subskill = await Item.create(subskillData);
     createdSubskills.push(subskill);
     addToRegistry(registry, subskill);
@@ -601,7 +628,7 @@ async function createSkillBundle(input, registry, linkQueue, options) {
     img: input.img || DEFAULT_ITEM_IMG,
     system: normalizeItemSystem("skill", skillSystem),
     effects: deepClone(input.effects ?? [])
-  }, mainInput, options.createFolders);
+  }, mainInput, options);
   const mainSkill = await Item.create(mainData);
   addToRegistry(registry, mainSkill);
   const refs = [...createdSubskills];
@@ -661,9 +688,7 @@ function prepareCreatureEmbeddedItems(input, registry) {
     ...(input.creatureAttacks ?? []),
     ...(input.naturalAttacks ?? [])
   ];
-  for (const attackInput of naturalInputs) {
-    embedded.push(cleanCreatureAttackInput(attackInput));
-  }
+  for (const attackInput of naturalInputs) embedded.push(cleanCreatureAttackInput(attackInput));
 
   for (const name of input.naturalWeaponNames ?? input.creatureAttackNames ?? []) {
     const item = resolveItemByNameOrRef(registry, name, "creatureAttack");
@@ -706,7 +731,7 @@ function prepareCreatureEmbeddedItems(input, registry) {
 async function createCreatureActor(input, registry, options) {
   const actorData = cleanCreatureActor(input);
   actorData.items = prepareCreatureEmbeddedItems(input, registry);
-  await assignActorFolderData(actorData, { ...input, type: "creature" }, options.createFolders);
+  await assignActorFolderData(actorData, { ...input, type: "creature" }, options);
   const actor = await Actor.create(actorData);
   addToRegistry(registry, actor);
   return actor;
@@ -822,11 +847,7 @@ async function applyNameBasedLinks(item, input, registry) {
       ...(input.system?.mechanics?.onHitEffectNames ?? [])
     ];
     if (topEffectNames.length) {
-      updates["system.mechanics.onHitEffectIds"] = resolveEffectNames(
-        item,
-        item.system.mechanics?.onHitEffectIds ?? [],
-        topEffectNames
-      );
+      updates["system.mechanics.onHitEffectIds"] = resolveEffectNames(item, item.system.mechanics?.onHitEffectIds ?? [], topEffectNames);
     }
 
     const inputModes = Array.from(input.system?.mechanics?.modes ?? []);
@@ -925,6 +946,13 @@ const content = `
       Create/use folders
     </label>
   </div>
+  <div class="form-group">
+    <label>
+      <input type="checkbox" name="preferExistingFolders" checked />
+      Prefer existing matching folders
+    </label>
+    <p class="notes">When checked, an item whose destination leaf is Armor, Weapons, Skills, etc. will use an existing matching folder instead of creating a new duplicate path.</p>
+  </div>
 </form>
 `;
 
@@ -938,7 +966,8 @@ await foundry.applications.api.DialogV2.prompt({
       const root = button.form ?? button.element ?? button;
       const raw = root.querySelector?.("[name='payload']")?.value ?? button.form?.elements?.payload?.value ?? "";
       const createFolders = Boolean(root.querySelector?.("[name='createFolders']")?.checked ?? button.form?.elements?.createFolders?.checked);
-      await importStarFrontiers(raw, { createFolders });
+      const preferExistingFolders = Boolean(root.querySelector?.("[name='preferExistingFolders']")?.checked ?? button.form?.elements?.preferExistingFolders?.checked);
+      await importStarFrontiers(raw, { createFolders, preferExistingFolders });
     }
   },
   rejectClose: false,
